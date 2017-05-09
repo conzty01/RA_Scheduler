@@ -1,0 +1,28 @@
+{% extends "bootstrap/base.html" %}
+{% block styles %}
+{{ super() }}
+<link rel="stylesheet" href="{{url_for('.static', filename='master.css')}}">
+{% endblock %}
+
+{% block navbar %}
+<div class="navbar navbar-inverse navbar-fixed-left">
+  <a class="navbar-brand" href="#">LC Res Life</a>
+  <ul class="nav navbar-nav">
+   <li><a href="/">Home</a></li>
+   <li><a href="/conflicts">Enter Conflicts</a></li>
+   <li><a href="/archive">View Archive</a></li>
+  </ul>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+
+ <div class="row">
+   <h1>Luther College RA Schedules</h1>
+
+   <p>Left side Navigation</p>
+ </div>
+
+</div>
+{% endblock %}

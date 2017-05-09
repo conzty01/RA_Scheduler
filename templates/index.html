@@ -1,0 +1,70 @@
+{% extends "bootstrap/base.html" %}
+{% block title %}Luther College RA Scheduling App{% endblock %}
+{% block styles %}
+{{ super() }}
+<link rel="stylesheet" href="{{url_for('.static', filename='master.css')}}">
+{% endblock %}
+
+{% block navbar %}
+<div class="navbar navbar-inverse navbar-fixed-left">
+    <a class="navbar-brand" href="https://www.luther.edu/reslife/">LC Res Life</a>
+    <ul class="nav navbar-nav">
+        <li><a href="/">Home</a></li>
+        <li><a href="/conflicts">Enter Conflicts</a></li>
+        <li><a href="/archive">View Archives</a></li>
+    </ul>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+
+    <div class="row">
+        <h1>Luther College RA Schedules</h1>
+        <p>Use the dropdown menu below to display the current
+           RA duty schedule for the selected residence hall.</p>
+    </div>
+
+    <div class="row">
+    <form class="entryForm">
+        <table class="calendar">
+            <caption class="month">{{ calDict["Tmonth"] }}</caption>
+            <col class="weekend">
+            <col class="weekday" span="5">
+            <col class="weekend">
+
+            <thead>
+                <tr>
+                {% for day in ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"]: %}
+                    <th>{{ day }}</th>
+                {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for week in cal: %}
+                <tr>
+                    {% for day in week: %}
+
+                        {% if day[0] != 0: %}
+                            <td id="{{ day[0] }}">
+                                <label class="checkLabel" for="day{{ day[0] }}">
+                                    <div class="day">{{ day[0] }}</div>
+                                    <div class="check"><input type="checkbox" name="day{{ day[0] }}" onchange="changeCheck(this)" id="day{{ day[0] }}"></div>
+                                </label>
+                            </td>
+                        {% else %}
+                            <td></td>
+                        {% endif %}
+
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </form>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="./static/master.js"></script>
+{% endblock %}
