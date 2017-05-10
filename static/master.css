@@ -1,11 +1,14 @@
 @charset "UTF-8";
 
 /*   General Tags   */
+.row:nth-child(2) {
+    margin-top: 30px;
+}
 
 /*   Navbar   */
 
 .navbar-fixed-left {
-  width: 140px;
+  width: 150px;
   position: fixed;
   border-radius: 0;
   height: 100%;
@@ -28,11 +31,20 @@
 .navbar-fixed-left + .container {
   padding-left: 160px;
 }
-
+.navbar-fixed-left .navbar-nav > li > .dropdown-menu {
+  margin-top: -50px;
+  margin-left: 140px;
+}
 /*   Calendar   */
 
 .calendar input[type=checkbox] {
     transform: scale(1.5);
+}
+.calendar > thead > tr > th {
+    font-size: 3em;
+}
+.calendar > caption {
+    margin-top: -50px;
 }
 .checkLabel {
     display: block;
@@ -81,6 +93,6 @@
    background-color: #F3F3F3;
 }
 .check {
-    display: none;
+    
     text-align: center;
 }
