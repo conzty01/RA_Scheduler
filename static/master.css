@@ -4,7 +4,10 @@
 .row:nth-child(2) {
     margin-top: 30px;
 }
-
+.arcDates {
+    text-decoration: underline;
+    color: #0000EE;
+}
 /*   Navbar   */
 
 .navbar-fixed-left {

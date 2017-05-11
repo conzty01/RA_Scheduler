@@ -23,6 +23,12 @@
  </div>
 
  <div class="row">
+     <select id="halls" onchange="conflictChangeSelect(this)">
+            <option value="1">Select Hall</option>
+    		{% for h in hall_list: %}
+    		<option value="{{ h[0] }}">{{ h[1] }}</option>
+    		{% endfor %}
+    	</select>
  <form id="conflictForm" class="entryForm" action="/conflicts/p" method="post">
      <label for="raList">Select an RA</label>
      <select id="raList" class="ra_list" name="selectRA" form="conflictForm">
@@ -74,4 +80,6 @@
 {% endblock %}
 {% block scripts %}
 <script src="/static/master.js"></script>
+<script src="https://code.jquery.com/jquery-1.12.4.js"></script>
+<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
 {% endblock %}

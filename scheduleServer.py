@@ -28,9 +28,10 @@ def index():
 @app.route("/conflicts")
 def conflicts():
     cur = conn.cursor()
+    cur2 = conn.cursor()
     cur.execute("SELECT id, first_name, last_name FROM lc_resident_assistant WHERE hall_id = 1 ORDER BY last_name ASC;")
-
-    return render_template("conflicts.html", calDict=fDict, \
+    cur2.execute("SELECT id, name FROM lc_res_hall;")
+    return render_template("conflicts.html", calDict=fDict, hall_list=cur2.fetchall(), \
                             cal=cc.monthdays2calendar(fDict["year"],fDict["num_month"]), ras=cur.fetchall())
 
 @app.route("/archive")
@@ -99,7 +100,8 @@ def runScheduler(hallId, month, year):
 
     cur.execute("""SELECT first_name, last_name
                    FROM lc_resident_assistant
-                   WHERE lc_resident_assistant.id NOT IN (SELECT ra_id FROM lc_conflict WHERE date >= '2017-06-01'::date)""")
+                   WHERE lc_resident_assistant.id NOT IN (SELECT ra_id FROM lc_conflict WHERE date >= '2017-06-01'::date) AND
+                         lc_resident_assistant.hall_id = {}""".format(hallId))
 
     res2 = cur.fetchall()
     for tup in res2:
@@ -142,12 +144,12 @@ def raIDmap(hallId):
 
 #     -- api --
 
-@app.route("/api/v1/curSchedule")
-def apiSearch():
+@app.route("/api/v1/curSchedule/<string:hallID>")
+def apiSearch(hallID):
     cur = conn.cursor()
-    cur.execute("""SELECT * FROM lc_schedule WHERE EXTRACT(MONTH FROM month) = EXTRACT(MONTH FROM NOW()) AND
-                                                 EXTRACT(YEAR FROM month) = EXTRACT(YEAR FROM NOW());""")
-    return jsonify(cur.fetchall())
+    cur.execute("""SELECT * FROM lc_schedule WHERE hall_id = {};""".format(hallID))
+    res = {"schedule":cur.fetchall()[0],"raList":raIDmap(hallID),"cal":cc.monthdays2calendar(fDict["year"],fDict["num_month"])}
+    return jsonify(res)
 
 @app.route("/api/v1/arcSchedule/<string:hallId>", methods=["GET"])
 def apiArchive(hallId):
@@ -161,8 +163,25 @@ def apiArchive(hallId):
     cur2 = conn.cursor()
     cur2.execute("SELECT id, first_name || ' ' || last_name FROM lc_resident_assistant WHERE hall_id = {}".format(hallId))
 
-    res = {"archive":formdates, "raList":raIDmap(hallId)}
+    res = {"hallID":hallId, "archive":formdates, "raList":raIDmap(hallId)}
     return jsonify(res)
+
+@app.route("/api/v1/arcRetrieve/<string:stuff>")
+def apiArchiveRetrieve(stuff):
+    s = stuff.split("_")
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM lc_schedule WHERE hall_id = {} AND month = '{}'::date;".format(s[1],s[0]))
+    sched = cur.fetchall()[0]
+    raMap = raIDmap(s[1])
+    res = {"schedule":sched,"raList":raMap, "cal":cc.monthdays2calendar(fDict["year"],fDict["num_month"])}
+    return jsonify(res)
+
+@app.route("/api/v1/getRAs/<string:hallId>")
+def getRAs(hallId):
+    cur = conn.cursor()
+    cur.execute("SELECT id, first_name || ' ' || last_name FROM lc_resident_assistant WHERE hall_id = {}".format(hallId))
+    return jsonify(cur.fetchall())
+
 
 
 if __name__ == "__main__":

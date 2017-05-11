@@ -25,7 +25,7 @@
            RA duty schedule for the selected residence hall.</p>
     </div>
     <div class="row">
-   	<select id="halls" onchange="changeHall(this)">
+   	<select id="halls" onchange="indexchangeHall(this)">
            <option value="1">Select Hall</option>
    		{% for h in hall_list: %}
    		<option value="{{ h[0] }}">{{ h[1] }}</option>
@@ -71,4 +71,6 @@
 {% endblock %}
 {% block scripts %}
 <script src="/static/master.js"></script>
+<script src="https://code.jquery.com/jquery-1.12.4.js"></script>
+<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
 {% endblock %}
