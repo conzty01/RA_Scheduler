@@ -3,9 +3,7 @@ from flask_bootstrap import Bootstrap
 from scheduler import scheduling
 import datetime
 import psycopg2
-import sqlalchemy
 import calendar
-import os
 
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
