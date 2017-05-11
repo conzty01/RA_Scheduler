@@ -1,4 +1,5 @@
 import psycopg2
+import os
 
 def popResHall(cur):
 	for n in ['Brandt','Olson','Miller','Dieseth','PFABS','Ylvisaker','Larsen']:

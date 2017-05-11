@@ -1,4 +1,5 @@
 import psycopg2
+import os
 
 def createHallDB(conn):
 	conn.execute("DROP TABLE IF EXISTS lc_res_hall CASCADE;")
