@@ -180,8 +180,3 @@ def getRAs(hallId):
     cur = conn.cursor()
     cur.execute("SELECT id, first_name || ' ' || last_name FROM lc_resident_assistant WHERE hall_id = {}".format(hallId))
     return jsonify(cur.fetchall())
-
-
-
-if __name__ == "__main__":
-    app.run(debug=True)
