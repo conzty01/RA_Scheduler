@@ -41,7 +41,7 @@ def createScheduleDB(conn):
 	exStr = ""
 
 	for num in range(1,32):
-		exStr += "ra_id_day_{}  int[],\n".format(num)
+		exStr += "day_{}  int[],\n".format(num)
 
 	conn.execute("""
 		CREATE TABLE lc_schedule(
@@ -49,15 +49,15 @@ def createScheduleDB(conn):
 			hall_id	int,
 			month	date,
 			{}
-			
+
 			PRIMARY KEY (id),
 			FOREIGN KEY (hall_id) REFERENCES lc_res_hall(id)
-			
+
 		);""".format(exStr))
-		
-	
+
+
 def main():
-	conn = psycopg2.connect(dbname="conzty01", user="conzty01")
+	conn = psycopg2.connect(dbname="conzty01", user="conzty01", host="knuth.luther.edu")
 	createHallDB(conn.cursor())
 	createRaDB(conn.cursor())
 	createConflictDB(conn.cursor())

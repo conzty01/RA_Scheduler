@@ -93,6 +93,6 @@
    background-color: #F3F3F3;
 }
 .check {
-    
+    display: none;
     text-align: center;
 }

@@ -19,11 +19,57 @@
 <div class="container">
 
  <div class="row">
-   <h1>Luther College RA Schedules</h1>
+   <h1>Luther College RA Schedule Archive</h1>
  </div>
  <div class="row">
      <p>Select which month of this year you would like to view</p>
  </div>
+ <div class="row">
+	<select id="halls" onchange="changeHall(this)">
+        <option value="1">Select Hall</option>
+		{% for h in hall_list: %}
+		<option value="{{ h[0] }}">{{ h[1] }}</option>
+		{% endfor %}
+	</select>
+ </div>
+ <div id="dates" class="row"></div>
+ <div class="row">
+     <table id="calendar" class="calendar">
+         <caption class="month">{{ calDict["text_month"] }}</caption>
+         <col class="weekend">
+         <col class="weekday" span="5">
+         <col class="weekend">
 
+         <thead>
+             <tr>
+             {% for day in ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"]: %}
+                 <th>{{ day }}</th>
+             {% endfor %}
+             </tr>
+         </thead>
+         <tbody>
+             {% for week in cal: %}
+             <tr>
+                 {% for day in week: %}
+
+                     {% if day[0] != 0: %}
+                         <td id="{{ day[0] }}">
+                             <div class="day">{{ day[0] }}</div>
+                         </td>
+                     {% else %}
+                         <td></td>
+                     {% endif %}
+
+                 {% endfor %}
+             </tr>
+             {% endfor %}
+         </tbody>
+     </table>
+ </div>
 </div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/master.js"></script>
+<script src="https://code.jquery.com/jquery-1.12.4.js"></script>
+<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
 {% endblock %}

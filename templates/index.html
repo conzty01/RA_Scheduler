@@ -24,9 +24,51 @@
         <p>Use the dropdown menu below to display the current
            RA duty schedule for the selected residence hall.</p>
     </div>
+    <div class="row">
+   	<select id="halls" onchange="changeHall(this)">
+           <option value="1">Select Hall</option>
+   		{% for h in hall_list: %}
+   		<option value="{{ h[0] }}">{{ h[1] }}</option>
+   		{% endfor %}
+   	</select>
+    </div>
+    <div id="dates" class="row"></div>
+    <div class="row">
+        <table id="calendar" class="calendar">
+            <caption class="month">{{ calDict["text_month"] }}</caption>
+            <col class="weekend">
+            <col class="weekday" span="5">
+            <col class="weekend">
+
+            <thead>
+                <tr>
+                {% for day in ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"]: %}
+                    <th>{{ day }}</th>
+                {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for week in cal: %}
+                <tr>
+                    {% for day in week: %}
+
+                        {% if day[0] != 0: %}
+                            <td id="{{ day[0] }}">
+                                <div class="day">{{ day[0] }}</div>
+                            </td>
+                        {% else %}
+                            <td></td>
+                        {% endif %}
+
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 
 </div>
 {% endblock %}
 {% block scripts %}
-<script src="./static/master.js"></script>
+<script src="/static/master.js"></script>
 {% endblock %}
