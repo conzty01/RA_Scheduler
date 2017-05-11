@@ -57,7 +57,7 @@ def createScheduleDB(conn):
 
 
 def main():
-	conn = psycopg2.connect(dbname="conzty01", user="conzty01", host="knuth.luther.edu")
+	conn = psycopg2.connect(os.environ["DATABASE_URL"])
 	createHallDB(conn.cursor())
 	createRaDB(conn.cursor())
 	createConflictDB(conn.cursor())

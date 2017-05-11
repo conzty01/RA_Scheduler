@@ -16,7 +16,7 @@ def popOlsonRA(cur):
 		cur.execute("INSERT INTO lc_resident_assistant (first_name, last_name, hall_id) VALUES ('{}','{}',2)".format(n.split()[0],n.split()[1]))
 
 def main():
-	conn = psycopg2.connect(dbname="conzty01",user="conzty01", host="knuth.luther.edu")
+	conn = psycopg2.connect(os.environ["DATABASE_URL"])
 	cur = conn.cursor()
 	popResHall(cur)
 	popBrandtRA(cur)
