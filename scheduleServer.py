@@ -9,8 +9,8 @@ import os
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 Bootstrap(app)
-#conn = psycopg2.connect(dbname="conzty01",user="conzty01",host="knuth.luther.edu")
-conn = psycopg2.connect(os.environ["DATABASE_URL"])
+conn = psycopg2.connect(dbname="conzty01",user="conzty01",host="knuth.luther.edu")
+#conn = psycopg2.connect(os.environ["DATABASE_URL"])
 ct = datetime.datetime.now()
 fDict = {"text_month":calendar.month_name[(ct.month+1)%12], "num_month":(ct.month+1)%12, "year":(ct.year if ct.month <= 12 else ct.year+1)}
 cDict = {"text_month":calendar.month_name[ct.month], "num_month":ct.month, "year":ct.year}
