@@ -147,7 +147,7 @@ def raIDmap(hallId):
 @app.route("/api/v1/curSchedule/<string:hallID>")
 def apiSearch(hallID):
     cur = conn.cursor()
-    cur.execute("""SELECT * FROM schedule WHERE hall_id = {};""".format(hallID))
+    cur.execute("""SELECT * FROM schedule WHERE hall_id = {};""".format(hallId))
     res = {"schedule":cur.fetchall()[0],"raList":raIDmap(hallID),"cal":cc.monthdays2calendar(fDict["year"],fDict["num_month"])}
     return jsonify(res)
 
