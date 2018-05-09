@@ -2,37 +2,6 @@ from datetime import date
 import calendar
 import random
 
-class RA:
-    def __init__(self,firstName,lastName,id,hallId,dateStarted,conflicts,points):
-        self.firstName = firstName
-        self.lastName = lastName
-        self.fullName = firstName + " " + lastName
-        self.id = id
-        self.hallId = hallId
-        self.conflicts = conflicts
-        self.dateStarted = dateStarted
-        self.points = points
-
-
-class Day:
-    def __init__(self,d,duty):
-        self.date = d
-        self.hasDuty = duty
-
-class Schedule:
-    def __init__(self,month,year,specialDates=[],sched=[]):
-        if sched:
-            self.schedule = sched
-        else:
-            self.schedule = []
-
-            for d in range(0,calendar.monthrange(year,month)[1]+1):
-                if d not in specialDates:
-                    self.schedule.append(Day(date(year,month,d),True))
-                else:
-                    self.schedule.append(Day(date(year,month,d),False))
-
-
 def scheduling(raConflicts, year, month):
     #this will take conflicts eventually
     daysInMonth = calendar.monthrange(year,month)[1]
