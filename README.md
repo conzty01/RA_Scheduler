@@ -46,7 +46,7 @@ With all of the above prerequisites installed, you should be able to run
 $ python createDB.py
 $ python scheduleServer.py
 ```
-to start the Flask server. You can then open the browser of your choice and go to `localhost:8000/`.
+to start the Flask server. You can then open the browser of your choice and go to `localhost:5000/`.
 
 <!-- ## Running the tests
 
