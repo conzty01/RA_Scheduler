@@ -20,25 +20,30 @@ Here is a step by step series of examples that tells you how to get the developm
 Installing PostgreSQL
 
 ```
-Give the example
+$ sudo apt-get update
+$ sudo apt-get install postgresql postgresql-contrib
+$ sudo -u postgres createuser --interactive
+[ follow the prompts to create a role for yourself ]
 ```
 
 Installing Python
 
 ```
-until finished
+$ sudo apt-get install python3.5
 ```
 
 Installing VirtualEnv
 
 ```
 $ sudo pip install virtualenv
-$ virtualenv /path/to/home/MyEnv
+$ virtualenv -p python3 /path/to/home/MyEnv
 $ source /path/to/home/MyEnv/bin/activate
 ```
+In order to develop in the correct Python environment, you will need to perform the last step each time you close your terminal. Similarly, if you would like to exit the virtual enviromnet, simply type `deactivate` in the terminal.
 
 With all of the above prerequisites installed, you should be able to run
 ```
+$ python createDB.py
 $ python scheduleServer.py
 ```
 to start the Flask server. You can then open the browser of your choice and go to `localhost:8000/`.
@@ -65,7 +70,7 @@ Give an example
 -->
 ## Deployment
 
-Add additional notes about how to deploy this on a live system
+RADSA is deployed on [Heroku](https://www.heroku.com/).
 <!--
 ## Built With
 
