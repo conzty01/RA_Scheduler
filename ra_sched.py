@@ -89,6 +89,10 @@ class Schedule:
 
     def __init__(self,year,month,noDutyDates=[],sched=[],doubleDays=(4,5)):
 
+        self.noDutyDates = noDutyDates
+        self.doubleDays = doubleDays
+        self.doubleDates = []
+
         if sched:
             self.schedule = sched
         else:
@@ -112,6 +116,7 @@ class Schedule:
                         if d[1] in doubleDays:
                             # If the day of the week should have two RAs on duty
                             #  By default, this is Friday and Saturday: (4,5)
+                            self.doubleDays.append(d[0])
                             self.schedule.append(Day(date(year,month,d[0]),numDutySlots=2))
                         else:
                             self.schedule.append(Day(date(year,month,d[0]),numDutySlots=1))
