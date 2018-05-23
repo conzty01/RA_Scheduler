@@ -23,8 +23,8 @@ Installing PostgreSQL
 $ sudo apt-get update
 $ sudo apt-get install postgresql postgresql-contrib
 $ sudo -u postgres createuser --interactive
-[ follow the prompts to create a role for yourself ]
 ```
+Follow the prompts to create a role for yourself. I suggest creating a role that is the same name as your username and making yourself a superuser.
 
 Installing Python
 
