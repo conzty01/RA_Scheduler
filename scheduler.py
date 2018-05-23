@@ -1,12 +1,12 @@
-import datetime
+from datetime import date
 import calendar
 import random
 
 def scheduling(raConflicts, year, month):
     #this will take conflicts eventually
-    daysInMonth = calendar.monthrange(2017,5)[1]
-    days = [0,1,2,3,4,5,6]
-    weekDays = [0,1,2,3,6]
+    daysInMonth = calendar.monthrange(year,month)[1]
+    days = [0,1,2,3,4,5,6] # Mon,Tues,Wed,Thurs,Fri,,Sat,Sun
+    weekDays = [0,1,2,3,6] # Mon,Tues,Wed,Thurs,Sun
     startDay = calendar.monthrange(year,month)[0]
     raNames = []
     schedule = {}
@@ -19,7 +19,7 @@ def scheduling(raConflicts, year, month):
         #checks to shcedule one RA vs two depending on weekday/weekend
 
         if startDay in weekDays:
-            #checks to see if there is a conflict if there isn't we schedule
+            #checks to see if there is a conflict, if there isn't we schedule
             if day not in raConflicts[raNames[pos]]:
 
                 schedule[raNames[pos]].append(day)
@@ -34,7 +34,11 @@ def scheduling(raConflicts, year, month):
                     startDay = 0
                 else:
                     startDay = startDay+1
-            #we have a conflict!  it adds the ra's name to a list of conflicts to keep track of ra's with conflicts on that date
+
+
+
+            #we have a conflict!  it adds the ra's name to a list of conflicts
+            #to keep track of ra's with conflicts on that date
             else:
                 conflictchecker.append(raNames[pos])
                 if pos == len(raNames)-1:
@@ -67,7 +71,8 @@ def scheduling(raConflicts, year, month):
                         else:
                             pos = pos+1
                         continue
-                #worst case scenario where everyone remaining has a conflict on this day we schedule someone at random and move on.
+                #worst case scenario where everyone remaining has a conflict on
+                #this day we schedule someone at random and move on.
                 if len(conflictchecker) == len(raNames):
                     random.shuffle(raNames)
                     schedule[raNames[pos]].append(day)
@@ -198,4 +203,8 @@ def scheduling(raConflicts, year, month):
     return schedule
 
 if __name__ == "__main__":
-    scheduling({'Ryan': [1,3,5,9,10],'Sarah':[4,5,6,20,25],'Steve': [1,2,5,15, 25], 'Tyler': [15,16,19,20,28], 'Bethany': [1,13,14,15,16],'Steven':[7,11],'Rob': [20,25]})
+    s = scheduling({'Ryan': [1,3,5,9,10],'Sarah':[4,5,6,20,25],
+                    'Steve': [1,2,5,15, 25],'Tyler': [15,16,19,20,28],
+                    'Bethany': [1,13,14,15,16],'Steven':[7,11],
+                    'Rob': [20,25]
+                    },2017,5)
