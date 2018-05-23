@@ -85,7 +85,6 @@ def createMonthDB(conn):
 
 def main():
 	conn = psycopg2.connect(os.environ["DATABASE_URL"])
-	#conn = psycopg2.connect(dbname="ra_sched", user="conzty01")
 	createHallDB(conn.cursor())
 	createRaDB(conn.cursor())
 	createMonthDB(conn.cursor())

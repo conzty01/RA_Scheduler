@@ -17,8 +17,7 @@ def popOlsonRA(cur):
 		cur.execute("INSERT INTO ra (first_name, last_name, hall_id) VALUES ('{}','{}',2)".format(n.split()[0],n.split()[1]))
 
 def main():
-	#conn = psycopg2.connect(os.environ["DATABASE_URL"])
-	conn = psycopg2.connect(dbname="ra_sched", user="conzty01")
+	conn = psycopg2.connect(os.environ["DATABASE_URL"])
 	cur = conn.cursor()
 	popResHall(cur)
 	popBrandtRA(cur)
