@@ -9,7 +9,7 @@ def createHallDB(conn):
 			name			varchar(50),
 			calendar_id		text,
 
-		PRIMARY KEY (id, name)
+		PRIMARY KEY (name)
 		);""")
 
 def createRaDB(conn):
@@ -80,7 +80,7 @@ def createMonthDB(conn):
 			name		varchar(8),
 			year		date,
 
-			PRIMARY KEY (id,name,year)
+			PRIMARY KEY (name,year)
 		);""")
 
 def main():
