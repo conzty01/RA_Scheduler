@@ -1,10 +1,10 @@
 language: python
 rvm:
  - 3.5
+cache: pip
+install:
+    pip install -r requirements.txt
+script:
+    python -m discover -p "*_test.py"
 notifications:
     slack: ra-scheduler:z6I7Y1LLLdzzVggMuJnw4Jiq
-script:
-    . activateEnv
-    python3.5 createDB.py
-    python3.5 populateDB.py
-    python3.5 scheduleServer.py
