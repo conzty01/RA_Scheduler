@@ -1,10 +1,7 @@
 language: python
 rvm:
  - 3.5
+script:
+    python -m unittest discover -s ./tests/ -p "*_test.py"
 notifications:
     slack: ra-scheduler:z6I7Y1LLLdzzVggMuJnw4Jiq
-script:
-    . activateEnv
-    python3.5 createDB.py
-    python3.5 populateDB.py
-    python3.5 scheduleServer.py
