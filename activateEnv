@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# A simple script to create the environment for RADSA.
+# In order for the configuration in this script to apply to the outer
+# environment, this script will need to be called as `. activateEnv`
+# instead of ./activateEnv .
+
+# The DATABASE_URL should be configured as it is in the example below.
+# DATABASE_URL='postgres://{role_name}:{password}@{host}/{database_name}'
+
+export DATABASE_URL='postgres:///ra_sched'
