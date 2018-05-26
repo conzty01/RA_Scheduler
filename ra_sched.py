@@ -57,7 +57,7 @@ class Day:
         return "{} on {}".format(self.ras,self.date)
 
     def __repr__(self):
-        return "Day(Date: {}, Number of Duty Slots: {}, RAs: {})".format(self.date,self.numDutySlots,self.ras)
+        return self.__str__()
 
     def __iter__(self):
         for ra in self.ras:
@@ -67,8 +67,7 @@ class Day:
         if len(self.ras) < self.numDutySlots:
             self.ras.add(ra)
         else:
-            raise Exception("Cannot assign RA, {}, for duty. Duty Limit reached- \
-                             NumSlots: {}, RAs: {}".format(ra,self.numDutySlots,self.ras))
+            raise OverflowError("Limit for number on duty exceeded.")
 
     def removeRA(self,ra):
         self.ras.remove(ra)
@@ -77,7 +76,7 @@ class Day:
         return self.numDutySlots
 
     def addDutySlot(self,amt=1):
-        self.numDutySlots += num
+        self.numDutySlots += amt
 
     def numberOnDuty(self):
         return len(self.ras)
@@ -116,7 +115,7 @@ class Schedule:
                         if d[1] in doubleDays:
                             # If the day of the week should have two RAs on duty
                             #  By default, this is Friday and Saturday: (4,5)
-                            self.doubleDays.append(d[0])
+                            self.doubleDates.append(d[0])
                             self.schedule.append(Day(date(year,month,d[0]),numDutySlots=2))
                         else:
                             self.schedule.append(Day(date(year,month,d[0]),numDutySlots=1))
@@ -132,13 +131,16 @@ class Schedule:
         return len(self.schedule)
 
     def getDate(self,date):
-        return self.schedule[date-1] # The 1st of a month is at position 0 in the list
+        if date < 1 or date > len(self.schedule):
+            raise IndexError("Dates are indexed from 1 to {}, index given: {}".format(len(self.schedule),date))
+        else:
+            return self.schedule[date-1] # The 1st of a month is at position 0 in the list
 
     def addRA(self,date,ra):
-        self.schedule[date-1].addRA(ra)
+        self.getDate(date).addRA(ra)
 
     def removeRA(self,date,ra):
-        self.schedule[date-1].removeRA(ra)
+        self.getDate(date).removeRA(ra)
 
 
 
