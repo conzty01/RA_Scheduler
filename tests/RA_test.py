@@ -64,7 +64,6 @@ class TestRAObject(unittest.TestCase):
 
         random.seed(4)                  # Set random number generation seed
 
-        self.assertEqual(len(lst),len([ra4,ra2,ra5,ra3,ra1]))
         lst.sort()
         self.assertEqual(lst,[ra5,ra2,ra1,ra4,ra3])
         lst.sort()
