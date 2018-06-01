@@ -31,6 +31,8 @@ class RA:
                self.dateStarted == other.dateStarted and \
                self.points == other.points
 
+    def __hash__(self):
+        return hash((self.fullName,self.id,self.hallId,self.dateStarted))
 
     def __lt__(self,other):
         # Sort by comparing the number of points RAs have. If RAs have the same
