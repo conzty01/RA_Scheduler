@@ -1,4 +1,5 @@
 import calendar
+import random
 from datetime import date
 
 class RA:
@@ -23,7 +24,12 @@ class RA:
             yield c
 
     def __lt__(self,other):
-        return self.getPoints() < other.getPoints()
+        # Sort by comparing the number of points RAs have. If RAs have the same
+        #  number of points, then randomly return True or False.
+        if self.getPoints() != other.getPoints():
+            return self.getPoints() < other.getPoints()
+        else:
+            return 1 == random.randint(0,1)
 
     def getConflicts(self):
         return self.conflicts
