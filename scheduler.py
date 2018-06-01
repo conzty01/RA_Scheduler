@@ -1,7 +1,7 @@
 from datetime import date
 from ra_sched import Schedule, Day
 import random
-import calendar             # Only needed for oldScheduling() 
+import calendar             # Only needed for oldScheduling()
 
 def resetRAList(raList,schedList):
     raList = schedList                                                          # Switch the two lists
@@ -14,7 +14,7 @@ def assignRA(day,raList,schedList,cand_index):
     return (raList,schedList,0)
 
 
-def scheduling2(raList,year,month,noDutyDates=[],doubleDays=(4,5)):
+def scheduling(raList,year,month,noDutyDates=[],doubleDays=(4,5)):
     # This algorithm will schedule RAs for duties based on ...
     #
     # The algorithm returns a Schedule object that contains Day objects which, in
