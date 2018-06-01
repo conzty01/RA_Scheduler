@@ -23,6 +23,15 @@ class RA:
         for c in self.conflicts:
             yield c
 
+    def __eq__(self,other):
+        return self.fullName == other.fullName and \
+               self.id == other.id and \
+               self.hallId == other.hallId and \
+               self.conflicts == other.conflicts and \
+               self.dateStarted == other.dateStarted and \
+               self.points == other.points
+
+
     def __lt__(self,other):
         # Sort by comparing the number of points RAs have. If RAs have the same
         #  number of points, then randomly return True or False.
