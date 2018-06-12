@@ -13,7 +13,7 @@
   grid-template-areas: "content";
   /*! border: 10px solid #000; */
   width: 100%; /* unnecessary, but let's keep things consistent */
-  height: 100%;
+  height: 90%;
 }
 
 @media screen and (min-width: 850px) {
@@ -21,6 +21,9 @@
     grid-template-columns: 1fr;
     grid-template-rows: 1fr;
     grid-template-areas: "content";
+  }
+  body {
+      overflow: hidden;
   }
 }
 
@@ -45,6 +48,8 @@ main {
 .calendar{
   display: grid;
   width: 100%;
+  height: 75%;
+  overflow: hidden;
 }
 
 .calendar__week,
@@ -61,6 +66,7 @@ main {
   grid-auto-rows: 50px;
   align-items: center;
   text-align: center;
+  font-size: 1.5em;
 }
 
 .date {
@@ -79,6 +85,7 @@ main {
   text-align: right;
   border-left: 5px solid green;
   padding: 3px;
+  padding-right: 10px;
   font-size: 15px;
 }
 .calendar__day {
@@ -94,7 +101,7 @@ main {
 /* COSMETIC STYLING */
 
 :root {
-  --red: #ED5454;
+  --blue: #2010A2;
 }
 
 /*body {
@@ -123,7 +130,7 @@ main {
 }
 
 .menu__item--active .menu__icon {
-  color: var(--red);
+  color: var(--blue);
 }
 .menu__item--active .menu__text {
   color: black;
@@ -144,14 +151,18 @@ main {
     padding-right: 16px;
   }
   .menu__item--active {
-    border-left: 4px solid var(--red);
-    box-shadow: inset 10px 0px 17px -13px var(--red);
+    border-left: 4px solid var(--blue);
+    box-shadow: inset 10px 0px 17px -13px var(--blue);
   }
 }
 
 .copyright {
   font-size: 0.7rem;
   font-weight: 400;
+}
+
+.current-month {
+    font-size: 40;
 }
 
 .calendar {
@@ -201,7 +212,11 @@ main {
 .toggle__option--selected{
   border-color: white;
   background-color: white;
-  color: var(--red);
+  color: var(--blue);
   font-weight: 500;
-  box-shadow: 1px 2px 30px -5px var(--red);
+  box-shadow: 1px 2px 30px -5px var(--blue);
+}
+
+.oth {
+    color: #A0A0A0;
 }
