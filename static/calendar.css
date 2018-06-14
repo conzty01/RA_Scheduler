@@ -13,7 +13,7 @@
   grid-template-areas: "content";
   /*! border: 10px solid #000; */
   width: 100%; /* unnecessary, but let's keep things consistent */
-  height: 90%;
+  height: 100%;
 }
 
 @media screen and (min-width: 850px) {
@@ -109,10 +109,6 @@ main {
   font-weight: 100;
   color: #A8B2B9;
 }*/
-
-main {
-  background-color: #FCFBFC;
-}
 
 .avatar__name {
   font-size: 0.8rem;
