@@ -24,6 +24,14 @@ def index():
     return render_template("index.html", calDict=fDict, hall_list=cur.fetchall(), \
                             cal=cc.monthdays2calendar(fDict["year"],fDict["num_month"]))
 
+@app.route("/dev/index")
+def indexdev():
+    cur = conn.cursor()
+    cur.execute("SELECT id, name FROM res_hall;")
+    print(fDict)
+    return render_template("dev_index.html", calDict=fDict, hall_list=cur.fetchall(), \
+                            cal=cc.monthdays2calendar(fDict["year"],fDict["num_month"]))
+
 @app.route("/conflicts")
 def conflicts():
     cur = conn.cursor()

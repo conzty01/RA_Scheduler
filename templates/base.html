@@ -1,0 +1,53 @@
+<html{% block html_attribs %}{% endblock html_attribs %}>
+{%- block html %}
+    <head>
+        {%- block head %}
+        <title>{%- block title %}Luther College RA Scheduling App{%- endblock title %}</title>
+
+        {%- block metas %}
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        {%- endblock metas %}
+
+        {%- block styles %}
+        <!-- Bootstrap -->
+        <link href="{{bootstrap_find_resource('css/bootstrap.css', cdn='bootstrap')}}" rel="stylesheet">
+        <link rel="stylesheet" href="{{url_for('.static', filename='master.css')}}">
+        {%- endblock styles %}
+        {%- endblock head %}
+    </head>
+    <body{% block body_attribs %}{% endblock body_attribs %}>
+        {%- block body %}
+        {%- block navbar %}
+        <div class="navbar navbar-inverse navbar-fixed-left">
+            <a class="navbar-brand" href="https://www.luther.edu/reslife/">LC Res Life</a>
+            <ul class="nav navbar-nav">
+                <li><a href="/">Home</a></li>
+                <li><a href="/conflicts">Enter Conflicts</a></li>
+                <li><a href="/archive">View Archives</a></li>
+            </ul>
+        </div>
+        {%- endblock navbar %}
+        {%- block content %}
+        <div class="container">
+            {%- block rows %}
+
+            <div class="row">
+                {%- block headerRow %}
+                {%- endblock headerRow %}
+            </div>
+
+            {%- block contentRows %}
+            {%- endblock contentRows%}
+
+            {%- endblock rows %}
+        </div>
+        {%- endblock content %}
+
+        {%- block scripts %}
+        <script src="{{bootstrap_find_resource('jquery.js', cdn='jquery')}}"></script>
+        <script src="{{bootstrap_find_resource('js/bootstrap.js', cdn='bootstrap')}}"></script>
+        {%- endblock scripts %}
+        {%- endblock body %}
+    </body>
+{%- endblock html %}
+</html>
