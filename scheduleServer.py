@@ -11,7 +11,7 @@ app.config['TEMPLATES_AUTO_RELOAD'] = True
 Bootstrap(app)
 conn = psycopg2.connect(os.environ["DATABASE_URL"])
 ct = datetime.datetime.now()
-fDict = {"text_month":calendar.month_name[(ct.month+1)%12], "num_month":(ct.month+1)%12, "year":(ct.year if ct.month <= 12 else ct.year+1)}
+fDict = {"text_month":calendar.month_name[(ct.month+2)%12], "num_month":(ct.month+2)%12, "year":(ct.year if ct.month <= 12 else ct.year+1)}
 cDict = {"text_month":calendar.month_name[ct.month], "num_month":ct.month, "year":ct.year}
 cc = calendar.Calendar(6) #format calendar so Sunday starts the week
 
@@ -22,14 +22,6 @@ def index():
     cur = conn.cursor()
     cur.execute("SELECT id, name FROM res_hall;")
     return render_template("index.html", calDict=fDict, hall_list=cur.fetchall(), \
-                            cal=cc.monthdays2calendar(fDict["year"],fDict["num_month"]))
-
-@app.route("/dev/index")
-def indexdev():
-    cur = conn.cursor()
-    cur.execute("SELECT id, name FROM res_hall;")
-    print(fDict)
-    return render_template("dev_index.html", calDict=fDict, hall_list=cur.fetchall(), \
                             cal=cc.monthdays2calendar(fDict["year"],fDict["num_month"]))
 
 @app.route("/conflicts")

@@ -1,129 +1,71 @@
-<html>
-    <head>
-        <title>Luther College RA Scheduling App</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% extends "base.html" %}
+{% block styles %}
+{{ super() }}
+<link rel="stylesheet" href="{{url_for('.static', filename='calendar.css')}}">
+{% endblock %}
 
-        <!-- Bootstrap -->
-        <link href="//cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="/static/master.css">
-    <link rel="stylesheet" href="/static/calendar.css">
+{%- block headerRow %}
+<h1>Brandt Hall RA Duty Calendar</h1>
+<p>Below is the duty calendar for the month of {{ calDict["text_month"] }}</p>
+{%- endblock headerRow %}
 
-      </head>
-      <body>
-
-    <div class="navbar navbar-inverse navbar-fixed-left">
-        <a class="navbar-brand" href="https://www.luther.edu/reslife/">LC Res Life</a>
-        <ul class="nav navbar-nav">
-            <li><a href="/">Home</a></li>
-            <li><a href="/conflicts">Enter Conflicts</a></li>
-            <li><a href="/archive">View Archives</a></li>
-        </ul>
-    </div>
-
-
-    <div class="container">
-
-        <div class="row">
-            <h1>Luther College RA Schedules</h1>
-            <p>Use the dropdown menu below to display the current
-               RA duty schedule for the selected residence hall.</p>
-        </div>
-
-        <div class="row">
-            <div class="wrapper">
-      <main>
-        <div class="toolbar">
-          <div class="toggle">
-            <div class="toggle__option">week</div>
-            <div class="toggle__option toggle__option--selected">month</div>
-          </div>
-          <div class="current-month">June 2016</div>
-          <div class="search-input">
-            <input value="What are you looking for?" type="text">
-            <i class="fa fa-search"></i>
-          </div>
-        </div>
-        <div class="calendar">
-          <div class="calendar__header">
-            <div>sun</div>
-            <div>mon</div>
-            <div>tue</div>
-            <div>wed</div>
-            <div>thu</div>
-            <div>fri</div>
-            <div>sat</div>
-          </div>
-          <div class="calendar__week">
-            <div class="calendar__day day">
-              <div class="date">1</div>
-              <div class="name" style="background-color: #3cb371;border-color:green">Tyler C.</div>
-              <div class="name" style="background-color: #3a7e9f; border-color: blue">Casey K.</div>
+{% block contentRows %}
+<div class="row">
+    <div class="wrapper">
+        <main>
+            <div class="toolbar">
+                <div class="toggle">
+                    <div class="toggle__option">week</div>
+                    <div class="toggle__option toggle__option--selected">month</div>
+                </div>
+                <div class="current-month">{{ calDict["text_month"] }}</div>
+                <div class="search-input">
+                    <input value="What are you looking for?" type="text">
+                    <i class="fa fa-search"></i>
+                </div>
             </div>
-            <div class="calendar__day day">
-      <div class="date">2</div>
-      <div class="name" style="background-color: #fbad54;border-color:yellow">Ryan E.</div></div>
-            <div class="calendar__day day">
-      <div class="date">3</div>
-      <div class="name" style="background-color: #fb7754;border-color:red">Erin K.</div></div>
-            <div class="calendar__day day">
-      <div class="date">4</div>
-      <div class="name" style="background-color: #3a7e9f;border-color:blue">Casey K.</div></div>
-            <div class="calendar__day day">
-      <div class="date">5</div>
-      <div class="name" style="background-color: #3cb371;border-color:green">Tyler C.</div></div>
-            <div class="calendar__day day">6</div>
-            <div class="calendar__day day">7</div>
-          </div>
-          <div class="calendar__week">
-            <div class="calendar__day day">8</div>
-            <div class="calendar__day day">9</div>
-            <div class="calendar__day day">10</div>
-            <div class="calendar__day day">11</div>
-            <div class="calendar__day day">12</div>
-            <div class="calendar__day day">13</div>
-            <div class="calendar__day day">14</div>
-          </div>
-          <div class="calendar__week">
-            <div class="calendar__day day">15</div>
-            <div class="calendar__day day">16</div>
-            <div class="calendar__day day">17</div>
-            <div class="calendar__day day">18</div>
-            <div class="calendar__day day">19</div>
-            <div class="calendar__day day">20</div>
-            <div class="calendar__day day">21</div>
-          </div>
-          <div class="calendar__week">
-            <div class="calendar__day day">22</div>
-            <div class="calendar__day day">23</div>
-            <div class="calendar__day day">24</div>
-            <div class="calendar__day day">25</div>
-            <div class="calendar__day day">26</div>
-            <div class="calendar__day day">27</div>
-            <div class="calendar__day day">28</div>
-          </div>
-          <div class="calendar__week">
-            <div class="calendar__day day">29</div>
-            <div class="calendar__day day">30</div>
-            <div class="calendar__day day">31</div>
-            <div class="calendar__day day oth">1</div>
-            <div class="calendar__day day oth">2</div>
-            <div class="calendar__day day oth">3</div>
-            <div class="calendar__day day oth">4</div>
-          </div>
-        </div>
-      </main>
+            {# The server will only create the calendar when it serves this page
+               and the RA information will be given when the client requests it
+               via a script that will run when the page is fully loaded in the
+               browser. This behavior allows for shorter loading times when
+               loading the page page. Additionally, this behavior might also
+               work nicely for an archive feature where users can look up old
+               schedules.
+
+               TODO: Create a js script that will request the proper data from
+                     the server and put that data on the calendar.
+
+                     Create some sort of way for the user to know that the
+                     calendar is loading when the page is displayed.
+
+                     Figure out how to handle days outside of the scope of the
+                     current month. Include date? Fade color? Keep Blank?
+                #}
+            <div class="calendar">
+                <div class="calendar__header">
+                    {% for d in ["sun","mon","tue","wed","thu","fri","sat"]: %}
+                    <div>{{ d }}</div>
+                    {% endfor %}
+                </div>
+                {% for week in cal: %}
+                <div class="calendar__week">
+                    {% for day in week: %}
+
+                    {% if day[0] != 0: %}
+                    <div class="calendar__day day" id="d{{ day[0] }}">
+                        <div class="date">{{ day[0] }}</div>
+                    </div>
+                    {% else %}
+                    <div class="calendar__day day oth">
+                        <div class="date">0</div>
+                    </div>
+                    {% endif %}
+
+                    {% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+        </main>
     </div>
-        </div>
-
-    </div>
-
-
-
-    <script src="/static/master.js"></script>
-    <script src="https://code.jquery.com/jquery-1.12.4.js"></script>
-    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
-
-
-
-    </body>
-</head>
+</div>
+{% endblock %}

@@ -46,6 +46,7 @@
         {%- block scripts %}
         <script src="{{bootstrap_find_resource('jquery.js', cdn='jquery')}}"></script>
         <script src="{{bootstrap_find_resource('js/bootstrap.js', cdn='bootstrap')}}"></script>
+        <script src="{{url_for('.static', filename='master.js')}}"></script>
         {%- endblock scripts %}
         {%- endblock body %}
     </body>
