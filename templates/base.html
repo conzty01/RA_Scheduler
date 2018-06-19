@@ -46,7 +46,14 @@
         {%- block scripts %}
         <script src="{{bootstrap_find_resource('jquery.js', cdn='jquery')}}"></script>
         <script src="{{bootstrap_find_resource('js/bootstrap.js', cdn='bootstrap')}}"></script>
+        <script src="{{url_for('.static', filename='appBase.js')}}"></script>
         <script src="{{url_for('.static', filename='master.js')}}"></script>
+        <script>
+            appConfig = {};
+            appConfig.host = 'http://localhost:5000';
+            appConfig.apiURL = appConfig.host+'/api/';
+            appConfig.base = new AppBase();
+        </script>
         {%- endblock scripts %}
         {%- endblock body %}
     </body>

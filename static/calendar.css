@@ -87,6 +87,7 @@ main {
   padding: 3px;
   padding-right: 10px;
   font-size: 15px;
+  overflow: hidden;
 }
 .calendar__day {
   color: #000;
@@ -159,6 +160,10 @@ main {
 
 .current-month {
     font-size: 40;
+    text-align: center;
+}
+.toggle__option:hover {
+    background-color: #F9F9F9;
 }
 
 .calendar {
@@ -190,11 +195,12 @@ main {
   margin-right: 100px;
 }
 .toggle__option{
-  padding: 16px;
+  padding: 12px;
   border: 1px solid #e1e1e1;
   border-radius: 8px;
   text-transform: capitalize;
   cursor: pointer;
+  font-size: 1.5em;
 }
 .toggle__option:first-child {
     border-top-right-radius: 0;

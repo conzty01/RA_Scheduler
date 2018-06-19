@@ -15,13 +15,11 @@
         <main>
             <div class="toolbar">
                 <div class="toggle">
-                    <div class="toggle__option">week</div>
-                    <div class="toggle__option toggle__option--selected">month</div>
+                    <div class="toggle__option" onclick="changeMonth(1)">&#60;</div>
+                    <div class="toggle__option" onclick="changeMonth(-1)">&#62;</div>
                 </div>
                 <div class="current-month">{{ calDict["text_month"] }}</div>
                 <div class="search-input">
-                    <input value="What are you looking for?" type="text">
-                    <i class="fa fa-search"></i>
                 </div>
             </div>
             {# The server will only create the calendar when it serves this page
@@ -41,7 +39,7 @@
                      Figure out how to handle days outside of the scope of the
                      current month. Include date? Fade color? Keep Blank?
                 #}
-            <div class="calendar">
+            <div id="calendar" class="calendar">
                 <div class="calendar__header">
                     {% for d in ["sun","mon","tue","wed","thu","fri","sat"]: %}
                     <div>{{ d }}</div>
@@ -54,6 +52,8 @@
                     {% if day[0] != 0: %}
                     <div class="calendar__day day" id="d{{ day[0] }}">
                         <div class="date">{{ day[0] }}</div>
+                        <div class="name" style="background-color:#3cb371;border-color:green">Tyler C.</div>
+                        <div class="name" style="background-color: #3a7e9f;border-color:blue">Casey K.</div>
                     </div>
                     {% else %}
                     <div class="calendar__day day oth">
@@ -68,4 +68,9 @@
         </main>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="{{url_for('.static', filename='calendar.js')}}"></script>
 {% endblock %}
