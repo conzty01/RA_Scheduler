@@ -18,7 +18,7 @@
                     <div class="toggle__option" onclick="changeMonth(1)">&#60;</div>
                     <div class="toggle__option" onclick="changeMonth(-1)">&#62;</div>
                 </div>
-                <div class="current-month">{{ calDict["text_month"] }}</div>
+                <div id="current-month" class="current-month">{{ calDict["text_month"] }}</div>
                 <div class="search-input">
                 </div>
             </div>
@@ -57,7 +57,7 @@
                     </div>
                     {% else %}
                     <div class="calendar__day day oth">
-                        <div class="date">0</div>
+                        <div class="date"></div>
                     </div>
                     {% endif %}
 

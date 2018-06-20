@@ -53,6 +53,8 @@
             appConfig.host = 'http://localhost:5000';
             appConfig.apiURL = appConfig.host+'/api/';
             appConfig.base = new AppBase();
+            appConfig.curDate = new Date();
+            appConfig.calDate = new Date();
         </script>
         {%- endblock scripts %}
         {%- endblock body %}

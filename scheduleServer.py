@@ -171,17 +171,14 @@ def getSchedule():
     #  The month will be given via request.args as 'monthNum' and 'year'.
     #  The server will then query the database for the appropriate schedule
     #  and send back a jsonified version of the schedule.
-    year = 2018
-    month = 5
-    ra_list = [RA("Ryan","E",1,1,date(2017,8,22),[date(year,month,1),date(year,month,10),date(year,month,11)]),
-               RA("Sarah","L",1,2,date(2017,8,22),[date(year,month,2),date(year,month,12),date(year,month,22)]),
-               RA("Steve","B",1,3,date(2017,8,22),[date(year,month,3),date(year,month,13),date(year,month,30)]),
-               RA("Tyler","C",1,4,date(2017,8,22),[date(year,month,4),date(year,month,14)]),
-               RA("Casey","K",1,5,date(2017,8,22),[date(year,month,5)])]
-
-    s2 = scheduling(ra_list,year,month,[date(year,month,14),date(year,month,15),date(year,month,16),date(year,month,17)])
-
-    return jsonify(s2)
+    return jsonify({"month":'TestMonth',
+                    "firstDay":3,   # First day of the month is index 3 or the week (Wednesday)
+                    "dates":[[{"date":0,"ras":[]},{"date":0,"ras":[]},{"date":0,"ras":[]},{"date":1,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":2,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":3,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"},{"name":"Casey K.","bgColor":"#3a7e9f","bdColor":"blue"}]},{"date":4,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"},{"name":"Casey K.","bgColor":"#3a7e9f","bdColor":"blue"}]}],
+                             [{"date":5,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":6,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":7,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":8,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":9,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":10,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"},{"name":"Casey K.","bgColor":"#3a7e9f","bdColor":"blue"}]},{"date":11,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"},{"name":"Casey K.","bgColor":"#3a7e9f","bdColor":"blue"}]}],
+                             [{"date":12,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":13,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":14,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":15,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":16,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":17,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"},{"name":"Casey K.","bgColor":"#3a7e9f","bdColor":"blue"}]},{"date":18,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"},{"name":"Casey K.","bgColor":"#3a7e9f","bdColor":"blue"}]}],
+                             [{"date":19,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":20,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":21,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":22,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":23,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":24,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"},{"name":"Casey K.","bgColor":"#3a7e9f","bdColor":"blue"}]},{"date":25,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"},{"name":"Casey K.","bgColor":"#3a7e9f","bdColor":"blue"}]}],
+                             [{"date":26,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":27,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":28,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":29,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":30,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":31,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"},{"name":"Casey K.","bgColor":"#3a7e9f","bdColor":"blue"}]},{"date":0,"ras":[]}]
+                            ]})
 
 @app.route("/api/v1/curSchedule/<string:hallID>")
 def apiSearch(hallID):

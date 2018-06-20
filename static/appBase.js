@@ -23,7 +23,7 @@ AppBase.prototype.callAPI = function (apiStr, params, fun) {
 
     let dfd = new $.Deferred();
     console.log("Calling API: " + apiStr);
-    console.log(params);
+    //console.log(params);
 
 	$.ajax({
 		url: appConfig.apiURL + apiStr,
@@ -32,6 +32,8 @@ AppBase.prototype.callAPI = function (apiStr, params, fun) {
     }).done(function(data) {
         fun(data)
         dfd.resolve();
+    }).error(function(data){
+        console.log("Ajax Error: ",data);
     });
 
     return dfd;
