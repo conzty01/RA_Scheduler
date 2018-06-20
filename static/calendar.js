@@ -74,5 +74,5 @@ function changeMonth(i) {
 
     console.log("Change Month: ",i);
     appConfig.calDate.setMonth(appConfig.calDate.getMonth() + i);
-    getSchedule(appConfig.calDate.getMonth(),appConfig.appDate.getFullYear());
+    getSchedule(appConfig.calDate.getMonth(),appConfig.calDate.getFullYear());
 }
