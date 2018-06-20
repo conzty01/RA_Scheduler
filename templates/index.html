@@ -1,76 +1,76 @@
-{% extends "bootstrap/base.html" %}
-{% block title %}Luther College RA Scheduling App{% endblock %}
+{% extends "base.html" %}
 {% block styles %}
 {{ super() }}
-<link rel="stylesheet" href="{{url_for('.static', filename='master.css')}}">
+<link rel="stylesheet" href="{{url_for('.static', filename='calendar.css')}}">
 {% endblock %}
 
-{% block navbar %}
-<div class="navbar navbar-inverse navbar-fixed-left">
-    <a class="navbar-brand" href="https://www.luther.edu/reslife/">LC Res Life</a>
-    <ul class="nav navbar-nav">
-        <li><a href="/">Home</a></li>
-        <li><a href="/conflicts">Enter Conflicts</a></li>
-        <li><a href="/archive">View Archives</a></li>
-    </ul>
-</div>
-{% endblock %}
+{%- block headerRow %}
+<h1>Brandt Hall RA Duty Calendar</h1>
+<p>Below is the duty calendar for the month of {{ calDict["text_month"] }}</p>
+{%- endblock headerRow %}
 
-{% block content %}
-<div class="container">
+{% block contentRows %}
+<div class="row">
+    <div class="wrapper">
+        <main>
+            <div class="toolbar">
+                <div class="toggle">
+                    <div class="toggle__option" onclick="changeMonth(-1)">&#60;</div>
+                    <div class="toggle__option" onclick="changeMonth(1)">&#62;</div>
+                </div>
+                <div id="current-month" class="current-month">{{ calDict["text_month"] }}</div>
+                <div class="search-input">
+                </div>
+            </div>
+            {# The server will only create the calendar when it serves this page
+               and the RA information will be given when the client requests it
+               via a script that will run when the page is fully loaded in the
+               browser. This behavior allows for shorter loading times when
+               loading the page page. Additionally, this behavior might also
+               work nicely for an archive feature where users can look up old
+               schedules.
 
-    <div class="row">
-        <h1>Luther College RA Schedules</h1>
-        <p>Use the dropdown menu below to display the current
-           RA duty schedule for the selected residence hall.</p>
-    </div>
-    <div class="row">
-   	<select id="halls" onchange="indexchangeHall(this)">
-           <option value="1">Select Hall</option>
-   		{% for h in hall_list: %}
-   		<option value="{{ h[0] }}">{{ h[1] }}</option>
-   		{% endfor %}
-   	</select>
-    </div>
-    <div id="dates" class="row"></div>
-    <div class="row">
-        <table id="calendar" class="calendar">
-            <caption class="month">{{ calDict["text_month"] }}</caption>
-            <col class="weekend">
-            <col class="weekday" span="5">
-            <col class="weekend">
+               TODO: Create a js script that will request the proper data from
+                     the server and put that data on the calendar.
 
-            <thead>
-                <tr>
-                {% for day in ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"]: %}
-                    <th>{{ day }}</th>
-                {% endfor %}
-                </tr>
-            </thead>
-            <tbody>
+                     Create some sort of way for the user to know that the
+                     calendar is loading when the page is displayed.
+
+                     Figure out how to handle days outside of the scope of the
+                     current month. Include date? Fade color? Keep Blank?
+                #}
+            <div id="calendar" class="calendar">
+                <div class="calendar__header">
+                    {% for d in ["sun","mon","tue","wed","thu","fri","sat"]: %}
+                    <div>{{ d }}</div>
+                    {% endfor %}
+                </div>
                 {% for week in cal: %}
-                <tr>
+                <div class="calendar__week">
                     {% for day in week: %}
 
-                        {% if day[0] != 0: %}
-                            <td id="{{ day[0] }}">
-                                <div class="day">{{ day[0] }}</div>
-                            </td>
-                        {% else %}
-                            <td></td>
-                        {% endif %}
+                    {% if day[0] != 0: %}
+                    <div class="calendar__day day" id="d{{ day[0] }}">
+                        <div class="date">{{ day[0] }}</div>
+                        <div class="name" style="background-color:#3cb371;border-color:green">Tyler C.</div>
+                        <div class="name" style="background-color: #3a7e9f;border-color:blue">Casey K.</div>
+                    </div>
+                    {% else %}
+                    <div class="calendar__day day oth">
+                        <div class="date"></div>
+                    </div>
+                    {% endif %}
 
                     {% endfor %}
-                </tr>
+                </div>
                 {% endfor %}
-            </tbody>
-        </table>
+            </div>
+        </main>
     </div>
-
 </div>
 {% endblock %}
+
 {% block scripts %}
-<script src="/static/master.js"></script>
-<script src="https://code.jquery.com/jquery-1.12.4.js"></script>
-<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+{{ super() }}
+<script src="{{url_for('.static', filename='calendar.js')}}"></script>
 {% endblock %}

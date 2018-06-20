@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify
 from flask_bootstrap import Bootstrap
 from scheduler import scheduling
+from ra_sched import RA
 import datetime
 import psycopg2
 import calendar
@@ -11,7 +12,7 @@ app.config['TEMPLATES_AUTO_RELOAD'] = True
 Bootstrap(app)
 conn = psycopg2.connect(os.environ["DATABASE_URL"])
 ct = datetime.datetime.now()
-fDict = {"text_month":calendar.month_name[(ct.month+1)%12], "num_month":(ct.month+1)%12, "year":(ct.year if ct.month <= 12 else ct.year+1)}
+fDict = {"text_month":calendar.month_name[(ct.month+2)%12], "num_month":(ct.month+2)%12, "year":(ct.year if ct.month <= 12 else ct.year+1)}
 cDict = {"text_month":calendar.month_name[ct.month], "num_month":ct.month, "year":ct.year}
 cc = calendar.Calendar(6) #format calendar so Sunday starts the week
 
@@ -76,8 +77,8 @@ def processConflicts():
         return index()
 
 def runScheduler(hallId, month, year):
-    # need to pass algorithm a dict with keys of names and values of lists of int date conflicts
-    # also needs to pass year and month as ints
+    # need to pass algorithm a dict with keys of names and values of lists of
+    # int date conflicts also needs to pass year and month as ints
     d = {}
 
     # -- conflicts --
@@ -142,6 +143,42 @@ def raIDmap(hallId):
     return d
 
 #     -- api --
+
+@app.route("/api/testAPI", methods=["GET"])
+def testAPI():
+    cookie = request.cookies.get("username")
+    print(request.cookies)
+    print(cookie)
+    for v in request.args:
+        print(v)
+
+
+    year = 2018
+    month = 5
+    ra_list = [RA("Ryan","E",1,1,datetime.date(2017,8,22),[datetime.date(year,month,1),datetime.date(year,month,10),datetime.date(year,month,11)]),
+               RA("Sarah","L",1,2,datetime.date(2017,8,22),[datetime.date(year,month,2),datetime.date(year,month,12),datetime.date(year,month,22)]),
+               RA("Steve","B",1,3,datetime.date(2017,8,22),[datetime.date(year,month,3),datetime.date(year,month,13),datetime.date(year,month,30)]),
+               RA("Tyler","C",1,4,datetime.date(2017,8,22),[datetime.date(year,month,4),datetime.date(year,month,14)]),
+               RA("Casey","K",1,5,datetime.date(2017,8,22),[datetime.date(year,month,5)])]
+
+    s2 = scheduling(ra_list,year,month,[datetime.date(year,month,14),datetime.date(year,month,15),datetime.date(year,month,16),datetime.date(year,month,17)])
+
+    return jsonify(s2)
+
+@app.route("/api/getSchedule", methods=["GET"])
+def getSchedule():
+    # API Hook that will get the requested schedule for a given month
+    #  The month will be given via request.args as 'monthNum' and 'year'.
+    #  The server will then query the database for the appropriate schedule
+    #  and send back a jsonified version of the schedule.
+    return jsonify({"month":'TestMonth',
+                    "firstDay":3,   # First day of the month is index 3 or the week (Wednesday)
+                    "dates":[[{"date":0,"ras":[]},{"date":0,"ras":[]},{"date":0,"ras":[]},{"date":1,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":2,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":3,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"},{"name":"Casey K.","bgColor":"#3a7e9f","bdColor":"blue"}]},{"date":4,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"},{"name":"Casey K.","bgColor":"#3a7e9f","bdColor":"blue"}]}],
+                             [{"date":5,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":6,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":7,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":8,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":9,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":10,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"},{"name":"Casey K.","bgColor":"#3a7e9f","bdColor":"blue"}]},{"date":11,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"},{"name":"Casey K.","bgColor":"#3a7e9f","bdColor":"blue"}]}],
+                             [{"date":12,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":13,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":14,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":15,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":16,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":17,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"},{"name":"Casey K.","bgColor":"#3a7e9f","bdColor":"blue"}]},{"date":18,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"},{"name":"Casey K.","bgColor":"#3a7e9f","bdColor":"blue"}]}],
+                             [{"date":19,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":20,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":21,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":22,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":23,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":24,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"},{"name":"Casey K.","bgColor":"#3a7e9f","bdColor":"blue"}]},{"date":25,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"},{"name":"Casey K.","bgColor":"#3a7e9f","bdColor":"blue"}]}],
+                             [{"date":26,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":27,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":28,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":29,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":30,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":31,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"},{"name":"Casey K.","bgColor":"#3a7e9f","bdColor":"blue"}]},{"date":0,"ras":[]}]
+                            ]})
 
 @app.route("/api/v1/curSchedule/<string:hallID>")
 def apiSearch(hallID):

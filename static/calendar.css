@@ -1,0 +1,224 @@
+/**
+ * ALL the UI design credit goes to:
+ * https://www.sketchappsources.com/free-source/2676-calendar-template-sketch-freebie-resource.html
+ */
+
+
+/* WRAPPER */
+
+.wrapper {
+  display: grid;
+  grid-template-rows: 1fr;
+  grid-template-columns: 1fr;
+  grid-template-areas: "content";
+  /*! border: 10px solid #000; */
+  width: 100%; /* unnecessary, but let's keep things consistent */
+  height: 100%;
+}
+
+@media screen and (min-width: 850px) {
+  .wrapper {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+    grid-template-areas: "content";
+  }
+  body {
+      overflow: hidden;
+  }
+}
+
+/* MAIN */
+
+main {
+  grid-area: content;
+  padding: 10px;
+  /*! border: 5px solid red; */
+  height:100%;
+}
+
+.toolbar{
+  display: grid;
+  /*! justify-items: space-between; */
+  align-items: center;
+  margin-bottom: 24px;
+  grid-template-columns: 1fr 1fr 1fr;
+  /*! grid-template-rows: 1; */
+  /*! justify-self: space-between; */
+}
+.calendar{
+  display: grid;
+  width: 100%;
+  height: 75%;
+  overflow: hidden;
+}
+
+.calendar__week,
+.calendar__header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+.calendar__week {
+  grid-auto-rows: 100px;
+  text-align: right;
+}
+
+.calendar__header {
+  grid-auto-rows: 50px;
+  align-items: center;
+  text-align: center;
+  font-size: 1.5em;
+}
+
+.date {
+    padding-right: 10px;
+    padding-top: 10px;
+    margin-bottom: 4px;
+}
+
+.name {
+  width: 100%;
+  height: 25px;
+  margin-bottom: 3px;
+  color: #FFF;
+  font-weight: normal;
+  background-color: #3cb371;
+  text-align: right;
+  border-left: 5px solid green;
+  padding: 3px;
+  padding-right: 10px;
+  font-size: 15px;
+  overflow: hidden;
+}
+.calendar__day {
+  color: #000;
+  height: 200px;
+  padding: 0px;
+  padding-right: 5px;
+}
+
+
+
+
+/* COSMETIC STYLING */
+
+:root {
+  --blue: #2010A2;
+}
+
+/*body {
+  font-family: Montserrat;
+  font-weight: 100;
+  color: #A8B2B9;
+}*/
+
+.avatar__name {
+  font-size: 0.8rem;
+}
+
+.menu__item {
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 16px 16px 16px 14px;
+  border-left: 4px solid transparent;
+  color: inherit;
+  text-decoration: none;
+  transition: color ease 0.3s;
+}
+
+.menu__item--active .menu__icon {
+  color: var(--blue);
+}
+.menu__item--active .menu__text {
+  color: black;
+}
+
+.menu__item:hover {
+  color: black;
+}
+
+
+.menu__icon {
+  font-size: 1.3rem;
+}
+
+@media screen and (min-width: 850px) {
+  .menu__icon {
+    font-size: 0.9rem;
+    padding-right: 16px;
+  }
+  .menu__item--active {
+    border-left: 4px solid var(--blue);
+    box-shadow: inset 10px 0px 17px -13px var(--blue);
+  }
+}
+
+.copyright {
+  font-size: 0.7rem;
+  font-weight: 400;
+}
+
+.current-month {
+    font-size: 40;
+    text-align: center;
+}
+.toggle__option:hover {
+    background-color: #F9F9F9;
+}
+
+.calendar {
+  background-color: white;
+  border: 1px solid #e1e1e1;
+}
+
+.calendar__header > div {
+  text-transform: uppercase;
+  font-size: 0.8em;
+  font-weight: bold;
+}
+
+.calendar__day {
+  border-right: 1px solid #e1e1e1;
+  border-top: 1px solid #e1e1e1;
+}
+
+.calendar__day:last-child {
+  border-right: 0;
+}
+
+.toggle{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+
+  text-align: center;
+  font-size: 0.9em;
+  margin-right: 100px;
+}
+.toggle__option{
+  padding: 12px;
+  border: 1px solid #e1e1e1;
+  border-radius: 8px;
+  text-transform: capitalize;
+  cursor: pointer;
+  font-size: 1.5em;
+}
+.toggle__option:first-child {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+.toggle__option:last-child {
+    border-left: 0;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
+.toggle__option--selected{
+  border-color: white;
+  background-color: white;
+  color: var(--blue);
+  font-weight: 500;
+  box-shadow: 1px 2px 30px -5px var(--blue);
+}
+
+.oth {
+    color: #A0A0A0;
+}

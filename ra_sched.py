@@ -1,4 +1,5 @@
 import calendar
+import random
 from datetime import date
 
 class RA:
@@ -22,6 +23,25 @@ class RA:
         for c in self.conflicts:
             yield c
 
+    def __eq__(self,other):
+        return self.fullName == other.fullName and \
+               self.id == other.id and \
+               self.hallId == other.hallId and \
+               self.conflicts == other.conflicts and \
+               self.dateStarted == other.dateStarted and \
+               self.points == other.points
+
+    def __hash__(self):
+        return hash((self.fullName,self.id,self.hallId,self.dateStarted))
+
+    def __lt__(self,other):
+        # Sort by comparing the number of points RAs have. If RAs have the same
+        #  number of points, then randomly return True or False.
+        if self.getPoints() != other.getPoints():
+            return self.getPoints() < other.getPoints()
+        else:
+            return 1 == random.randint(0,1)
+
     def getConflicts(self):
         return self.conflicts
 
@@ -44,8 +64,9 @@ class RA:
         return self.hallId
 
 class Day:
-    def __init__(self,d,numDutySlots=0,ras=set()):
+    def __init__(self,d,numDutySlots=0,ras=set(),customPointVal=0):
         self.date = d
+        self.review = False
         if ras:
             self.ras = ras
             self.numDutySlots = len(ras)
@@ -53,8 +74,16 @@ class Day:
             self.numDutySlots = numDutySlots
             self.ras = set()
 
+        if customPointVal == 0:
+            if numDutySlots > 1:
+                self.pointVal = 2
+            else:
+                self.pointVal = 1
+        else:
+            self.pointVal = customPointVal
+
     def __str__(self):
-        return "{} on {}".format(self.ras,self.date)
+        return "{} with {} on duty".format(self.date,self.ras)
 
     def __repr__(self):
         return self.__str__()
@@ -63,9 +92,31 @@ class Day:
         for ra in self.ras:
             yield ra
 
+    def __lt__(self,other):
+        if self.numberDutySlots() == other.numberDutySlots():
+            if self.getDate() < other.getDate():
+                return True
+            else:
+                return False
+
+        elif self.numberDutySlots() > other.numberDutySlots():
+            # This '>' is hardcoded for the expectation that we want to sort in
+            #  reverse order, but we would still like earlier dates before later
+            #  dates in a list.
+            return True
+        else:
+            return False
+
+    def __hash__(self):
+        return hash(self.date)
+
+    def __eq__(self,other):
+        return self.date == other.date
+
     def addRA(self,ra):
         if len(self.ras) < self.numDutySlots:
             self.ras.add(ra)
+            ra.addPoints(self.pointVal)
         else:
             raise OverflowError("Limit for number on duty exceeded.")
 
@@ -78,16 +129,29 @@ class Day:
     def addDutySlot(self,amt=1):
         self.numDutySlots += amt
 
+    def getPoints(self):
+        return self.pointVal
+
+    def getDate(self):
+        return self.date
+
     def numberOnDuty(self):
         return len(self.ras)
 
     def getRAs(self):
         return self.ras
 
+    def setReview(self):
+        self.review = True
+
+    def review(self):
+        return self.review
+
 class Schedule:
 
     def __init__(self,year,month,noDutyDates=[],sched=[],doubleDays=(4,5)):
-
+        self.review = False
+        self.reviewDays = set()
         self.noDutyDates = noDutyDates
         self.doubleDays = doubleDays
         self.doubleDates = []
@@ -127,6 +191,9 @@ class Schedule:
         for d in self.schedule:
             yield d
 
+    def sort(self):
+        self.schedule.sort(reverse=True)
+
     def numDays(self):
         return len(self.schedule)
 
@@ -142,6 +209,17 @@ class Schedule:
     def removeRA(self,date,ra):
         self.getDate(date).removeRA(ra)
 
+    def setReview(self):
+        self.review = True
+
+    def addReviewDay(self,day):
+        self.reviewDays.add(day)
+
+    def getReviewDays(self):
+        return self.reviewDays
+
+    def shouldReview(self):
+        return self.review
 
 
 if __name__ == "__main__":
