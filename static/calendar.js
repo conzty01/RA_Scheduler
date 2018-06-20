@@ -1,7 +1,5 @@
 "use strict"
 
-// Dev stuff
-document.cookie = "username=conzty01; hall=Brandt;";
 
 function getCurSchedule() {
     // Get the schedule for the current month
