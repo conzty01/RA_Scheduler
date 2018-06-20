@@ -12,7 +12,7 @@ function getCurSchedule() {
 function getSchedule(monthNum,year) {
     // Get the schedule for the given month and year
     console.log("Getting Schedule for month: ",monthNum, year);
-    appConfig.base.callAPI("getSchedule",[monthNum,year],applySchedule);
+    appConfig.base.callAPI("getSchedule",{"monthNum":monthNum,"year":year},applySchedule);
 }
 
 function applySchedule(sched) {
