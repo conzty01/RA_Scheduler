@@ -13,6 +13,12 @@ def assignRA(day,raList,schedList,cand_index):
     schedList.append(raList.pop(cand_index))                                    # Add RA to scheduledList
     return (raList,schedList,0)
 
+def checkReset(raList,scheduledList):
+    if len(raList) < 1 and len(scheduledList) > 0:  # If all RAs have been assigned
+        raList, scheduledList = resetRAList(raList, scheduledList)  # Reset lists
+        raList.sort()  # Re-sort the RA lists
+    return (raList,scheduledList)
+
 
 def scheduling(raList,year,month,noDutyDates=[],doubleDays=(4,5)):
     # This algorithm will schedule RAs for duties based on ...
@@ -68,27 +74,27 @@ def scheduling(raList,year,month,noDutyDates=[],doubleDays=(4,5)):
             while day.numberOnDuty() < day.numberDutySlots():
 
                 if cand_index >= len(raList):
-                    # If the candidate RA index exceedes the length of the raList,
+                    # If the candidate RA index exceeds the length of the raList,
                     #  then assign an RA and add the day to the schedule's review
                     #  set and mark the schedule for review.
                     raList, scheduledList, cand_index = assignRA(day,raList,    # Assign the first RA for duty
                                                             scheduledList,0)
                     schedule.addReviewDay(day)                                  # Add day to schedule's review days
                     schedule.setReview()                                        # Mark schedule for review
-
-                cand_ra = raList[cand_index]                                    # Candidate RA
-
-                if day.getDate() not in cand_ra.getConflicts():
-                    raList, scheduledList, cand_index = assignRA(day,raList,    # Assign RA
-                                                            scheduledList,
-                                                            cand_index)
+                    raList, scheduledList = checkReset(raList,scheduledList)    # Check if the lists should be reset
 
                 else:
-                    cand_index += 1                                             # Move to next candidate
+                    cand_ra = raList[cand_index]                                # Candidate RA
 
-                if len(raList) < 1 and len(scheduledList) > 0:                  # If all RAs have been assigned
-                    raList,scheduledList = resetRAList(raList,scheduledList)    # Reset lists
-                    raList.sort()                                               # Re-sort the RA lists
+                    if day.getDate() not in cand_ra.getConflicts():
+                        raList, scheduledList, cand_index = assignRA(day, raList,  # Assign RA
+                                                                     scheduledList,
+                                                                     cand_index)
+
+                    else:
+                        cand_index += 1                                         # Move to next candidate
+
+                    raList, scheduledList = checkReset(raList, scheduledList)   # Check if the lists should be reset
 
     return schedule
 
@@ -293,27 +299,37 @@ def oldScheduling(raConflicts, year, month):
     return schedule
 
 if __name__ == "__main__":
-    # s = oldScheduling({'Ryan': [1,3,5,9,10],'Sarah':[4,5,6,20,25],
-    #                 'Steve': [1,2,5,15, 25],'Tyler': [15,16,19,20,28],
-    #                 'Casey': [1,13,14,15,16],'Steven':[7,11],
-    #                 'Rob': [20,25]
-    #                 },2017,5)
+    s = oldScheduling({'Ryan': [1,3,5,9,10],'Sarah':[4,5,6,20,25],
+                    'Steve': [1,2,5,15, 25],'Tyler': [15,16,19,20,28],
+                    'Casey': [1,13,14,15,16],'Steven':[7,11],
+                    'Rob': [20,25]
+                    },2017,5)
 
     from ra_sched import RA
     year = 2018
     month = 5
-    ra_list = [RA("Ryan","E",1,1,date(2017,8,22),[date(year,month,1),date(year,month,10),date(year,month,11)]),
-               RA("Sarah","L",1,2,date(2017,8,22),[date(year,month,2),date(year,month,12),date(year,month,22)]),
-               RA("Steve","B",1,3,date(2017,8,22),[date(year,month,3),date(year,month,13),date(year,month,30)]),
-               RA("Tyler","C",1,4,date(2017,8,22),[date(year,month,4),date(year,month,14)]),
-               RA("Casey","K",1,5,date(2017,8,22),[date(year,month,5)])]
+    reviewed = 0
+    times = 1#00000
+    for t in range(times):
+        ra_list = [RA("Ryan", "E", 1, 1, date(2017, 8, 22),
+                      [date(year, month, 1), date(year, month, 10), date(year, month, 11)]),
+                   RA("Jeff", "L", 1, 2, date(2017, 8, 22),
+                      [date(year, month, 2), date(year, month, 12), date(year, month, 22)]),
+                   RA("Steve", "B", 1, 3, date(2017, 8, 22),
+                      [date(year, month, 3), date(year, month, 13), date(year, month, 30)]),
+                   RA("Tyler", "C", 1, 4, date(2017, 8, 22), [date(year, month, 4), date(year, month, 14)]),
+                   RA("Casey", "K", 1, 5, date(2017, 8, 22), [date(year, month, 5)])]
+        s2 = scheduling(ra_list,year,month,[date(year,month,14),date(year,month,15),date(year,month,16),date(year,month,17)])
 
-    s2 = scheduling2(ra_list,year,month,[date(year,month,14),date(year,month,15),date(year,month,16),date(year,month,17)])
+        print(s)
+        print(s2)
+        print("Should review: ", s2.shouldReview())
+        print("Review days: ", s2.getReviewDays())
+        print("-----")
+        if s2.shouldReview():
+            reviewed += 1
 
-    #print(s)
-    print(s2)
-    print("Should review: ", s2.shouldReview())
-    print("Review days: ", s2.getReviewDays())
+    print("Review Avg: ",reviewed/times)
     print("Point Breakdown: ")
 
     for d in s2:
