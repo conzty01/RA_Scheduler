@@ -1,3 +1,6 @@
+from scheduler import scheduling
+from ra_sched import RA, Day, Schedule
+from datetime import date
 import psycopg2
 import calendar
 import os
@@ -34,9 +37,9 @@ def popRAs(cur):
 	popOlsonRA(cur)
 
 def popMonth(cur):
-	cur.execute("INSERT INTO month (name, year) VALUES ('January',to_date('2018', 'YYYY'))")
-	cur.execute("INSERT INTO month (name, year) VALUES ('February',to_date('2018', 'YYYY'))")
-	cur.execute("INSERT INTO month (name, year) VALUES ('March',to_date('2018', 'YYYY'))")
+	cur.execute("INSERT INTO month (name, year) VALUES ('January',to_date('January 2018', 'Month YYYY'))")
+	cur.execute("INSERT INTO month (name, year) VALUES ('February',to_date('February 2018', 'Month YYYY'))")
+	cur.execute("INSERT INTO month (name, year) VALUES ('March',to_date('March 2018', 'Month YYYY'))")
 
 def popDay(cur):
 	c = calendar.Calendar()
@@ -53,17 +56,44 @@ def popDay(cur):
 				s = dstr +" "+ m[0][:3] +" "+ "2018"
 				cur.execute("INSERT INTO day (month_id, date) VALUES ({},to_date('{}', 'DD Mon YYYY'))".format(mID,s))
 
+def popSchedule(cur):
+	cur.execute("SELECT name, year FROM month ORDER BY year ASC;")
+	d = cur.fetchone()[-1]
+	year = d.year
+	month = d.month
+
+	cur.execute("""SELECT first_name,last_name,id,hall_id,date_started,points,cons.array_agg
+				   FROM ra JOIN (SELECT ra_id, ARRAY_AGG(days.date)
+								 FROM conflicts JOIN (SELECT id, date
+													  FROM day
+													  WHERE month_id = 1) AS days
+				   				 ON (conflicts.day_id = days.id)
+								 WHERE ra_id = 1
+				  			     GROUP BY ra_id) AS cons
+						   ON (ra.id = cons.ra_id)
+				   WHERE ra.hall_id = 1;""")
+	
+	for res in cur.fetchall():
+		print(res)
+
+    # times = 1
+    # for t in range(times):
+    #     ra_list
+	#
+    #     s2 = scheduling(ra_list,year,month,[date(year,month,14),date(year,month,15),date(year,month,16),date(year,month,17)])
+
 
 def main():
 	conn = psycopg2.connect(os.environ["DATABASE_URL"])
 	cur = conn.cursor()
-	popResHall(cur)
-	conn.commit()
-	popRAs(cur)
-	conn.commit()
-	popMonth(cur)
-	conn.commit()
-	popDay(cur)
-	conn.commit()
+	# popResHall(cur)
+	# conn.commit()
+	# popRAs(cur)
+	# conn.commit()
+	# popMonth(cur)
+	# conn.commit()
+	# popDay(cur)
+	# conn.commit()
+	popSchedule(cur)
 
 main()
