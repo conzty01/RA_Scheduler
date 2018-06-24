@@ -4,10 +4,10 @@
 <link rel="stylesheet" href="{{url_for('.static', filename='calendar.css')}}">
 {% endblock %}
 
-{%- block headerRow %}
+{% block headerRow %}
 <h1>Brandt Hall RA Duty Calendar</h1>
 <p>Below is the duty calendar for the month of {{ calDict["text_month"] }}</p>
-{%- endblock headerRow %}
+{% endblock headerRow %}
 
 {% block contentRows %}
 <div class="row">
