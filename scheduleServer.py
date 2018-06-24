@@ -47,7 +47,7 @@ def archive():
 
 #     -- Functional --
 
-@app.route("/conflicts/p", methods=['POST'])
+@app.route("/enterConflicts", methods=['POST'])
 def processConflicts():
     hallId = 3
     month = 6
