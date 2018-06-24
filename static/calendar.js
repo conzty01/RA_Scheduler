@@ -1,5 +1,7 @@
 "use strict"
 
+// Dev stuff
+document.cookie = "username=conzty01; hall=Brandt;";
 
 function getCurSchedule() {
     // Get the schedule for the current month
@@ -73,4 +75,13 @@ function changeMonth(i) {
     console.log("Change Month: ",i);
     appConfig.calDate.setMonth(appConfig.calDate.getMonth() + i);
     getSchedule(appConfig.calDate.getMonth(),appConfig.calDate.getFullYear());
+}
+
+function resetForm() {
+    console.log("Reset Form");
+    let days = document.getElementsByClassName("checkLabel");
+    for (let d of days) {
+        d.setAttribute("style","background-color:rgba(0,255,0,0.3)");
+    }
+    document.getElementById("conflictForm").reset();
 }
