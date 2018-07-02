@@ -22,7 +22,7 @@ cc = calendar.Calendar(6) #format calendar so Sunday starts the week
 def index():
     cur = conn.cursor()
     cur.execute("SELECT id, name FROM res_hall;")
-    return render_template("index.html", calDict=fDict, hall_list=cur.fetchall(), \
+    return render_template("index.html", calDict=cDict, hall_list=cur.fetchall(), \
                             cal=cc.monthdays2calendar(fDict["year"],fDict["num_month"]))
 
 @app.route("/conflicts")
@@ -47,7 +47,7 @@ def archive():
 
 #     -- Functional --
 
-@app.route("/enterConflicts", methods=['POST'])
+@app.route("/enterConflicts/", methods=['POST'])
 def processConflicts():
     hallId = 3
     month = 6
@@ -170,15 +170,100 @@ def getSchedule():
     # API Hook that will get the requested schedule for a given month
     #  The month will be given via request.args as 'monthNum' and 'year'.
     #  The server will then query the database for the appropriate schedule
-    #  and send back a jsonified version of the schedule.
-    return jsonify({"month":'TestMonth',
-                    "firstDay":3,   # First day of the month is index 3 or the week (Wednesday)
-                    "dates":[[{"date":0,"ras":[]},{"date":0,"ras":[]},{"date":0,"ras":[]},{"date":1,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":2,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":3,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"},{"name":"Casey K.","bgColor":"#3a7e9f","bdColor":"blue"}]},{"date":4,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"},{"name":"Casey K.","bgColor":"#3a7e9f","bdColor":"blue"}]}],
-                             [{"date":5,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":6,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":7,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":8,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":9,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":10,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"},{"name":"Casey K.","bgColor":"#3a7e9f","bdColor":"blue"}]},{"date":11,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"},{"name":"Casey K.","bgColor":"#3a7e9f","bdColor":"blue"}]}],
-                             [{"date":12,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":13,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":14,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":15,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":16,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":17,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"},{"name":"Casey K.","bgColor":"#3a7e9f","bdColor":"blue"}]},{"date":18,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"},{"name":"Casey K.","bgColor":"#3a7e9f","bdColor":"blue"}]}],
-                             [{"date":19,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":20,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":21,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":22,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":23,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":24,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"},{"name":"Casey K.","bgColor":"#3a7e9f","bdColor":"blue"}]},{"date":25,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"},{"name":"Casey K.","bgColor":"#3a7e9f","bdColor":"blue"}]}],
-                             [{"date":26,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":27,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":28,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":29,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":30,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"}]},{"date":31,"ras":[{"name":"Tyler C.","bgColor":"#3cb371","bdColor":"green"},{"name":"Casey K.","bgColor":"#3a7e9f","bdColor":"blue"}]},{"date":0,"ras":[]}]
-                            ]})
+    #  and send back a jsonified version of the schedule. If no month and
+    #  subsequently no schedule is found in the database, the server will
+    #  return a blank calendar for that month.
+
+    def missingInfo(year,monthNum):
+        # This function generates a blank calendar to return to the client for
+        #  the given year and monthNum (1-12)
+        res = {}
+        dateList = []
+        for week in cc.monthdayscalendar(year,monthNum):
+            weeklst = []
+            for day in week:
+                weeklst.append({"date":day,"ras":[]})
+
+            dateList.append(weeklst)
+
+        res["dates"] = dateList
+        res["month"] = calendar.month_name[monthNum]
+
+        return jsonify(res)
+
+    monthNum = int(request.args.get("monthNum"))
+    year = int(request.args.get("year"))
+    res = {}
+
+    cur = conn.cursor()
+    # Get the id, number and name for the month in question
+    cur.execute("SELECT id, num, name FROM month WHERE num = {} AND year = to_date('{}','YYYY')".format(monthNum,year))
+    m = cur.fetchone()
+
+    if m == None:
+        # If there is not a month matching the criteria, then a blank calendar
+        #  will be generated and returned.
+        return missingInfo(year,monthNum)
+
+    cur.execute("SELECT id FROM schedule WHERE hall_id = {} AND month_id = {} ORDER BY created DESC;".format(1,m[0]))
+    # hall_id is Brandt until login is made -----------------------------------------------------------------^
+    s = cur.fetchone()
+
+    if s == None:
+        # If there is not a schedule matching the criteria, then a blank calendar
+        #  will be generated and returned.
+        return missingInfo(year,monthNum)
+
+    res["month"] = m[2]                                                         # Set the month name
+
+    cur.execute("""SELECT ra.first_name, ra.last_name, ra.color, day.date
+                   FROM duties JOIN day ON (day.id=duties.day_id) JOIN ra ON (ra.id=duties.ra_id)
+                   WHERE duties.hall_id = {} AND duties.sched_id = {}
+                   ORDER BY day.date ASC;""".format(1,1))                       # Get the duty schedule
+    # hall_id is Brandt until login is made --------^
+
+    date_res = cur.fetchall()
+    prev_month_days = (calendar.weekday(year,monthNum,1)+1)%7
+    # The line above determines the number of days at the beginning of the month that
+    # belong to the previous month. Essentially, it maps the days of the week so that
+    # Sunday is 0 and Saturday is 6. For example, if the expression returns 2, then
+    # that means that the month in question starts on Tuesday.
+
+    datesLst = []                                                               # This list will contain lists that represent each week in the month
+
+    prev_month_dates = []                                                       # This list contains the days on the calendar that belong to the previous month
+    for i in range(prev_month_days):
+        prev_month_dates.append({"date":0,"ras":[]})
+
+    week_lst = prev_month_dates
+    prev_date = None
+    prev_entry = None
+    for d in date_res:                                                          # For each day in the duty schedule
+
+        if len(week_lst) == 7:                                                  # If the length of the week is 7 days
+            datesLst.append(week_lst)                                           # Start working on a new week
+            week_lst = []
+
+        if d[3] == prev_date:                                                    # If another RA was already assigned to the date
+            prev_entry["ras"].append({"name":d[0]+" "+d[1][0]+".",               # Then we only need to add this RA to the last entry
+                                        "bgColor":d[2],
+                                        "bdColor":"#"+hex(int('0x'+d[2][1:],16)-0x2c2540)[2:]}) # Converting a str of a hex number to an int, subtracting a value, then converting to str of hex
+        else:
+            week_lst.append({"date":d[3].day,"ras":[{"name":d[0]+" "+d[1][0]+".", # Else create a new date dictionary and add the appropriate information
+                                                     "bgColor":d[2],
+                                                     "bdColor":"#"+hex(int('0x'+d[2][1:],16)-0x2c2540)[2:]}]}) # Converting a str of a hex number to an int, subtracting a value, then converting to str of hex
+            prev_entry = week_lst[-1]                                           # Keep track of the last entry made
+
+        prev_date = d[3]                                                        # Update prev_date for the next duty assignment
+
+    while len(week_lst) < 7:                                                    # Add any days that belong to the next month
+        week_lst.append({"date":0,"ras":[]})
+
+    datesLst.append(week_lst)                                                   # Add the week to the dateLst
+    res["dates"] = datesLst                                                     # Add the dateLst to the result dict
+
+
+    return jsonify(res)
 
 @app.route("/api/v1/curSchedule/<string:hallID>")
 def apiSearch(hallID):

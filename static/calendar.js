@@ -6,7 +6,10 @@ document.cookie = "username=conzty01; hall=Brandt;";
 function getCurSchedule() {
     // Get the schedule for the current month
     console.log("Getting Current Schedule: ",appConfig.curDate);
-    getSchedule(appConfig.curDate.getMonth(),appConfig.curDate.getFullYear());
+    appConfig.calDate.setMonth(appConfig.curDate.getMonth());
+    appConfig.calDate.setYear(appConfig.curDate.getFullYear());
+    getSchedule(appConfig.curDate.getMonth()+1,appConfig.curDate.getFullYear());
+    // The +1 accounts for the 0 indexing ---^
 }
 
 function getSchedule(monthNum,year) {
@@ -74,7 +77,7 @@ function changeMonth(i) {
 
     console.log("Change Month: ",i);
     appConfig.calDate.setMonth(appConfig.calDate.getMonth() + i);
-    getSchedule(appConfig.calDate.getMonth(),appConfig.calDate.getFullYear());
+    getSchedule(appConfig.calDate.getMonth()+1,appConfig.calDate.getFullYear());
 }
 
 function resetForm() {

@@ -17,6 +17,7 @@
                 <div class="toggle">
                     <div class="toggle__option" onclick="changeMonth(-1)">&#60;</div>
                     <div class="toggle__option" onclick="changeMonth(1)">&#62;</div>
+                    <div class="toggle__option" onclick="getCurSchedule()">Today</div>
                 </div>
                 <div id="current-month" class="current-month">{{ calDict["text_month"] }}</div>
                 <div class="search-input">
@@ -30,14 +31,8 @@
                work nicely for an archive feature where users can look up old
                schedules.
 
-               TODO: Create a js script that will request the proper data from
-                     the server and put that data on the calendar.
-
-                     Create some sort of way for the user to know that the
+               TODO: Create some sort of way for the user to know that the
                      calendar is loading when the page is displayed.
-
-                     Figure out how to handle days outside of the scope of the
-                     current month. Include date? Fade color? Keep Blank?
                 #}
             <div id="calendar" class="calendar">
                 <div class="calendar__header">

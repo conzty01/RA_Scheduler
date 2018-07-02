@@ -188,7 +188,7 @@ main {
 
 .toggle{
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
 
   text-align: center;
   font-size: 0.9em;
