@@ -18,10 +18,12 @@ def createScheduleDB(conn):
 		CREATE TABLE schedule(
 			id				serial UNIQUE,
 			hall_id			int,
+			month_id		int,
 			created			date,
 
 		PRIMARY KEY (id),
-		FOREIGN KEY (hall_id) REFERENCES res_hall(id)
+		FOREIGN KEY (hall_id) REFERENCES res_hall(id),
+		FOREIGN KEY (month_id) REFERENCES month(id)
 		);""")
 
 def createRaDB(conn):
@@ -34,6 +36,7 @@ def createRaDB(conn):
 			hall_id			int,
 			date_started	date,
 			points			int,
+			color			varchar(7),
 
 			PRIMARY KEY (id, hall_id),
 			FOREIGN KEY (hall_id) REFERENCES res_hall(id)
@@ -90,6 +93,7 @@ def createMonthDB(conn):
 	conn.execute("""
 		CREATE TABLE month(
 			id			serial UNIQUE,
+			num			int,
 			name		varchar(8),
 			year		date,
 

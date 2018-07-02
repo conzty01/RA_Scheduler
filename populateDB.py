@@ -11,36 +11,51 @@ def popResHall(cur):
 		cur.execute("INSERT INTO res_hall (name) VALUES ('{}')".format(n))
 
 def popRAs(cur):
+	def randomColor():
+		colors = ['#DEB887','#5F9EA0','#7FFF00','#D2691E','#FF7F50','#6495ED','#DC143C',
+		'#00FFFF','#A9A9A9','#BDB76B','#FF8C00','#E9967A','#8FBC8F','#00CED1','#FF1493',
+		'#00BFFF','#1E90FF','#228B22','#FF00FF','#FFD700','#DAA520','#808080','#008000',
+		'#FF69B4','#CD5C5C','#ADD8E6','#F08080','#90EE90','#FFB6C1','#FFA07A','#20B2AA',
+		'#87CEFA','#B0C4DE','#00FF00','#32CD32','#FF00FF','#66CDAA','#BA55D3','#9370DB',
+		'#3CB371','#7B68EE','#00FA9A','#48D1CC','#C71585','#FFA500','#FF4500','#DA70D6',
+		'#DB7093','#CD853F','#FFC0CB','#DDA0DD','#B0E0E6','#FF0000','#BC8F8F','#4169E1',
+		'#FA8072','#F4A460','#2E8B57','#A0522D','#C0C0C0','#87CEEB','#6A5ACD','#708090',
+		'#00FF7F','#4682B4','#D2B48C','#D8BFD8','#FF6347','#40E0D0','#EE82EE','#F5DEB3']
+		return colors[random.randint(0,len(colors)-1)]
+
 	def popBrandtRA(cur):
 		cur.execute("SELECT id FROM res_hall WHERE name = 'Brandt';")
 		iD = cur.fetchone()[0]
 
 		for n in ["Alfonzo Doerr" , "Lahoma Berns", "Lue Girardin", "Donald Demartini", "Aubrey Mandell", "Stormy Dunigan","Arron Kernan",
 				  "Betty Chmiel", "Gerardo Spells", "Epifania Soucy", "Tristan Hedgepeth","Neil Frix","Marvin Cheatam","Carmen Broadnax","Milford Schroyer"]:
-			cur.execute("INSERT INTO ra (first_name, last_name, hall_id, date_started, points) VALUES ('{}','{}',{},NOW(),0)".format(n.split()[0],n.split()[1],iD))
+			c = randomColor()
+			cur.execute("INSERT INTO ra (first_name, last_name, hall_id, date_started, points, color) VALUES ('{}','{}',{},NOW(),0,'{}')".format(n.split()[0],n.split()[1],iD,c))
 
 	def popLarsenRA(cur):
 		cur.execute("SELECT id FROM res_hall WHERE name = 'Larsen';")
 		iD = cur.fetchone()[0]
 
 		for n in ["Contessa Clardy", "Lolita Marcelino", "Wan Waddington", "Venus Maus", "Rosamond Chesson" "Mitzie Sickels"]:
-			cur.execute("INSERT INTO ra (first_name, last_name, hall_id, date_started, points) VALUES ('{}','{}',{},NOW(),0)".format(n.split()[0],n.split()[1],iD))
+			c = randomColor()
+			cur.execute("INSERT INTO ra (first_name, last_name, hall_id, date_started, points, color) VALUES ('{}','{}',{},NOW(),0,'{}')".format(n.split()[0],n.split()[1],iD,c))
 
 	def popOlsonRA(cur):
 		cur.execute("SELECT id FROM res_hall WHERE name = 'Olson';")
 		iD = cur.fetchone()[0]
 
 		for n in ["Nick Vankirk", "Eldon Sweetman", "Zita Gans", "Claudia Hole", "Dane Agarwal", "Verna Korb", "Ray Housman", "Zulema Robitaille"]:
-			cur.execute("INSERT INTO ra (first_name, last_name, hall_id, date_started, points) VALUES ('{}','{}',{},NOW(),0)".format(n.split()[0],n.split()[1],iD))
+			c = randomColor()
+			cur.execute("INSERT INTO ra (first_name, last_name, hall_id, date_started, points, color) VALUES ('{}','{}',{},NOW(),0,'{}')".format(n.split()[0],n.split()[1],iD,c))
 
 	popBrandtRA(cur)
 	popLarsenRA(cur)
 	popOlsonRA(cur)
 
 def popMonth(cur):
-	cur.execute("INSERT INTO month (name, year) VALUES ('January',to_date('January 2018', 'Month YYYY'))")
-	cur.execute("INSERT INTO month (name, year) VALUES ('February',to_date('February 2018', 'Month YYYY'))")
-	cur.execute("INSERT INTO month (name, year) VALUES ('March',to_date('March 2018', 'Month YYYY'))")
+	cur.execute("INSERT INTO month (num, name, year) VALUES (1,'January',to_date('2018', 'YYYY'))")
+	cur.execute("INSERT INTO month (num, name, year) VALUES (2,'February',to_date('2018', 'YYYY'))")
+	cur.execute("INSERT INTO month (num, name, year) VALUES (3,'March',to_date('2018', 'YYYY'))")
 
 def popDay(cur):
 	c = calendar.Calendar()
@@ -103,7 +118,7 @@ def popDuties(cur):
 			""".format(r.getId(),days[d.getDate()],1))
 
 def popSchedule(cur):
-	cur.execute("INSERT INTO schedule (hall_id,created) VALUES (1,NOW());")
+	cur.execute("INSERT INTO schedule (hall_id,month_id,created) VALUES (1,1,NOW());")
 
 def main():
 	# This program assumes that the database is completely clean
