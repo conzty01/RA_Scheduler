@@ -3,7 +3,7 @@
 }
 .checkLabel {
     display: block;
-    height: 65%;
+    height: 55%;
     width: 100%;
     background-color:rgba(0,255,0,0.3);
 }
@@ -14,7 +14,7 @@
     padding-right: 0px;
 }
 .check {
-    
+
     text-align: center;
 }
 .date {

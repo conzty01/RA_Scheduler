@@ -77,16 +77,16 @@ main {
 
 .name {
   width: 100%;
-  height: 25px;
+  height: auto;
   margin-bottom: 3px;
   color: #FFF;
-  font-weight: normal;
+  font-weight: bold;
   background-color: #3cb371;
   text-align: right;
   border-left: 5px solid green;
   padding: 3px;
   padding-right: 10px;
-  font-size: 15px;
+  font-size: .8em;
   overflow: hidden;
 }
 .calendar__day {
