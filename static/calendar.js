@@ -15,6 +15,7 @@ function getCurSchedule() {
 function getSchedule(monthNum,year) {
     // Get the schedule for the given month and year
     console.log("Getting Schedule for month: ",monthNum, year);
+    document.getElementById("loading").style.display = "block";
     appConfig.base.callAPI("getSchedule",{"monthNum":monthNum,"year":year},applySchedule);
 }
 
@@ -54,6 +55,7 @@ function applySchedule(sched) {
             }
         }
     }
+    document.getElementById("loading").style.display = "none";
 
 }
 

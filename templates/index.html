@@ -20,7 +20,8 @@
                     <div class="toggle__option" onclick="getCurSchedule()">Today</div>
                 </div>
                 <div id="current-month" class="current-month">{{ calDict["text_month"] }}</div>
-                <div class="search-input">
+                <div>
+                    <img id="loading" align="right" src="{{url_for('.static', filename='loading.svg')}}" alt="Loading..." height="50" width="50">
                 </div>
             </div>
             {# The server will only create the calendar when it serves this page
