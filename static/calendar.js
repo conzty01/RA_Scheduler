@@ -1,7 +1,7 @@
 "use strict"
 
 // Dev stuff
-document.cookie = "username=conzty01; hall=Brandt;";
+//document.cookie = "username=conzty01; hall=Brandt;";
 
 function getCurSchedule() {
     // Get the schedule for the current month
@@ -88,3 +88,5 @@ function resetForm() {
     }
     document.getElementById("conflictForm").reset();
 }
+
+window.onload = getCurSchedule();
