@@ -50,6 +50,7 @@ function applySchedule(sched) {
                     r.className = "name";
                     r.setAttribute("style","background-color:"+ra["bgColor"]+";border-color:"+ra["bdColor"]);
                     r.innerHTML = ra["name"];
+                    r.id = ra["id"];
                     d.appendChild(r);
                 }
             }
