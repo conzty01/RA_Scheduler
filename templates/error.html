@@ -1,0 +1,16 @@
+<html>
+    <head>
+        <title>Luther College RA Scheduling App</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="{{url_for('.static', filename='master.css')}}">
+    </head>
+    <body>
+        <h1>Oh, No!</h1>
+        {% if errorMsg != None: %}
+        <p>{{ errorMsg }}</p>
+        {% else: %}
+        <p>It looks like something strange happened and I'm not exactly sure what it is!</p>
+        {% endif %}
+        <p>Please contact your Hall Director or Assistant Hall Director.</p>
+    </body>
+</html>

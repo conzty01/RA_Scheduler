@@ -1,15 +1,21 @@
 "use strict"
 
+// Dev stuff
+//document.cookie = "username=conzty01; hall=Brandt;";
 
 function getCurSchedule() {
     // Get the schedule for the current month
     console.log("Getting Current Schedule: ",appConfig.curDate);
-    getSchedule(appConfig.curDate.getMonth(),appConfig.curDate.getFullYear());
+    appConfig.calDate.setMonth(appConfig.curDate.getMonth());
+    appConfig.calDate.setYear(appConfig.curDate.getFullYear());
+    getSchedule(appConfig.curDate.getMonth()+1,appConfig.curDate.getFullYear());
+    // The +1 accounts for the 0 indexing ---^
 }
 
 function getSchedule(monthNum,year) {
     // Get the schedule for the given month and year
     console.log("Getting Schedule for month: ",monthNum, year);
+    document.getElementById("loading").style.display = "block";
     appConfig.base.callAPI("getSchedule",{"monthNum":monthNum,"year":year},applySchedule);
 }
 
@@ -44,11 +50,13 @@ function applySchedule(sched) {
                     r.className = "name";
                     r.setAttribute("style","background-color:"+ra["bgColor"]+";border-color:"+ra["bdColor"]);
                     r.innerHTML = ra["name"];
+                    r.id = ra["id"];
                     d.appendChild(r);
                 }
             }
         }
     }
+    document.getElementById("loading").style.display = "none";
 
 }
 
@@ -72,5 +80,16 @@ function changeMonth(i) {
 
     console.log("Change Month: ",i);
     appConfig.calDate.setMonth(appConfig.calDate.getMonth() + i);
-    getSchedule(appConfig.calDate.getMonth(),appConfig.calDate.getFullYear());
+    getSchedule(appConfig.calDate.getMonth()+1,appConfig.calDate.getFullYear());
 }
+
+function resetForm() {
+    console.log("Reset Form");
+    let days = document.getElementsByClassName("checkLabel");
+    for (let d of days) {
+        d.setAttribute("style","background-color:rgba(0,255,0,0.3)");
+    }
+    document.getElementById("conflictForm").reset();
+}
+
+window.onload = getCurSchedule();

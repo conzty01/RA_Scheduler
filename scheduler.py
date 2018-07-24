@@ -1,7 +1,7 @@
 from datetime import date
 from ra_sched import Schedule, Day
 import random
-import calendar             # Only needed for oldScheduling()
+import calendar                                                                 # Only needed for oldScheduling()
 
 def resetRAList(raList,schedList):
     raList = schedList                                                          # Switch the two lists
@@ -14,9 +14,9 @@ def assignRA(day,raList,schedList,cand_index):
     return (raList,schedList,0)
 
 def checkReset(raList,scheduledList):
-    if len(raList) < 1 and len(scheduledList) > 0:  # If all RAs have been assigned
-        raList, scheduledList = resetRAList(raList, scheduledList)  # Reset lists
-        raList.sort()  # Re-sort the RA lists
+    if len(raList) < 1 and len(scheduledList) > 0:                              # If all RAs have been assigned
+        raList, scheduledList = resetRAList(raList, scheduledList)              # Reset lists
+        raList.sort()                                                           # Re-sort the RA lists
     return (raList,scheduledList)
 
 
