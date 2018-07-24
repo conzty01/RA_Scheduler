@@ -100,6 +100,20 @@ def createMonthDB(conn):
 			PRIMARY KEY (name,year)
 		);""")
 
+def createUsersDB(conn):
+	conn.execute("DROP TABLE IF EXISTS users CASCADE;")
+
+	conn.execute("""
+		CREATE TABLE users(
+			id			serial UNIQUE,
+			ra_id		int,
+			email		varchar(20) UNIQUE,
+			auth_level	int,
+
+			PRIMARY KEY (ra_id,email),
+			FOREIGN KEY (ra_id) REFERENCES ra(id)
+		);""")
+
 def main():
 	conn = psycopg2.connect(os.environ["DATABASE_URL"])
 	createHallDB(conn.cursor())
@@ -109,6 +123,7 @@ def main():
 	createConflictDB(conn.cursor())
 	createScheduleDB(conn.cursor())
 	createDutyDB(conn.cursor())
+	createUsersDB(conn.cursor())
 
 	conn.commit()
 
