@@ -56,10 +56,11 @@ def popMonth(cur):
 	cur.execute("INSERT INTO month (num, name, year) VALUES (1,'January',to_date('2018', 'YYYY'))")
 	cur.execute("INSERT INTO month (num, name, year) VALUES (2,'February',to_date('2018', 'YYYY'))")
 	cur.execute("INSERT INTO month (num, name, year) VALUES (3,'March',to_date('2018', 'YYYY'))")
+	cur.execute("INSERT INTO month (num, name, year) VALUES (5,'May',to_date('2018', 'YYYY'))")
 
 def popDay(cur):
 	c = calendar.Calendar()
-	for m in [("January",1),("February",2),("March",3)]:
+	for m in [("January",1),("February",2),("March",3),("May",5)]:
 		cur.execute("SELECT id FROM month WHERE name = '{}'".format(m[0]))
 		mID = cur.fetchone()[0]
 
