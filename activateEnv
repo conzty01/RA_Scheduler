@@ -14,3 +14,8 @@ export DATABASE_URL='postgres:///ra_sched'
 # They allow oauth2 to be used over http instead of https
 export OAUTHLIB_RELAX_TOKEN_SCOPE=1
 export OAUTHLIB_INSECURE_TRANSPORT=1
+
+# The following need to be set with the appropriate oAuth2 information.
+export SECRET_KEY=
+export CLIENT_ID=
+export CLIENT_SECRET=
