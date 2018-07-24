@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block styles %}
+{{ super() }}
+<link rel="stylesheet" href="{{url_for('.static', filename='calendar.css')}}">
+<link rel="stylesheet" href="{{url_for('.static', filename='editSched.css')}}">
+{% endblock %}
+
+{% block content %}
+<div class="container" style="width:80%">
+    <div class="row"></div>
+    <div class="row">
+        <div class="col-md-9">
+            <div class="row">
+                <div class="wrapper">
+                    <main>
+                        <div class="toolbar">
+                            <div class="toggle">
+                                <div class="toggle__option" onclick="changeMonth(-1)">&#60;</div>
+                                <div class="toggle__option" onclick="changeMonth(1)">&#62;</div>
+                                <div class="toggle__option" onclick="getCurSchedule()">Today</div>
+                            </div>
+                            <div id="current-month" class="current-month">{{ calDict["text_month"] }}</div>
+                            <div>
+                                <img id="loading" align="right" src="{{url_for('.static', filename='loading.svg')}}" alt="Loading..." height="50" width="50">
+                            </div>
+                        </div>
+                        {# The server will only create the calendar when it serves this page
+                           and the RA information will be given when the client requests it
+                           depending on the action they chose on their dashboard (ie run, edit)
+                            #}
+                        <div id="calendar" class="calendar">
+                            <div class="calendar__header">
+                                {% for d in ["sun","mon","tue","wed","thu","fri","sat"]: %}
+                                <div>{{ d }}</div>
+                                {% endfor %}
+                            </div>
+                            {% for week in cal: %}
+                            <div class="calendar__week">
+                                {% for day in week: %}
+
+                                {% if day[0] != 0: %}
+                                <div class="calendar__day day" id="d{{ day[0] }}">
+                                    <div class="date">{{ day[0] }}</div>
+                                    <div class="name" style="background-color:#3cb371;border-color:green">Tyler C.</div>
+                                    <div class="name" style="background-color: #3a7e9f;border-color:blue">Casey K.</div>
+                                </div>
+                                {% else %}
+                                <div class="calendar__day day oth">
+                                    <div class="date"></div>
+                                </div>
+                                {% endif %}
+
+                                {% endfor %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </main>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="options">
+                <div id="raList" class="raList">
+                <ul>
+                    {% for ra in raList: %}
+                    <li id="{{ ra[0] }}" onclick="highlightRA({{ ra[0] }})">
+                        <div class="tName">{{ ra[1] }} {{ ra[2] }}</div>
+                        <div class="tPoints">0 / {{ ra[3] }}</div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                </div>
+                <button id="run" type="button" onclick="runScheduler()">Run Scheduler</button>
+                <button id="edit" type="button" onclick="editCalendar()">Edit Calendar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="{{url_for('.static', filename='calendar.js')}}"></script>
+<script src="{{url_for('.static', filename='editSched.js')}}"></script>
+{% endblock %}

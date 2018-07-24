@@ -53,7 +53,7 @@
         <script src="{{url_for('.static', filename='appBase.js')}}"></script>
         <script src="{{url_for('.static', filename='master.js')}}"></script>
         <script>
-            appConfig = {};
+            var appConfig = {};
             appConfig.host = 'http://localhost:5000';
             appConfig.apiURL = appConfig.host+'/api/';
             appConfig.base = new AppBase();
