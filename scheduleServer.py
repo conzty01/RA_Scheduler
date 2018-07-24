@@ -41,13 +41,17 @@ def getAuth():
     jsonResp = resp.json()
     uEmail = jsonResp["email"]                                                  # The email returned from Google
     cur = conn.cursor()
-    cur.execute("SELECT ra_id, auth_level FROM users WHERE email = '{}';".format(uEmail))
+    cur.execute("""
+            SELECT ra.id, email, first_name, last_name, hall_id, auth_level
+            FROM users JOIN ra ON (users.ra_id = ra.id)
+            WHERE email = '{}';""".format(uEmail))
     res = cur.fetchone()                                                        # Get user info from the database
 
     if res == None:                                                             # If user does not exist, go to error url
         return redirect(url_for(".err",msg="No user found with email: {}".format(uEmail)))
 
-    return {"uEmail":uEmail,"ra_id":res[0],"auth_level":res[1]}
+    return {"uEmail":uEmail,"ra_id":res[0],"name":res[2]+" "+res[3],
+            "hall_id":res[4],"auth_level":res[5]}
 
 #     -- Views --
 
