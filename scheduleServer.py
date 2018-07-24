@@ -15,7 +15,7 @@ Bootstrap(app)
 app.secret_key = os.environ["SECRET_KEY"]
 blueprint = make_google_blueprint(
     client_id=os.environ["CLIENT_ID"],
-    client_secret=os.environment["CLIENT_SECRET"],
+    client_secret=os.environ["CLIENT_SECRET"],
     scope=["profile", "email"]
 )
 app.register_blueprint(blueprint, url_prefix="/login")
