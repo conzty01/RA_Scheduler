@@ -12,15 +12,15 @@ app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 Bootstrap(app)
 # Setup for flask_dance with oauth
-app.secret_key = "IamNotreallysurewhatThisSuperSeCrEtKeyisforbutIwillmakeAreallylongONE"
+app.secret_key = os.environ["SECRET_KEY"]
 blueprint = make_google_blueprint(
-    client_id="299373397497-0q4ivqhq2sajc478n25gg49uo9edllqe.apps.googleusercontent.com",
-    client_secret="DLqB-T-Gva7lRe0AzzQJSwLe",
+    client_id=os.environ["CLIENT_ID"],
+    client_secret=os.environment["CLIENT_SECRET"],
     scope=["profile", "email"]
 )
 app.register_blueprint(blueprint, url_prefix="/login")
 
-conn = psycopg2.connect("postgres:///ra_sched")
+conn = psycopg2.connect(os.environ["DATABASE_URL"])
 # Format date and time information for calendar
 ct = datetime.datetime.now()
 fDict = {"text_month":calendar.month_name[(ct.month+2)%12], "num_month":(ct.month+2)%12, "year":(ct.year if ct.month <= 12 else ct.year+1)}
@@ -64,7 +64,7 @@ def index():
     return resp
 
 @app.route("/conflicts")
-def conflicts():    
+def conflicts():
     cur = conn.cursor()
     cur2 = conn.cursor()
     cur.execute("SELECT id, first_name, last_name FROM ra WHERE hall_id = 1 ORDER BY last_name ASC;")
