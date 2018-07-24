@@ -9,3 +9,8 @@
 # DATABASE_URL='postgres://{role_name}:{password}@{host}/{database_name}'
 
 export DATABASE_URL='postgres:///ra_sched'
+
+# The next two are for developing purposes only
+# They allow oauth2 to be used over http instead of https
+export OAUTHLIB_RELAX_TOKEN_SCOPE=1
+export OAUTHLIB_INSECURE_TRANSPORT=1
