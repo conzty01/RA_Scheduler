@@ -37,6 +37,8 @@ def createRaDB(conn):
 			date_started	date,
 			points			int,
 			color			varchar(7),
+			email			varchar(256),
+			auth_level		int,
 
 			PRIMARY KEY (id, hall_id),
 			FOREIGN KEY (hall_id) REFERENCES res_hall(id)
@@ -100,18 +102,32 @@ def createMonthDB(conn):
 			PRIMARY KEY (name,year)
 		);""")
 
-def createUsersDB(conn):
-	conn.execute("DROP TABLE IF EXISTS users CASCADE;")
+def createUserDB(conn):
+	conn.execute('DROP TABLE IF EXISTS "user" CASCADE;')
 
 	conn.execute("""
-		CREATE TABLE users(
+		CREATE TABLE "user"(
 			id			serial UNIQUE,
-			ra_id		int,
-			email		varchar(20) UNIQUE,
-			auth_level	int,
+			ra_id		int UNIQUE,
+			username	varchar(20) UNIQUE,
 
-			PRIMARY KEY (ra_id,email),
+			PRIMARY KEY (id),
 			FOREIGN KEY (ra_id) REFERENCES ra(id)
+		);""")
+
+def createOAuthDB(conn):
+	conn.execute('DROP TABLE IF EXISTS flask_dance_oauth CASCADE;')
+
+	conn.execute("""
+		CREATE TABLE flask_dance_oauth(
+			id					serial UNIQUE,
+			provider			varchar(50),
+			created_at			timestamp without time zone,
+			token				json,
+			provider_user_id	varchar(256),
+			user_id				int,
+
+			PRIMARY KEY (id)
 		);""")
 
 def main():
@@ -123,7 +139,8 @@ def main():
 	createConflictDB(conn.cursor())
 	createScheduleDB(conn.cursor())
 	createDutyDB(conn.cursor())
-	createUsersDB(conn.cursor())
+	createUserDB(conn.cursor())
+	createOAuthDB(conn.cursor())
 
 	conn.commit()
 
