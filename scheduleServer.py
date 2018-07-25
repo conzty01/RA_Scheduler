@@ -390,13 +390,18 @@ def runScheduler(hallId, month, year):
     #  Additionally, the dates that should no have duties are also sent via
     #  request.args and can either be a string of comma separated integers
     #  ("1,2,3,4") or an empty string ("").
+    userDict = getAuth()                                                        # Get the user's info from our database
+    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
+        return jsonify("NOT AUTHORIZED")
+
     try:                                                                        # Try to get the proper information from the request
         year = int(request.args["year"])
         month = int(request.args["monthNum"])
         noDutyList = request.args["noDuty"].split(",")
     except:                                                                     # If error, send back an error message
         return jsonify("ERROR")
-    hallId = 1  # Default to Brandt until login is finished
+
+    hallId = userDict["hall_id"]
 
     cur.execute("SELECT id FROM month WHERE num = {} AND year = TO_DATE('{}','YYYY')".format(month,year))
     monthId = cur.fetchone()[0]                                                 # Get the month_id from the database
@@ -442,8 +447,8 @@ def runScheduler(hallId, month, year):
     conn.commit()                                                               # Commit additions to the database
 
     resp = {}                                                                   # Begin to create the JSON response to the client
-    res["schedule"] = getSchedule(month,year,hallId)                            # Get the formatted schedule from the database
-    res["raStats"] = None
+    resp["schedule"] = getSchedule(month,year,hallId)                           # Get the formatted schedule from the database
+    resp["raStats"] = None
 
     return resp
 
