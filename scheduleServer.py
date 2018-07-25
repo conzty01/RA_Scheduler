@@ -104,20 +104,13 @@ def googleLoggedIn(blueprint,token):
 #     -- Helper Functions --
 
 def getAuth():
-    if not google.authorized:                                                   # If the user is not authorized by Google
-        return redirect(url_for("google.login"))                                # Then redirect the user to the login page
     resp = google.get("/oauth2/v2/userinfo")
-    try:
-        assert resp.ok, resp.text                                               # Make sure that the login is valid (This might only be needed on the index)
-    except AssertionError:                                                      # If the login is not valid
-        return redirect(url_for("google.login"))                                # Then redirect the user to the login page
-
     jsonResp = resp.json()
     uEmail = jsonResp["email"]                                                  # The email returned from Google
     cur = conn.cursor()
     cur.execute("""
-            SELECT ra.id, email, first_name, last_name, hall_id, auth_level
-            FROM users JOIN ra ON (users.ra_id = ra.id)
+            SELECT ra.id, username, first_name, last_name, hall_id, auth_level
+            FROM "user" JOIN ra ON ("user".ra_id = ra.id)
             WHERE email = '{}';""".format(uEmail))
     res = cur.fetchone()                                                        # Get user info from the database
 
@@ -139,26 +132,16 @@ def logout():
 def login():
     return redirect(url_for("google.login"))
 
-userDict={"auth_level":4,"uEmail":"conzty01@luther.edu"}
-
 @app.route("/home")
+@login_required
 def index():
-    # userDict = getAuth()                                                        # Get the user's info from our database
-    # if type(userDict) != dict:                                                  # If the result is not a dictionary
-    #     return userDict                                                         # Then it should be a redirect to either an error page or Google for login
-
-    resp = make_response(render_template("index.html",calDict=cDict,auth_level=userDict["auth_level"],
-                                         cal=cc.monthdays2calendar(fDict["year"],fDict["num_month"])))
-
-    resp.set_cookie("ra_email",userDict["uEmail"])                              # Set cookie for use on other pages
-    return resp
+    userDict = getAuth()                                                        # Get the user's info from our database
+    return render_template("index.html",calDict=cDict,auth_level=userDict["auth_level"], \
+                            cal=cc.monthdays2calendar(fDict["year"],fDict["num_month"]))
 
 @app.route("/conflicts")
 def conflicts():
-    # userDict = getAuth()                                                        # Get the user's info from our database
-    # if type(userDict) != dict:                                                  # If the result is not a dictionary
-    #     return userDict                                                         # Then it should be a redirect to either an error page or Google for login
-
+    userDict = getAuth()                                                        # Get the user's info from our database
     return render_template("conflicts.html", calDict=fDict, auth_level=userDict["auth_level"], \
                             cal=cc.monthdays2calendar(fDict["year"],fDict["num_month"]))
 
@@ -166,9 +149,6 @@ def conflicts():
 @login_required
 def editSched():
     userDict = getAuth()                                                        # Get the user's info from our database
-    if type(userDict) != dict:                                                  # If the result is not a dictionary
-        return userDict                                                         # Then it should be a redirect to either an error page or Google for login
-
     cur = conn.cursor()
     cur.execute("SELECT id, first_name, last_name, points FROM ra WHERE hall_id = {} ORDER BY points DESC;".format(userDict["hall_id"]))
     return render_template("editSched.html", calDict=cDict, raList=cur.fetchall(), auth_level=userDict["auth_level"], \
@@ -184,60 +164,60 @@ def manStaff():
 @app.route("/enterConflicts/", methods=['POST'])
 @login_required
 def processConflicts():
-    # userDict = getAuth()                                                        # Get the user's info from our database
-    # if type(userDict) != dict:                                                  # If the result is not a dictionary
-    #     return userDict                                                         # Then it should be a redirect to either an error page or Google for login
+    userDict = getAuth()                                                        # Get the user's info from our database
 
-    ra_id = 1#userDict["ra_id"]
-    hallId = 1#userDict["hall_id"]
-
-    month = 1#int(request.form.get("monthInfo").split("/")[0])
+    ra_id = userDict["ra_id"]
+    hallId = userDict["hall_id"]
+    month = int(request.form.get("monthInfo").split("/")[0])
     year = int(request.form.get("monthInfo").split("/")[1])
-    if len(str(month)) < 2:
+
+    if len(str(month)) < 2:                                                     # The following few lines formats the strings into a syntax that psql understands
         mstr = "0"+str(month)
     else:
         mstr = str(month)
     insert_cur = conn.cursor()
 
     dateList = ()
-    for key in request.form:                                                    # Append all dates to dateList
+    for key in request.form:                                                    # Append all dates to dateList (or in this case dateTUPLE)
         if "d" in key:
-            d = key.split("d")[-1]
+            d = key.split("d")[-1]                                              # Get only the date (This is due to HTML ids not being allowed to be non-strings)
 
-            if len(str(d)) < 2:
+            if len(str(d)) < 2:                                                 # Format the number to be 2 digits
                 dstr = "0"+str(d)
             else:
                 dstr = str(d)
 
-            s = "TO_DATE('"+dstr+" "+mstr+" "+str(year)+"','DD MM YYYY')"
-            dateList += (s,)
+            s = "TO_DATE('"+dstr+" "+mstr+" "+str(year)+"','DD MM YYYY')"       # Create TO_DATE string from all date information
+            dateList += (s,)                                                    # Add string to dateList
 
-    bigDateStr = "("
+    bigDateStr = "("                                                            # Begin assembling the psql array string
     for i in dateList:
         bigDateStr+= i+", "
-    bigDateStr = bigDateStr[:-2]+")"
+    bigDateStr = bigDateStr[:-2]+")"                                            # Get rid of the extra ", " at the end and cap it with a ")"
 
     exStr = """SELECT day.id FROM day JOIN month ON (month.id = day.month_id)
                WHERE month.num = {} AND
                      month.year = TO_DATE('{}','YYYY') AND
                      day.date IN {};
-                """.format(month,year,bigDateStr)
+                """.format(month,year,bigDateStr)                               # Format the query string
 
-    insert_cur.execute(exStr)
-    dIds = insert_cur.fetchall()
+    insert_cur.execute(exStr)                                                   # Execute the query
+    dIds = insert_cur.fetchall()                                                # Get results
 
     for d in dIds:                                                              # For each date
         try:                                                                    # Try to insert it into the database
             insert_cur.execute("INSERT INTO conflicts (ra_id, day_id) VALUES ({},{});"\
-                                .format(ra_id,d[0]))
+                                .format(ra_id,d[0]))                            # Each entry is a tuple that must be indexed into to get the value. ie d[0]
             conn.commit()                                                       # Commit the change in case the try runs into an error
         except psycopg2.IntegrityError:                                         # If the conflict entry already exists
+            print("error")
             conn.rollback()                                                     # Rollback last commit so that Internal Error doesn't occur
             insert_cur = conn.cursor()                                          # Create a new cursor
 
-    return redirect(url_for(".index"))
+    return redirect(url_for(".index"))                                          # Send the user back to the main page
 
 @app.route("/runIt/")
+@login_required
 def popDuties():
     cur = conn.cursor()
     cur.execute("SELECT year FROM month ORDER BY year DESC;")
@@ -298,6 +278,7 @@ def testAPI():
     return jsonify(s2)
 
 @app.route("/api/getSchedule", methods=["GET"])
+@login_required
 def getSchedule(monthNum=None,year=None,hallId=None):
     # API Hook that will get the requested schedule for a given month.
     #  The month will be given via request.args as 'monthNum' and 'year'.
@@ -326,7 +307,8 @@ def getSchedule(monthNum=None,year=None,hallId=None):
     if monthNum == None and year == None and hallId == None:                    # Effectively: If API was called from the client and not from the server
         monthNum = int(request.args.get("monthNum"))
         year = int(request.args.get("year"))
-        hallId = 1  # Default to Brandt until login is done.
+        userDict = getAuth()                                                    # Get the user's info from our database
+        hallId = userDict["hall_id"]
     res = {}
 
     cur = conn.cursor()
@@ -401,6 +383,7 @@ def getSchedule(monthNum=None,year=None,hallId=None):
     return jsonify(res)
 
 @app.route("/api/runScheduler", methods=["GET"])
+@login_required
 def runScheduler(hallId, month, year):
     # API Hook that will run the scheduler for a given month.
     #  The month will be given via request.args as 'monthNum' and 'year'.
