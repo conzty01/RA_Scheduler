@@ -1,31 +1,105 @@
+from flask_login import UserMixin, current_user, LoginManager, login_required, login_user, logout_user
 from flask import Flask, render_template, request, jsonify, redirect, url_for, make_response
+from flask_dance.consumer.backend.sqla import OAuthConsumerMixin, SQLAlchemyBackend
 from flask_dance.contrib.google import make_google_blueprint, google
+from flask_dance.consumer import oauth_authorized
+from sqlalchemy.orm.exc import NoResultFound
+from flask_sqlalchemy import SQLAlchemy
 from flask_bootstrap import Bootstrap
 from scheduler import scheduling
 from ra_sched import RA
 import datetime
 import psycopg2
 import calendar
+import json
 import os
 
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ["DATABASE_URL"]
 Bootstrap(app)
 # Setup for flask_dance with oauth
 app.secret_key = os.environ["SECRET_KEY"]
-blueprint = make_google_blueprint(
+gBlueprint = make_google_blueprint(
     client_id=os.environ["CLIENT_ID"],
     client_secret=os.environ["CLIENT_SECRET"],
-    scope=["profile", "email"]
+    scope=["profile", "email"],
+    redirect_to="index"
 )
-app.register_blueprint(blueprint, url_prefix="/login")
+app.register_blueprint(gBlueprint, url_prefix="/login")
 
 conn = psycopg2.connect(os.environ["DATABASE_URL"])
+
+db = SQLAlchemy(app)                                                            # SQLAlchemy is used for OAuth
+login_manager = LoginManager(app)                                               # The login manager for the application
+
+# The following classes are for SQLAlchemy to understand how the database is set up for OAuth
+class User(UserMixin,db.Model):                                                 # Contains information about the user
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(250), unique=True)
+    ra_id = db.Column(db.Integer, unique=True)
+
+class OAuth(OAuthConsumerMixin,db.Model):                                       # Contains information about OAuth tokens
+    provider_user_id = db.Column(db.String(256), unique=True)
+    user_id = db.Column(db.Integer, db.ForeignKey(User.id))                     # This links the tokens to the user
+    user = db.relationship(User)
+
+# The following creates the backend for flask_dance which associates users to OAuth tokens
+#   user_required is set to False because of issues when users would first arrive to the
+#   application before being authorized by Google and flask_dance would not be able to look
+#   them up since they were not already authorized. By setting it to False, the app does not
+#   require a user to already exist in our database to continue.
+gBlueprint.backend = SQLAlchemyBackend(OAuth, db.session, user=current_user, user_required=False)
+
 # Format date and time information for calendar
 ct = datetime.datetime.now()
 fDict = {"text_month":calendar.month_name[(ct.month+2)%12], "num_month":(ct.month+2)%12, "year":(ct.year if ct.month <= 12 else ct.year+1)}
 cDict = {"text_month":calendar.month_name[ct.month], "num_month":ct.month, "year":ct.year}
 cc = calendar.Calendar(6) #format calendar so Sunday starts the week
+
+#     -- OAuth Decorators --
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+@oauth_authorized.connect_via(gBlueprint)
+def googleLoggedIn(blueprint,token):
+    print('googleLoggedIn')
+    if not token:                                                               # If we don't have a token
+        return False
+
+    resp = blueprint.session.get("/oauth2/v2/userinfo")
+    if not resp.ok:                                                             # If the response is bad
+        return False
+    google_info = resp.json()
+    print(google_info)
+    username = google_info["email"]
+    gID = str(google_info["id"])
+
+    query = OAuth.query.filter_by(provider=blueprint.name,                      # Query to find OAuth token in database
+                                  provider_user_id=gID)
+    try:
+        oauth = query.one()                                                     # Execute the query
+    except NoResultFound:                                                       # If there are no results
+        oauth = OAuth(provider=blueprint.name,                                  # Create a new entry in our database
+                      provider_user_id=gID,
+                      token=token)
+
+    if oauth.user:                                                              # If we have a user
+        login_user(oauth.user)                                                  # Log them in
+    else:
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM ra WHERE email = '{}'".format(username))    # Get the ra with the matching email so that we can link RAs to their emails
+        raId = cur.fetchone()
+
+        user = User(username=username,ra_id=raId)                               # Create a new user in the database
+        oauth.user = user                                                       # Associate it with the OAuth token
+        db.session.add_all([user,oauth])
+        db.session.commit()                                                     # Commit changes
+        login_user(user)                                                        # Login user
+
+    return False                                                                # Function should return False so that flask_dance won't try to store the token itself
 
 #     -- Helper Functions --
 
@@ -55,63 +129,113 @@ def getAuth():
 
 #     -- Views --
 
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('.login'))
+
 @app.route("/")
+def login():
+    return redirect(url_for("google.login"))
+
+userDict={"auth_level":4,"uEmail":"conzty01@luther.edu"}
+
+@app.route("/home")
 def index():
-    userDict = getAuth()                                                        # Get the user's info from our database
-    if type(userDict) != dict:                                                  # If the result is not a dictionary
-        return userDict                                                         # Then it should be a redirect to either an error page or Google for login
+    # userDict = getAuth()                                                        # Get the user's info from our database
+    # if type(userDict) != dict:                                                  # If the result is not a dictionary
+    #     return userDict                                                         # Then it should be a redirect to either an error page or Google for login
 
     resp = make_response(render_template("index.html",calDict=cDict,auth_level=userDict["auth_level"],
                                          cal=cc.monthdays2calendar(fDict["year"],fDict["num_month"])))
 
-    resp.set_cookie("ra_email",userDict["uEmail"])                               # Set cookie for use on other pages
+    resp.set_cookie("ra_email",userDict["uEmail"])                              # Set cookie for use on other pages
     return resp
 
 @app.route("/conflicts")
 def conflicts():
-    cur = conn.cursor()
-    cur2 = conn.cursor()
-    cur.execute("SELECT id, first_name, last_name FROM ra WHERE hall_id = 1 ORDER BY last_name ASC;")
-    cur2.execute("SELECT id, name FROM res_hall;")
-    return render_template("conflicts.html", calDict=fDict, auth_level=1, hall_list=cur2.fetchall(), \
-                            cal=cc.monthdays2calendar(fDict["year"],fDict["num_month"]), ras=cur.fetchall())
+    # userDict = getAuth()                                                        # Get the user's info from our database
+    # if type(userDict) != dict:                                                  # If the result is not a dictionary
+    #     return userDict                                                         # Then it should be a redirect to either an error page or Google for login
+
+    return render_template("conflicts.html", calDict=fDict, auth_level=userDict["auth_level"], \
+                            cal=cc.monthdays2calendar(fDict["year"],fDict["num_month"]))
 
 @app.route("/editSched")
+@login_required
 def editSched():
+    userDict = getAuth()                                                        # Get the user's info from our database
+    if type(userDict) != dict:                                                  # If the result is not a dictionary
+        return userDict                                                         # Then it should be a redirect to either an error page or Google for login
+
     cur = conn.cursor()
-    cur.execute("SELECT id, first_name, last_name, points FROM ra WHERE hall_id = 1 ORDER BY points DESC;")
-    return render_template("editSched.html", calDict=cDict, raList=cur.fetchall(), auth_level=3, \
+    cur.execute("SELECT id, first_name, last_name, points FROM ra WHERE hall_id = {} ORDER BY points DESC;".format(userDict["hall_id"]))
+    return render_template("editSched.html", calDict=cDict, raList=cur.fetchall(), auth_level=userDict["auth_level"], \
                             cal=cc.monthdays2calendar(fDict["year"],fDict["num_month"]))
 
 @app.route("/staff")
+@login_required
 def manStaff():
     return render_template("staff.html")
 
 #     -- Functional --
 
 @app.route("/enterConflicts/", methods=['POST'])
+@login_required
 def processConflicts():
-    print("HELLO")
-    ra_id = 1
-    hallId = 3
-    month = 6
-    year = 2017
+    # userDict = getAuth()                                                        # Get the user's info from our database
+    # if type(userDict) != dict:                                                  # If the result is not a dictionary
+    #     return userDict                                                         # Then it should be a redirect to either an error page or Google for login
+
+    ra_id = 1#userDict["ra_id"]
+    hallId = 1#userDict["hall_id"]
+
+    month = 1#int(request.form.get("monthInfo").split("/")[0])
+    year = int(request.form.get("monthInfo").split("/")[1])
+    if len(str(month)) < 2:
+        mstr = "0"+str(month)
+    else:
+        mstr = str(month)
     insert_cur = conn.cursor()
 
-    dateList = []
-    for key in request.form:
+    dateList = ()
+    for key in request.form:                                                    # Append all dates to dateList
         if "d" in key:
-            dateList.append(key.split("d")[-1])
+            d = key.split("d")[-1]
 
-    for d in dateList:
+            if len(str(d)) < 2:
+                dstr = "0"+str(d)
+            else:
+                dstr = str(d)
 
-        insert_cur.execute("INSERT INTO conflicts (ra_id, day_id) VALUES ({},{});"\
-                            .format(ra_id,d))
+            s = "TO_DATE('"+dstr+" "+mstr+" "+str(year)+"','DD MM YYYY')"
+            dateList += (s,)
 
-    conn.commit()
+    bigDateStr = "("
+    for i in dateList:
+        bigDateStr+= i+", "
+    bigDateStr = bigDateStr[:-2]+")"
 
-    print("DONE")
-    return index()
+    exStr = """SELECT day.id FROM day JOIN month ON (month.id = day.month_id)
+               WHERE month.num = {} AND
+                     month.year = TO_DATE('{}','YYYY') AND
+                     day.date IN {};
+                """.format(month,year,bigDateStr)
+
+    insert_cur.execute(exStr)
+    dIds = insert_cur.fetchall()
+
+    for d in dIds:                                                              # For each date
+        try:                                                                    # Try to insert it into the database
+            insert_cur.execute("INSERT INTO conflicts (ra_id, day_id) VALUES ({},{});"\
+                                .format(ra_id,d[0]))
+            conn.commit()                                                       # Commit the change in case the try runs into an error
+        except psycopg2.IntegrityError:                                         # If the conflict entry already exists
+            conn.rollback()                                                     # Rollback last commit so that Internal Error doesn't occur
+            insert_cur = conn.cursor()                                          # Create a new cursor
+
+    return redirect(url_for(".index"))
 
 @app.route("/runIt/")
 def popDuties():
