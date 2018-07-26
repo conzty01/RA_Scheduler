@@ -91,5 +91,12 @@ function resetForm() {
     }
     document.getElementById("conflictForm").reset();
 }
+function submitForm() {
+    console.log("Submit Form");
+    let inputBox = document.getElementById("monthInfo");
+    let d = appConfig.calDate;
+    inputBox.value = d.getMonth().toString()+"/"+d.getFullYear().toString();
+    document.getElementById("conflictForm").submit();
+}
 
 window.onload = getCurSchedule();
