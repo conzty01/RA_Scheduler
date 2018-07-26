@@ -96,6 +96,7 @@ def googleLoggedIn(blueprint,token):
         cur = conn.cursor()
         cur.execute("SELECT id FROM ra WHERE email = '{}'".format(username))    # Get the ra with the matching email so that we can link RAs to their emails
         raId = cur.fetchone()
+        cur.close()
 
         user = User(username=username,ra_id=raId)                               # Create a new user in the database
         oauth.user = user                                                       # Associate it with the OAuth token
@@ -117,8 +118,10 @@ def getAuth():
     res = cur.fetchone()                                                        # Get user info from the database
 
     if res == None:                                                             # If user does not exist, go to error url
+        cur.close()
         return redirect(url_for(".err",msg="No user found with email: {}".format(uEmail)))
 
+    cur.close()
     return {"uEmail":uEmail,"ra_id":res[0],"name":res[2]+" "+res[3],
             "hall_id":res[4],"auth_level":res[5]}
 
@@ -153,6 +156,7 @@ def editSched():
     userDict = getAuth()                                                        # Get the user's info from our database
     cur = conn.cursor()
     cur.execute("SELECT id, first_name, last_name, points FROM ra WHERE hall_id = {} ORDER BY points DESC;".format(userDict["hall_id"]))
+    cur.close()
     return render_template("editSched.html", calDict=cDict, raList=cur.fetchall(), auth_level=userDict["auth_level"], \
                             cal=cc.monthdays2calendar(fDict["year"],fDict["num_month"]))
 
@@ -216,6 +220,7 @@ def processConflicts():
             conn.rollback()                                                     # Rollback last commit so that Internal Error doesn't occur
             insert_cur = conn.cursor()                                          # Create a new cursor
 
+    insert_cur.close()
     return redirect(url_for(".index"))                                          # Send the user back to the main page
 
 @app.route("/runIt/")
@@ -254,6 +259,7 @@ def popDuties():
                 INSERT INTO duties (hall_id,day_id,sched_id) VALUES (1,{},2);
                 """.format(days[str(d.getDate())]))
 
+    cur.close()
     conn.commit()
 
 #     -- api --
@@ -295,12 +301,13 @@ def getRAStats(hallId=None):
     res = []
 
     cur = conn.cursor()
-    cur.execute("SELECT id, first_name, last_name, points FROM ra WHERE hall_id = {}".format(hallId))
+    cur.execute("SELECT id, first_name, last_name, points FROM ra WHERE hall_id = {} ORDER BY last_name ASC;".format(hallId))
     raList = cur.fetchall()
 
     for ra in raList:                                                           # Append ras and their info to RAList
         res.append({"id":ra[0],"name":ra[1]+" "+ra[2],"pts":ra[3]})
 
+    cur.close()
     if fromServer:
         # If this function call is from the server, simply return the results
         return res
@@ -353,6 +360,7 @@ def getSchedule(monthNum=None,year=None,hallId=None):
     if m == None:
         # If there is not a month matching the criteria, then a blank calendar
         #  will be generated and returned.
+        cur.close()
         return missingInfo(year,monthNum)
 
     cur.execute("SELECT id FROM schedule WHERE hall_id = {} AND month_id = {} ORDER BY created DESC;".format(hallId,m[0]))
@@ -361,6 +369,7 @@ def getSchedule(monthNum=None,year=None,hallId=None):
     if s == None:
         # If there is not a schedule matching the criteria, then a blank calendar
         #  will be generated and returned.
+        cur.close()
         return missingInfo(year,monthNum)
 
     res["month"] = m[2]                                                         # Set the month name
@@ -413,6 +422,7 @@ def getSchedule(monthNum=None,year=None,hallId=None):
     datesLst.append(week_lst)                                                   # Add the week to the dateLst
     res["dates"] = datesLst                                                     # Add the dateLst to the result dict
 
+    cur.close()
     if fromServer:
         return res
     else:
@@ -502,6 +512,7 @@ def runScheduler(hallId=None, monthNum=None, year=None):
     conn.commit()
 
     ret = {"schedule":getSchedule(month,year,hallId),"raStats":getRAStats(hallId)}
+    cur.close()
     if fromServer:
         return ret
     else:
