@@ -22,9 +22,10 @@
                         <p><span style="color:red;font-weight:bold;">RED:</span> UNAVAILABLE for duty.</p>
                     </div>
                     <div id="current-month" class="current-month">{{ calDict["text_month"] }}</div>
+                    <input id="monthInfo" type="text" name="monthInfo" style="display:none">
                     <div style="text-align:right">
                         <button type="button" onclick="resetForm()">Reset Calendar</button>
-                        <input type="submit" value="Submit Conficts">
+                        <button type="button" onclick="submitForm()">Submit Conflicts</button>
                     </div>
                 </div>
                 <div id="calendar" class="calendar">
