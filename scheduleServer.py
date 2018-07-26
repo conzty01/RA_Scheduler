@@ -31,8 +31,8 @@ app.register_blueprint(gBlueprint, url_prefix="/login")
 conn = psycopg2.connect(os.environ["DATABASE_URL"])
 
 db = SQLAlchemy(app)                                                            # SQLAlchemy is used for OAuth
-login_manager = LoginManager(app)                                               # The login manager for the application
-
+login_manager = LoginManager()                                                  # The login manager for the application
+login_manager.init_app(app)
 # The following classes are for SQLAlchemy to understand how the database is set up for OAuth
 class User(UserMixin,db.Model):                                                 # Contains information about the user
     id = db.Column(db.Integer, primary_key=True)
@@ -71,9 +71,10 @@ def googleLoggedIn(blueprint,token):
 
     resp = blueprint.session.get("/oauth2/v2/userinfo")
     if not resp.ok:                                                             # If the response is bad
+        print("NOT OK")
         return False
     google_info = resp.json()
-    print(google_info)
+
     username = google_info["email"]
     gID = str(google_info["id"])
 
@@ -82,13 +83,16 @@ def googleLoggedIn(blueprint,token):
     try:
         oauth = query.one()                                                     # Execute the query
     except NoResultFound:                                                       # If there are no results
+        print("NO OAUTH")
         oauth = OAuth(provider=blueprint.name,                                  # Create a new entry in our database
                       provider_user_id=gID,
                       token=token)
 
     if oauth.user:                                                              # If we have a user
+        print("LOGGING OAUTH")
         login_user(oauth.user)                                                  # Log them in
     else:
+        print("CREATE NEW USER")
         cur = conn.cursor()
         cur.execute("SELECT id FROM ra WHERE email = '{}'".format(username))    # Get the ra with the matching email so that we can link RAs to their emails
         raId = cur.fetchone()
@@ -104,9 +108,7 @@ def googleLoggedIn(blueprint,token):
 #     -- Helper Functions --
 
 def getAuth():
-    resp = google.get("/oauth2/v2/userinfo")
-    jsonResp = resp.json()
-    uEmail = jsonResp["email"]                                                  # The email returned from Google
+    uEmail = current_user.username                                              # The email returned from Google
     cur = conn.cursor()
     cur.execute("""
             SELECT ra.id, username, first_name, last_name, hall_id, auth_level
@@ -277,6 +279,36 @@ def testAPI():
 
     return jsonify(s2)
 
+@app.route("/api/getStats", methods=["GET"])
+@login_required
+def getRAStats(hallId=None):
+    # API Hook that will get the RA stats for a given month.
+    #  The month will be given via request.args as 'monthNum' and 'year'.
+    #  The server will then query the database for the appropriate statistics
+    #  and send back a json object.
+
+    fromServer = True
+    if hallId == None:                                                          # Effectively: If API was called from the client and not from the server
+        userDict = getAuth()                                                    # Get the user's info from our database
+        hallId = userDict["hall_id"]
+        fromServer = False
+    res = []
+
+    cur = conn.cursor()
+    cur.execute("SELECT id, first_name, last_name, points FROM ra WHERE hall_id = {}".format(hallId))
+    raList = cur.fetchall()
+
+    for ra in raList:                                                           # Append ras and their info to RAList
+        res.append({"id":ra[0],"name":ra[1]+" "+ra[2],"pts":ra[3]})
+
+    if fromServer:
+        # If this function call is from the server, simply return the results
+        return res
+    else:
+        # Otherwise, if this function call is from the client, return the
+        #  results as a JSON response object.
+        return jsonify(res)
+
 @app.route("/api/getSchedule", methods=["GET"])
 @login_required
 def getSchedule(monthNum=None,year=None,hallId=None):
@@ -304,11 +336,13 @@ def getSchedule(monthNum=None,year=None,hallId=None):
 
         return jsonify(res)
 
+    fromServer = True
     if monthNum == None and year == None and hallId == None:                    # Effectively: If API was called from the client and not from the server
         monthNum = int(request.args.get("monthNum"))
         year = int(request.args.get("year"))
         userDict = getAuth()                                                    # Get the user's info from our database
         hallId = userDict["hall_id"]
+        fromServer = False
     res = {}
 
     cur = conn.cursor()
@@ -379,12 +413,14 @@ def getSchedule(monthNum=None,year=None,hallId=None):
     datesLst.append(week_lst)                                                   # Add the week to the dateLst
     res["dates"] = datesLst                                                     # Add the dateLst to the result dict
 
-
-    return jsonify(res)
+    if fromServer:
+        return res
+    else:
+        return jsonify(res)
 
 @app.route("/api/runScheduler", methods=["GET"])
 @login_required
-def runScheduler(hallId, month, year):
+def runScheduler(hallId=None, monthNum=None, year=None):
     # API Hook that will run the scheduler for a given month.
     #  The month will be given via request.args as 'monthNum' and 'year'.
     #  Additionally, the dates that should no have duties are also sent via
@@ -394,14 +430,24 @@ def runScheduler(hallId, month, year):
     if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
         return jsonify("NOT AUTHORIZED")
 
+    fromServer = True
+    if monthNum == None and year == None and hallId == None:                    # Effectively: If API was called from the client and not from the server
+        monthNum = int(request.args.get("monthNum"))
+        year = int(request.args.get("year"))
+        userDict = getAuth()                                                    # Get the user's info from our database
+        hallId = userDict["hall_id"]
+        fromServer = False
+    res = {}
+
     try:                                                                        # Try to get the proper information from the request
         year = int(request.args["year"])
-        month = int(request.args["monthNum"])
+        month = int(request.args["monthNum"])+1
         noDutyList = request.args["noDuty"].split(",")
     except:                                                                     # If error, send back an error message
         return jsonify("ERROR")
 
     hallId = userDict["hall_id"]
+    cur = conn.cursor()
 
     cur.execute("SELECT id FROM month WHERE num = {} AND year = TO_DATE('{}','YYYY')".format(month,year))
     monthId = cur.fetchone()[0]                                                 # Get the month_id from the database
@@ -422,7 +468,7 @@ def runScheduler(hallId, month, year):
     ra_list = [RA(res[0],res[1],res[2],res[3],res[4],res[5],res[6]) for res in cur.fetchall()]
     # The above line creates a list of RA objects reflecting the RAs for the appropriate hall
 
-    sched = scheduling(raList,year,month,noDutyDates=noDutyList)                # Run the scheduler
+    sched = scheduling(ra_list,year,month,noDutyDates=noDutyList)               # Run the scheduler
     cur.execute("INSERT INTO schedule (hall_id,month_id,created) VALUES ({},{},NOW());".format(hallId,monthId))
     conn.commit()                                                               # Add the schedule to the database
     cur.execute("SELECT id FROM schedule WHERE hall_id = {} AND month_id = {} ORDER BY created DESC;".format(hallId,monthId))
@@ -436,21 +482,30 @@ def runScheduler(hallId, month, year):
     for d in sched:                                                             # Iterate through the schedule
         if d.numberOnDuty() > 0:                                                # If there are RAs assigned to this day
             for r in d:
-                cur.execute("""
-                    INSERT INTO duties (hall_id,ra_id,day_id,sched_id) VALUES ({},{},{},{});
-                    """.format(hallId,r.getId(),days[d.getDate()],schedId))     # Add the assigned duty to the database
+                try:
+                    cur.execute("""
+                        INSERT INTO duties (hall_id,ra_id,day_id,sched_id) VALUES ({},{},{},{});
+                        """.format(hallId,r.getId(),days[d.getDate()],schedId)) # Add the assigned duty to the database
+                    cur.execute("UPDATE ra SET points = points + {} WHERE id = {};".format(d.getPoints(),r.getId()))
+                    conn.commit()
+                except psycopg2.IntegrityError:
+                    conn.rollback()
         else:
-            cur.execute("""
-                INSERT INTO duties (hall_id,day_id,sched_id) VALUES ({},{},{});
-                """.format(hallId,days[d.getDate()],schedId))                   # Add the unassigned duty to the database (These should be the dates in the noDutyList)
+            try:
+                cur.execute("""
+                    INSERT INTO duties (hall_id,day_id,sched_id) VALUES ({},{},{});
+                    """.format(hallId,days[d.getDate()],schedId))               # Add the unassigned duty to the database (These should be the dates in the noDutyList)
+                conn.commit()                                                   # Commit additions to the database
+            except psycopg2.IntegrityError:
+                conn.rollback()
 
-    conn.commit()                                                               # Commit additions to the database
+    conn.commit()
 
-    resp = {}                                                                   # Begin to create the JSON response to the client
-    resp["schedule"] = getSchedule(month,year,hallId)                           # Get the formatted schedule from the database
-    resp["raStats"] = None
-
-    return resp
+    ret = {"schedule":getSchedule(month,year,hallId),"raStats":getRAStats(hallId)}
+    if fromServer:
+        return ret
+    else:
+        return jsonify(ret)
 
 #     -- Error Handling --
 
