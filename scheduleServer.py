@@ -156,7 +156,6 @@ def editSched():
     userDict = getAuth()                                                        # Get the user's info from our database
     cur = conn.cursor()
     cur.execute("SELECT id, first_name, last_name, points FROM ra WHERE hall_id = {} ORDER BY points DESC;".format(userDict["hall_id"]))
-    cur.close()
     return render_template("editSched.html", calDict=cDict, raList=cur.fetchall(), auth_level=userDict["auth_level"], \
                             cal=cc.monthdays2calendar(fDict["year"],fDict["num_month"]))
 
@@ -363,7 +362,7 @@ def getSchedule(monthNum=None,year=None,hallId=None):
         cur.close()
         return missingInfo(year,monthNum)
 
-    cur.execute("SELECT id FROM schedule WHERE hall_id = {} AND month_id = {} ORDER BY created DESC;".format(hallId,m[0]))
+    cur.execute("SELECT id FROM schedule WHERE hall_id = {} AND month_id = {} ORDER BY created DESC, id DESC;".format(hallId,m[0]))
     s = cur.fetchone()
 
     if s == None:
@@ -397,7 +396,6 @@ def getSchedule(monthNum=None,year=None,hallId=None):
     prev_date = None
     prev_entry = None
     for d in date_res:                                                          # For each day in the duty schedule
-
         if len(week_lst) == 7:                                                  # If the length of the week is 7 days
             datesLst.append(week_lst)                                           # Start working on a new week
             week_lst = []
@@ -481,7 +479,7 @@ def runScheduler(hallId=None, monthNum=None, year=None):
     sched = scheduling(ra_list,year,month,noDutyDates=noDutyList)               # Run the scheduler
     cur.execute("INSERT INTO schedule (hall_id,month_id,created) VALUES ({},{},NOW());".format(hallId,monthId))
     conn.commit()                                                               # Add the schedule to the database
-    cur.execute("SELECT id FROM schedule WHERE hall_id = {} AND month_id = {} ORDER BY created DESC;".format(hallId,monthId))
+    cur.execute("SELECT id FROM schedule WHERE hall_id = {} AND month_id = {} ORDER BY created DESC, id DESC;".format(hallId,monthId))
     schedId = cur.fetchone()[0]                                                 # Get the id of the schedule that was just created
 
     days = {}                                                                   # Dictionary mapping the day id to the date
@@ -517,6 +515,56 @@ def runScheduler(hallId=None, monthNum=None, year=None):
         return ret
     else:
         return jsonify(ret)
+
+@app.route("/api/getEditInfo", methods=["GET"])
+@login_required
+def getEditInfo(hallId=None, monthNum=None, year=None):
+    # API Hook that will get a the list of RAs along with their conflicts for a.
+    #  given month. The month will be given via request.args as 'monthNum' and
+    #  'year'. The server will then query the database for the conflicts and
+    #  and return them along with a list of the RAs
+
+    userDict = getAuth()                                                        # Get the user's info from our database
+    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
+        return jsonify("NOT AUTHORIZED")
+
+    fromServer = True
+    if monthNum == None and year == None and hallId == None:                    # Effectively: If API was called from the client and not from the server
+        monthNum = int(request.args.get("monthNum")) + 1
+        year = int(request.args.get("year"))
+        userDict = getAuth()                                                    # Get the user's info from our database
+        hallId = userDict["hall_id"]
+        fromServer = False
+    res = []
+    cur = conn.cursor()
+
+    print(monthNum,year)
+
+    cur.execute("SELECT id FROM month WHERE num = {} AND year = TO_DATE('{}','YYYY')".format(monthNum,year))
+    monthId = cur.fetchone()[0]
+
+    cur.execute("SELECT id, first_name, last_name, points FROM ra WHERE hall_id = {};".format(hallId))
+    ra_list = cur.fetchall()
+
+    for raRes in ra_list:
+        raDict = {"id":raRes[0],"name":raRes[1]+" "+raRes[2][0]+".","points":raRes[3]}
+        cur.execute("""SELECT day.date
+                       FROM conflicts JOIN day ON (conflicts.day_id = day.id)
+                                      JOIN month ON (day.month_id = month.id)
+                       WHERE day.month_id = {} AND conflicts.ra_id = {};""".format(monthId,raRes[0]))
+
+        conList = cur.fetchall()
+        c = []
+        for con in conList:
+            c.append(con[0])
+
+        raDict["conflicts"] = c                                                 # Add conflicts to the RA Dict
+        res.append(raDict)                                                      # Append RA Dict to results list
+
+    if fromServer:
+        return res
+    else:
+        return jsonify(res)
 
 #     -- Error Handling --
 

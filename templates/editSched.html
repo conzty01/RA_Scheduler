@@ -37,10 +37,15 @@
                             {% for week in cal: %}
                             <div class="calendar__week">
                                 {% for day in week: %}
+                                {% if day[1] in [6,1,2,3,4]: %}
+                                {% set pts = 1 %}
+                                {% else %}
+                                {% set pts = 2 %}
+                                {% endif %}
 
                                 {% if day[0] != 0: %}
-                                <div class="calendar__day day" id="d{{ day[0] }}">
-                                    <div class="date">{{ day[0] }}</div>
+                                <div data-points="{{pts}}" class="calendar__day day" id="d{{ day[0] }}">
+                                    {{pts}}
                                 </div>
                                 {% else %}
                                 <div class="calendar__day day oth">
@@ -61,15 +66,15 @@
                 <div id="raList" class="raList">
                 <ul>
                     {% for ra in raList: %}
-                    <li id="{{ ra[0] }}" onclick="highlightRA({{ ra[0] }})">
-                        <div class="tName">{{ ra[1] }} {{ ra[2] }}</div>
-                        <div class="tPoints">{{ ra[3] }}</div>
+                    <li id="list_{{ ra[0] }}" onclick="highlightRA({{ ra[0] }})">
+                        <div id="list_name_{{ ra[0] }}" class="tName">{{ ra[1] }} {{ ra[2] }}</div>
+                        <div id="list_points_{{ ra[0] }}" class="tPoints">{{ ra[3] }}</div>
                     </li>
                     {% endfor %}
                 </ul>
                 </div>
                 <button id="run" type="button" onclick="runScheduler()">Run Scheduler</button>
-                <button id="edit" type="button" onclick="editCalendar()">Edit Calendar</button>
+                <button id="edit" type="button" onclick="getEditInfo()">Edit Calendar</button>
             </div>
         </div>
     </div>

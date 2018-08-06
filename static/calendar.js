@@ -32,7 +32,14 @@ function applySchedule(sched) {
         w.className = "calendar__week";
         cal.appendChild(w); // Append "calendar__week" div to "calendar" div
 
+        let dayNum = 0;
         for (let day of week) {
+            let pts;
+            if (dayNum in [0,1,2,3,4]) {
+                pts = 1;
+            } else {
+                pts = 2;
+            }
             let d = document.createElement("div");
             let dDate = document.createElement("div");
             dDate.className = "date";
@@ -53,6 +60,11 @@ function applySchedule(sched) {
                     r.id = ra["id"];
                     d.appendChild(r);
                 }
+            }
+            d.setAttribute("data-points",pts);
+            dayNum++;
+            if (dayNum >= 7) {
+                dayNum = 0;
             }
         }
     }
