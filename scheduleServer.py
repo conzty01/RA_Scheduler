@@ -300,11 +300,15 @@ def getRAStats(hallId=None):
     res = []
 
     cur = conn.cursor()
-    cur.execute("SELECT id, first_name, last_name, points FROM ra WHERE hall_id = {} ORDER BY last_name ASC;".format(hallId))
+    cur.execute("SELECT id, first_name, last_name FROM ra WHERE hall_id = {} ORDER BY last_name ASC;".format(hallId))
     raList = cur.fetchall()
 
     for ra in raList:                                                           # Append ras and their info to RAList
-        res.append({"id":ra[0],"name":ra[1]+" "+ra[2],"pts":ra[3]})
+        cur.execute("SELECT SUM(pts) FROM duties WHERE ra_id = {}".format(ra[0]))
+        pts = cur.fetchone()
+        if type(pts) == type(None):
+            pts = (0,)
+        res.append({"id":ra[0],"name":ra[1]+" "+ra[2],"pts":pts[0]})
 
     cur.close()
     if fromServer:
@@ -573,4 +577,4 @@ def err(msg):
     return render_template("error.html", errorMsg=msg)
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()

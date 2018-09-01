@@ -67,7 +67,7 @@ def createDutyDB(conn):
 			ra_id		int,
 			day_id		int,
 			sched_id	int,
-
+			point_val	int,
 
 			PRIMARY KEY (id),
 			FOREIGN KEY (hall_id) REFERENCES res_hall(id),
