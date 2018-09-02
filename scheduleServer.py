@@ -17,7 +17,6 @@ import os
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ["DATABASE_URL"]
-app.config['OAUTHLIB_RELAX_TOKEN_SCOPE'] = 1
 Bootstrap(app)
 # Setup for flask_dance with oauth
 app.secret_key = os.environ["SECRET_KEY"]
