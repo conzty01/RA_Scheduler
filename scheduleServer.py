@@ -578,4 +578,4 @@ def err(msg):
     return render_template("error.html", errorMsg=msg)
 
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True)
