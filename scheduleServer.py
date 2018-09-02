@@ -17,7 +17,6 @@ import os
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ["DATABASE_URL"]
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 Bootstrap(app)
 # Setup for flask_dance with oauth
 app.secret_key = os.environ["SECRET_KEY"]
@@ -579,4 +578,4 @@ def err(msg):
     return render_template("error.html", errorMsg=msg)
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()
