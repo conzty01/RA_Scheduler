@@ -19,7 +19,7 @@ app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ["DATABASE_URL"]
 Bootstrap(app)
 # Setup for flask_dance with oauth
-app.secret_key = os.environ["SECRET_KEY"]
+app.secret_key = os.environ["SUPER_SECRET_KEY"]
 gBlueprint = make_google_blueprint(
     client_id=os.environ["CLIENT_ID"],
     client_secret=os.environ["CLIENT_SECRET"],
@@ -162,6 +162,7 @@ def editSched():
 @app.route("/staff")
 @login_required
 def manStaff():
+    userDict = getAuth()                                                        # Get the user's info from our database
     return render_template("staff.html")
 
 #     -- Functional --
