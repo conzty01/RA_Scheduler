@@ -96,7 +96,7 @@ def createMonthDB(conn):
 		CREATE TABLE month(
 			id			serial UNIQUE,
 			num			int,
-			name		varchar(8),
+			name		varchar(10),
 			year		date,
 
 			PRIMARY KEY (name,year)
