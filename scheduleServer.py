@@ -63,6 +63,13 @@ cc = calendar.Calendar(6) #format calendar so Sunday starts the week
 def load_user(user_id):
     return User.query.get(int(user_id))
 
+@app.before_request
+def before_request():
+    if request.url.startswith('http://'):
+        url = request.url.replace('http://', 'https://', 1)
+        code = 301
+        return redirect(url, code=code)
+
 @oauth_authorized.connect_via(gBlueprint)
 def googleLoggedIn(blueprint,token):
     print('googleLoggedIn')
