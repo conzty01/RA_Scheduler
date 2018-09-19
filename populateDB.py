@@ -53,24 +53,30 @@ def popRAs(cur):
 	popOlsonRA(cur)
 
 def popMonth(cur):
-	cur.execute("INSERT INTO month (num, name, year) VALUES (1,'January',to_date('2018', 'YYYY'))")
-	cur.execute("INSERT INTO month (num, name, year) VALUES (2,'February',to_date('2018', 'YYYY'))")
-	cur.execute("INSERT INTO month (num, name, year) VALUES (3,'March',to_date('2018', 'YYYY'))")
-	cur.execute("INSERT INTO month (num, name, year) VALUES (5,'May',to_date('2018', 'YYYY'))")
+	cur.execute("INSERT INTO month (num, name, year) VALUES (8,'August',to_date('2018', 'YYYY'))")
+	cur.execute("INSERT INTO month (num, name, year) VALUES (9,'September',to_date('2018', 'YYYY'))")
+	cur.execute("INSERT INTO month (num, name, year) VALUES (10,'October',to_date('2018', 'YYYY'))")
+	cur.execute("INSERT INTO month (num, name, year) VALUES (11,'November',to_date('2018', 'YYYY'))")
+	cur.execute("INSERT INTO month (num, name, year) VALUES (12,'December',to_date('2018', 'YYYY'))")
+	cur.execute("INSERT INTO month (num, name, year) VALUES (1,'January',to_date('2019', 'YYYY'))")
+	cur.execute("INSERT INTO month (num, name, year) VALUES (2,'February',to_date('2019', 'YYYY'))")
+	cur.execute("INSERT INTO month (num, name, year) VALUES (3,'March',to_date('2019', 'YYYY'))")
+	cur.execute("INSERT INTO month (num, name, year) VALUES (4,'April',to_date('2019', 'YYYY'))")
+	cur.execute("INSERT INTO month (num, name, year) VALUES (5,'May',to_date('2019', 'YYYY'))")
 
 def popDay(cur):
 	c = calendar.Calendar()
-	for m in [("January",1),("February",2),("March",3),("May",5)]:
+	for m in [("January",1,2019),("February",2,2019),("March",3,2019),("April",4,2019),("May",5,2019),("August",8,2018),("September",9,2018),("October",10,2018),("November",11,2018),("December",12,2018)]:
 		cur.execute("SELECT id FROM month WHERE name = '{}'".format(m[0]))
 		mID = cur.fetchone()[0]
 
-		for d in c.itermonthdays(2018,m[1]):
+		for d in c.itermonthdays(m[2],m[1]):
 			if d > 0:
 				if len(str(d)) < 2:
 					dstr = "0"+str(d)
 				else:
 					dstr = str(d)
-				s = dstr +" "+ m[0][:3] +" "+ "2018"
+				s = dstr +" "+ m[0][:3] +" "+ str(m[2])
 				cur.execute("INSERT INTO day (month_id, date) VALUES ({},to_date('{}', 'DD Mon YYYY'))".format(mID,s))
 
 def popConflicts(cur):
@@ -125,19 +131,19 @@ def main():
 	# This program assumes that the database is completely clean
 	conn = psycopg2.connect(os.environ["DATABASE_URL"])
 	cur = conn.cursor()
-	popResHall(cur)
-	conn.commit()
-	popRAs(cur)
-	conn.commit()
+	# popResHall(cur)
+	# conn.commit()
+	# popRAs(cur)
+	# conn.commit()
 	popMonth(cur)
 	conn.commit()
 	popDay(cur)
 	conn.commit()
-	popConflicts(cur)
-	conn.commit()
-	popSchedule(cur)
-	conn.commit()
-	popDuties(cur)
-	conn.commit()
+	# popConflicts(cur)
+	# conn.commit()
+	# popSchedule(cur)
+	# conn.commit()
+	# popDuties(cur)
+	# conn.commit()
 
 main()
