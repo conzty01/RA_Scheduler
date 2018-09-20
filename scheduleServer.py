@@ -53,7 +53,7 @@ gBlueprint.backend = SQLAlchemyBackend(OAuth, db.session, user=current_user, use
 
 # Format date and time information for calendar
 ct = datetime.datetime.now()
-fDict = {"text_month":calendar.month_name[(ct.month+2)%12], "num_month":(ct.month+2)%12, "year":(ct.year if ct.month <= 12 else ct.year+1)}
+fDict = {"text_month":calendar.month_name[(ct.month+1)%12], "num_month":(ct.month+1)%12, "year":(ct.year if ct.month <= 12 else ct.year+1)}
 cDict = {"text_month":calendar.month_name[ct.month], "num_month":ct.month, "year":ct.year}
 cc = calendar.Calendar(6) #format calendar so Sunday starts the week
 
