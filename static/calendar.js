@@ -108,7 +108,7 @@ function submitForm() {
     document.getElementById("conflictForm").submit();
 }
 
-if (window.location.href.indexOf('conflicts') !== -1) {
+if (window.location.href.indexOf('conflicts') < 0) {
     window.onload = getCurSchedule();
 } else {
     appConfig.calDate.setMonth(appConfig.calDate.getMonth() + 1)
