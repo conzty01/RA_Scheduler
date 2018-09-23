@@ -104,7 +104,8 @@ function submitForm() {
     console.log("Submit Form");
     let inputBox = document.getElementById("monthInfo");
     let d = appConfig.calDate;
-    inputBox.value = d.getMonth().toString()+"/"+d.getFullYear().toString();
+    inputBox.value = (d.getMonth()+1).toString()+"/"+d.getFullYear().toString();
+    // +1 because months are 0-based numbers
     document.getElementById("conflictForm").submit();
 }
 

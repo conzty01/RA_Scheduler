@@ -181,7 +181,7 @@ def processConflicts():
 
     ra_id = userDict["ra_id"]
     hallId = userDict["hall_id"]
-    month = int(request.form.get("monthInfo").split("/")[0]) + 1
+    month = int(request.form.get("monthInfo").split("/")[0])
     year = int(request.form.get("monthInfo").split("/")[1])
 
     if len(str(month)) < 2:                                                     # The following few lines formats the strings into a syntax that psql understands
