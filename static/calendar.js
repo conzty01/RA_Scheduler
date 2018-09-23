@@ -1,8 +1,5 @@
 "use strict"
 
-// Dev stuff
-//document.cookie = "username=conzty01; hall=Brandt;";
-
 function getCurSchedule() {
     // Get the schedule for the current month
     console.log("Getting Current Schedule: ",appConfig.curDate);
@@ -111,4 +108,8 @@ function submitForm() {
     document.getElementById("conflictForm").submit();
 }
 
-window.onload = getCurSchedule();
+if (window.location.href.indexOf('conflicts') !== -1) {
+    window.onload = getCurSchedule();
+} else {
+    appConfig.calDate.setMonth(appConfig.calDate.getMonth() + 1)
+}
