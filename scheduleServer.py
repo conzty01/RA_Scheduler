@@ -154,8 +154,16 @@ def index():
 @app.route("/conflicts")
 def conflicts():
     userDict = getAuth()                                                        # Get the user's info from our database
+
+    # If current month is December, update the year
+    #  to display the proper month
+    if fDict["num_month"] == 12:
+        year = fDict["year"] + 1
+    else:
+        year = fDict["year"]
+
     return render_template("conflicts.html", calDict=fDict, auth_level=userDict["auth_level"], \
-                            cal=cc.monthdays2calendar(fDict["year"],fDict["num_month"]))
+                            cal=cc.monthdays2calendar(year,fDict["num_month"]))
 
 @app.route("/editSched")
 @login_required
