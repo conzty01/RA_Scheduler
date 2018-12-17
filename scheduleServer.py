@@ -157,8 +157,7 @@ def conflicts():
 
     # If current month is December, update the year
     #  to display the proper month
-    print("GET CONFLICT PAGE")
-    if fDict["num_month"] == 12:
+    if fDict["num_month"] == 1:
         year = fDict["year"] + 1
     else:
         year = fDict["year"]
