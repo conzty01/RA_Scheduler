@@ -173,7 +173,7 @@ class Schedule:
                 #  date belongs to the next or previous month.
 
                 if d[0] != 0:
-                    if d[0] in noDutyDates: # If the date is not a day without duty
+                    if d[0] in noDutyDates: # If the date is not a day with duty
                         self.schedule.append(Day(date(year,month,d[0]),numDutySlots=0))
                     else:
                         if d[1] in doubleDays:
@@ -182,6 +182,7 @@ class Schedule:
                             self.doubleDates.append(d[0])
                             self.schedule.append(Day(date(year,month,d[0]),numDutySlots=2))
                         else:
+                            # Else the day should have one RA on duty
                             self.schedule.append(Day(date(year,month,d[0]),numDutySlots=1))
 
     def __repr__(self):

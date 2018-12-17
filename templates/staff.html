@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block styles %}
+{{ super() }}
+<link rel="stylesheet" href="{{url_for('.static', filename='calendar.css')}}">
+<link rel="stylesheet" href="{{url_for('.static', filename='editSched.css')}}">
+{% endblock %}
+
+{% block headerRow %}
+<h1>Manage Staff</h1>
+{% endblock headerRow %}
+
+{% block contentRows %}
+<div class="row">
+    <form action="api/manStaff" method="post">
+        
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="{{url_for('.static', filename='calendar.js')}}"></script>
+{% endblock %}

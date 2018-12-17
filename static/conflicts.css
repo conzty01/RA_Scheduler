@@ -1,0 +1,33 @@
+.calendar input[type=checkbox] {
+    transform: scale(1.5);
+}
+.checkLabel {
+    display: block;
+    height: 55%;
+    width: 100%;
+    background-color:rgba(0,255,0,0.3);
+}
+.checkLabel > input[type=checkbox]:checked {
+    background-color: red;
+}
+.calendar__day {
+    padding-right: 0px;
+}
+.check {
+
+    text-align: center;
+}
+.date {
+    margin-right: 5px;
+}
+input[type=submit], button {
+    padding: 5px;
+    background: #003F87;
+    color: #FFF;
+    height: 50%;
+    width: auto;
+    font-size: 1.2em;
+    cursor: pointer;
+    border-radius: 5px;
+    text-align: center;
+}

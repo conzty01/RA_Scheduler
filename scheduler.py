@@ -1,24 +1,7 @@
 from datetime import date
 from ra_sched import Schedule, Day
 import random
-import calendar             # Only needed for oldScheduling()
-
-def resetRAList(raList,schedList):
-    raList = schedList                                                          # Switch the two lists
-    return (raList, [])                                                         # Reset schedList to []
-
-def assignRA(day,raList,schedList,cand_index):
-    cand_ra = raList[cand_index]                                                # Candidate RA
-    day.addRA(cand_ra)                                                          # Assign candidate RA for duty
-    schedList.append(raList.pop(cand_index))                                    # Add RA to scheduledList
-    return (raList,schedList,0)
-
-def checkReset(raList,scheduledList):
-    if len(raList) < 1 and len(scheduledList) > 0:  # If all RAs have been assigned
-        raList, scheduledList = resetRAList(raList, scheduledList)  # Reset lists
-        raList.sort()  # Re-sort the RA lists
-    return (raList,scheduledList)
-
+import calendar                                                                 # Only needed for oldScheduling()
 
 def scheduling(raList,year,month,noDutyDates=[],doubleDays=(4,5)):
     # This algorithm will schedule RAs for duties based on ...
@@ -41,6 +24,21 @@ def scheduling(raList,year,month,noDutyDates=[],doubleDays=(4,5)):
     #                       Mon, Tues, Wed, Thurs, Fri, Sat, Sun
     #                        0    1     2     3     4    5    6
     #
+    def resetRAList(raList,schedList):
+        raList = schedList                                                      # Switch the two lists
+        return (raList, [])                                                     # Reset schedList to []
+
+    def assignRA(day,raList,schedList,cand_index):
+        cand_ra = raList[cand_index]                                            # Candidate RA
+        day.addRA(cand_ra)                                                      # Assign candidate RA for duty
+        schedList.append(raList.pop(cand_index))                                # Add RA to scheduledList
+        return (raList,schedList,0)
+
+    def checkReset(raList,scheduledList):
+        if len(raList) < 1 and len(scheduledList) > 0:                          # If all RAs have been assigned
+            raList, scheduledList = resetRAList(raList, scheduledList)          # Reset lists
+            raList.sort()                                                       # Re-sort the RA lists
+        return (raList,scheduledList)
 
     scheduledList = [] # A list that contains RAs that have been scheduled already
     schedule = Schedule(year,month,noDutyDates,doubleDays=doubleDays)
@@ -99,6 +97,7 @@ def scheduling(raList,year,month,noDutyDates=[],doubleDays=(4,5)):
     return schedule
 
 def oldScheduling(raConflicts, year, month):
+    # Depreciated
     #this will take conflicts eventually
     daysInMonth = calendar.monthrange(year,month)[1]
     days = [0,1,2,3,4,5,6] # Mon,Tues,Wed,Thurs,Fri,,Sat,Sun
