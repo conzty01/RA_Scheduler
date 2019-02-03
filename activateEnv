@@ -19,3 +19,7 @@ export OAUTHLIB_INSECURE_TRANSPORT=1
 export SECRET_KEY=
 export CLIENT_ID=
 export CLIENT_SECRET=
+
+# The USE_ADHOC boolean is for setting the ssl_context of the flask
+#  this is only to be used for development purposes.
+export USE_ADHOC=true
