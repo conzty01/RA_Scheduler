@@ -16,6 +16,72 @@ function getSchedule(monthNum,year) {
     appConfig.base.callAPI("getSchedule",{"monthNum":monthNum,"year":year},applySchedule);
 }
 
+function getMonth(monthNum,year) {
+    // Get the month layout for the given month and year
+    console.log("Getting Layout for month: ", monthNum, year);
+    //document.getElementById("loading").style.display = "block";
+    appConfig.base.callAPI("getMonth",{"monthNum":monthNum,"year":year},applyMonth);
+
+}
+
+function applyMonth(layout) {
+    // Apply the given month layout to the calendar
+    console.log("Applying Month Layout: ",layout);
+
+    clearCalendar();
+    document.getElementById("current-month").innerHTML = layout["month"];
+    let cal = document.getElementById("calendar");
+
+    for (let week of layout["dates"]) {
+        let w = document.createElement("div");
+        w.className = "calendar__week";
+        cal.appendChild(w); // Append "calendar__week" div to "calendar" div
+
+        let dayNum = 0;
+        for (let day of week) {
+            let d = document.createElement("div");
+            let dDate = document.createElement("div");
+
+            w.appendChild(d);   // Append the "calendar__day" div to the "calendar__week" div
+
+            dDate.className = "date";
+
+            d.className = "calendar__day day";
+
+            if (day["date"] !== 0) {
+                let dLabel = document.createElement("label");
+                let dCheckD = document.createElement("div");
+                let dCheck = document.createElement("input");
+
+                dLabel.appendChild(dDate);   // Append the "date" div to the label element
+                dLabel.appendChild(dCheckD);  // Append the checkmark div to the label element
+                dCheckD.appendChild(dCheck);  // Append the input element to the checkmark div
+                d.appendChild(dLabel);  // Append the "label" div to the "calendar__day" div
+
+                dLabel.className = "checkLabel";
+                dLabel.htmlfor = "d"+day["date"];
+
+                dCheckD.className = "check";
+
+                dCheck.id = day["date"].toString();
+                dCheck.type = "checkbox";
+                dCheck.name = "d"+day["date"];
+                dCheck.setAttribute("onchange","changeCheck(this)");
+
+                dDate.innerHTML = day["date"];
+                d.id = "d" + day["date"];
+            } else {
+                d.appendChild(dDate);
+            }
+            dayNum++;
+            if (dayNum >= 7) {
+                dayNum = 0;
+            }
+        }
+    }
+    document.getElementById("loading").style.display = "none";
+}
+
 function applySchedule(sched) {
     // Apply the given schedule to the calendar
     console.log("Applying Schedule: ",sched);
@@ -81,15 +147,19 @@ function clearCalendar() {
     }
 }
 
-function changeMonth(i) {
+function changeMonth(i,getSched) {
     // This function should change the calendar to show either the previous
     //  or next month depending on the integer that is passed as a parameter.
     //   1  indicates the next month
     //  -1  indicates the previous month
 
-    console.log("Change Month: ",i);
+    console.log("Change Month: ",i," Get New Schedule: ",getSched);
     appConfig.calDate.setMonth(appConfig.calDate.getMonth() + i);
-    getSchedule(appConfig.calDate.getMonth()+1,appConfig.calDate.getFullYear());
+    if (getSched === true) {
+        getSchedule(appConfig.calDate.getMonth()+1,appConfig.calDate.getFullYear());
+    } else {
+        getMonth(appConfig.calDate.getMonth()+1,appConfig.calDate.getFullYear());
+    }
 }
 
 function resetForm() {

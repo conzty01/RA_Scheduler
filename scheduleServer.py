@@ -6,6 +6,7 @@ from flask_dance.consumer import oauth_authorized
 from sqlalchemy.orm.exc import NoResultFound
 from flask_sqlalchemy import SQLAlchemy
 from flask_bootstrap import Bootstrap
+from flask.wrappers import Response
 from scheduler import scheduling
 from ra_sched import RA
 import datetime
@@ -148,6 +149,8 @@ def login():
 @login_required
 def index():
     userDict = getAuth()                                                        # Get the user's info from our database
+    if type(userDict) != dict:
+        return userDict
     return render_template("index.html",calDict=cDict,auth_level=userDict["auth_level"], \
                             cal=cc.monthdays2calendar(fDict["year"],fDict["num_month"]))
 
@@ -157,7 +160,6 @@ def conflicts():
 
     # If current month is December, update the year
     #  to display the proper month
-    print("GET CONFLICT PAGE")
     if fDict["num_month"] == 12:
         year = fDict["year"] + 1
     else:
@@ -447,6 +449,30 @@ def getSchedule(monthNum=None,year=None,hallId=None):
     else:
         return jsonify(res)
 
+@app.route("/api/getMonth", methods=["GET"])
+def getMonth(monthNum=None,year=None):
+    # API Hook that will get the requested month format.
+    # This function generates a blank calendar to return to the client for
+    #  the given year and monthNum (1-12)
+
+    if monthNum == None and year == None:                                       # Effectively: If API was called from the client and not from the server
+        monthNum = int(request.args.get("monthNum"))
+        year = int(request.args.get("year"))
+
+    res = {}
+    dateList = []
+    for week in cc.monthdayscalendar(year,monthNum):
+        weeklst = []
+        for day in week:
+            weeklst.append({"date":day,"ras":[]})
+
+        dateList.append(weeklst)
+
+    res["dates"] = dateList
+    res["month"] = calendar.month_name[monthNum]
+
+    return jsonify(res)
+
 @app.route("/api/runScheduler", methods=["GET"])
 @login_required
 def runScheduler(hallId=None, monthNum=None, year=None):
@@ -594,4 +620,8 @@ def err(msg):
     return render_template("error.html", errorMsg=msg)
 
 if __name__ == "__main__":
-    app.run()
+    local = os.environ["USE_ADHOC"]
+    if local:
+        app.run(ssl_context="adhoc", debug=True)
+    else:
+        app.run()

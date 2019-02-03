@@ -8,7 +8,9 @@
 {% block headerRow %}
 <h1>Duty Conflicts</h1>
 <p>Select the dates that you have a duty conflict with
-    for the month of {{ calDict["text_month"] }}.</p>
+    for the month of {{ calDict["text_month"] }}.
+    <span style="color:green;font-weight:bold;">GREEN:</span> AVAILABLE for duty.
+    <span style="color:red;font-weight:bold;">RED:</span> UNAVAILABLE for duty.</p>
 {% endblock headerRow %}
 
 {% block contentRows %}
@@ -17,11 +19,14 @@
         <main>
             <form id="conflictForm" class="entryForm" action="/enterConflicts/" method="post">
                 <div class="toolbar">
-                    <div>
-                        <p><span style="color:green;font-weight:bold;">GREEN:</span> AVAILABLE for duty.</p>
-                        <p><span style="color:red;font-weight:bold;">RED:</span> UNAVAILABLE for duty.</p>
+                    <div class="toggle">
+                        <div class="toggle__option" onclick="changeMonth(-1)">&#60;</div>
+                        <div class="toggle__option" onclick="changeMonth(1)">&#62;</div>
+                        <div class="toggle__option" onclick="getCurSchedule()">Today</div>
                     </div>
+
                     <div id="current-month" class="current-month">{{ calDict["text_month"] }}</div>
+
                     <input id="monthInfo" type="text" name="monthInfo" style="display:none">
                     <div style="text-align:right">
                         <button type="button" onclick="resetForm()">Reset Calendar</button>
