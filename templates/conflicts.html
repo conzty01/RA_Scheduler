@@ -20,9 +20,9 @@
             <form id="conflictForm" class="entryForm" action="/enterConflicts/" method="post">
                 <div class="toolbar">
                     <div class="toggle">
-                        <div class="toggle__option" onclick="changeMonth(-1)">&#60;</div>
-                        <div class="toggle__option" onclick="changeMonth(1)">&#62;</div>
-                        <div class="toggle__option" onclick="getCurSchedule()">Today</div>
+                        <div class="toggle__option" onclick="changeMonth(-1,true)">&#60;</div>
+                        <div class="toggle__option" onclick="changeMonth(1,true)">&#62;</div>
+                        <div class="toggle__option" onclick="getCurMonth()">Today</div>
                     </div>
 
                     <div id="current-month" class="current-month">{{ calDict["text_month"] }}</div>

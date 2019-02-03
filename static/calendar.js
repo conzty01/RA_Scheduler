@@ -9,6 +9,14 @@ function getCurSchedule() {
     // The +1 accounts for the 0 indexing ---^
 }
 
+function getCurMonth() {
+    // Get the month layout for the current month
+    console.log("Getting Current Month Layout: ",appConfig.curDate);
+    appConfig.calDate.setMonth(appConfig.curDate.getMonth());
+    appConfig.calDate.setYear(appConfig.curDate.getFullYear());
+    getMonth(appConfig.curDate.getMonth()+1,appConfig.calDate.getFullYear());
+}
+
 function getSchedule(monthNum,year) {
     // Get the schedule for the given month and year
     console.log("Getting Schedule for month: ",monthNum, year);
@@ -155,7 +163,7 @@ function changeMonth(i,getSched) {
 
     console.log("Change Month: ",i," Get New Schedule: ",getSched);
     appConfig.calDate.setMonth(appConfig.calDate.getMonth() + i);
-    if (getSched === true) {
+    if (getSched != true) {
         getSchedule(appConfig.calDate.getMonth()+1,appConfig.calDate.getFullYear());
     } else {
         getMonth(appConfig.calDate.getMonth()+1,appConfig.calDate.getFullYear());
