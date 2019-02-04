@@ -640,9 +640,34 @@ def changeStaffInfo():
                         data["email"],data["authLevel"], data["raID"]))
 
     conn.commit()
-
+    cur.close()
     return data["raID"]
 
+@app.route("/api/removeStaffer", methods=["POST"])
+@login_required
+def removeStaffer():
+    userDict = getAuth()
+
+    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
+        return jsonify("NOT AUTHORIZED")
+
+    raID = request.json
+
+    checkCur = conn.cursor()
+    checkCur.execute("SELECT hall_id FROM ra WHERE id = {};".format(raID))
+
+    if userDict["hall_id"] != checkCur.fetchone()[0]:
+        return jsonify("NOT AUTHORIZED")
+
+    checkCur.close()
+
+    cur = conn.cursor()
+
+    cur.execute("UPDATE ra SET hall_id = 0 WHERE id = {};".format(raID))
+    conn.commit()
+    cur.close()
+
+    return jsonify(raID)
 
 #     -- Error Handling --
 

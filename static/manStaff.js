@@ -67,7 +67,10 @@ function resetRow(id) {
 }
 
 function delStaff(id) {
-
+    appConfig.base.callAPI("removeStaffer",id,function(i) {
+        let row = document.getElementById(i);
+        row.parentNode.removeChild(row);
+    },"POST");
 }
 
 function addStaff() {
