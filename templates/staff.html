@@ -2,7 +2,7 @@
 {% block styles %}
 {{ super() }}
 <link rel="stylesheet" href="{{url_for('.static', filename='calendar.css')}}">
-<link rel="stylesheet" href="{{url_for('.static', filename='editSched.css')}}">
+<link rel="stylesheet" href="{{url_for('.static', filename='manStaff.css')}}">
 {% endblock %}
 
 {% block headerRow %}
@@ -11,13 +11,48 @@
 
 {% block contentRows %}
 <div class="row">
-    <form action="api/manStaff" method="post">
-        
-    </form>
+    <button class="btn btn-primary" onclick="addStaff()">Add Staff Member</button>
+</div>
+
+<div class="row">
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr>
+                <th scope="col">ID</th>
+                <th scope="col">First Name</th>
+                <th scope="col">Last Name</th>
+                <th scope="col">Email</th>
+                <th scope="col">Date Started</th>
+                <th scope="col">Res Hall</th>
+                <th scope="col">Points</th>
+                <th scope="col">Color</th>
+                <th scope="col">Auth Level</th>
+                <th scope="col">Edit</th>
+                <th scope="col">Delete</th>
+            </tr>
+        </thead>
+        <tbody>
+    {% for ra in raList: %}
+            <tr id="{{ ra[0] }}" scope="row">
+                <td class="raID">{{ ra[0] }}</td>
+                <td class="fName">{{ ra[1] }}</td>
+                <td class="lName">{{ ra[2] }}</td>
+                <td class="email">{{ ra[3] }}</td>
+                <td class="startDate">{{ ra[4] }}</td>
+                <td class="resHall">{{ ra[5] }}</td>
+                <td class="points">{{ ra[6] }}</td>
+                <td class="color">{{ ra[7] }}</td>
+                <td class="authLevel">{{ ra[8] }}</td>
+                <td class="edit"><span class="glyphicon glyphicon-pencil" onclick="editStaff({{ ra[0] }})"></span></td>
+                <td class="del"><span class="glyphicon glyphicon-remove" onclick="delStaff({{ ra[0] }})"></span></td>
+            </tr>
+    {% endfor %}
+        </tbody>
+    </table>
 </div>
 {% endblock %}
 
 {% block scripts %}
 {{ super() }}
-<script src="{{url_for('.static', filename='calendar.js')}}"></script>
+<script src="{{url_for('.static', filename='manStaff.js')}}"></script>
 {% endblock %}

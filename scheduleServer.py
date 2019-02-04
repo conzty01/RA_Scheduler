@@ -181,7 +181,11 @@ def editSched():
 @login_required
 def manStaff():
     userDict = getAuth()                                                        # Get the user's info from our database
-    return render_template("staff.html")
+    cur = conn.cursor()
+    cur.execute("SELECT ra.id, first_name, last_name, email, date_started, res_hall.name, points, color, auth_level \
+     FROM ra JOIN res_hall ON (ra.hall_id = res_hall.id) \
+     WHERE hall_id = {} ORDER BY ra.id ASC;".format(userDict["hall_id"]))
+    return render_template("staff.html",raList=cur.fetchall(),auth_level=userDict["auth_level"])
 
 #     -- Functional --
 
@@ -612,6 +616,33 @@ def getEditInfo(hallId=None, monthNum=None, year=None):
         return res
     else:
         return jsonify(res)
+
+@app.route("/api/changeStaffInfo", methods=["POST"])
+@login_required
+def changeStaffInfo():
+    userDict = getAuth()                                                        # Get the user's info from our database
+
+    hallId = userDict["hall_id"]
+
+    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
+        return jsonify("NOT AUTHORIZED")
+
+    data = request.json
+
+    cur = conn.cursor()
+    cur.execute("""UPDATE ra
+                   SET first_name = '{}', last_name = '{}', hall_id = {},
+                       date_started = TO_DATE('{}', 'YYYY-MM-DD'),
+                       points = {}, color = '{}', email = '{}', auth_level = {}
+                   WHERE id = {};
+                """.format(data["fName"],data["lName"],hallId, \
+                        data["startDate"],data["points"],data["color"], \
+                        data["email"],data["authLevel"], data["raID"]))
+
+    conn.commit()
+
+    return data["raID"]
+
 
 #     -- Error Handling --
 

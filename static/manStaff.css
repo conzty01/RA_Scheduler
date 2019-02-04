@@ -1,0 +1,30 @@
+.glyphicon-pencil {
+    color: yellow;
+}
+
+.glyphicon-remove {
+    color: red;
+}
+
+.glyphicon-ok {
+    color: green;
+}
+
+.glyphicon:hover {
+    cursor: pointer;
+}
+
+.row button {
+    margin-bottom: 10px;
+}
+
+table {
+    width: 100%;
+    max-height: 700px;
+    overflow: scroll;
+}
+
+input {
+    max-width: 100px;
+    overflow: scroll;
+}
