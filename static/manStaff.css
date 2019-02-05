@@ -28,3 +28,12 @@ input {
     max-width: 100px;
     overflow: scroll;
 }
+
+#addRow > div {
+    padding: 5px;
+}
+
+#addRow > div > input {
+    width: 100%;
+    max-width: none;
+}

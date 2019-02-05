@@ -10,8 +10,25 @@
 {% endblock headerRow %}
 
 {% block contentRows %}
-<div class="row">
-    <button class="btn btn-primary" onclick="addStaff()">Add Staff Member</button>
+<div id="addRow" class="row">
+    <div class="col-xs-2"><input type="text" placeholder="First Name" /></div>
+    <div class="col-xs-2"><input type="text" placeholder="Last Name" /></div>
+    <div class="col-xs-3"><input type="text" placeholder="Email" /></div>
+    <div class="col-xs-1"><input type="text" placeholder="Color" /></div>
+    <div class="col-xs-2">
+        <select>
+            <option value="" selected disabled>Select Position</option>
+            <option value="" disabled>-------------------------</option>
+            <option value="1">RA</option>
+            <option value="2">AHD</option>
+            {% if auth_level >= 3: %}
+            <option value="3">HD</option>
+            {% endif %}
+        </select>
+    </div>
+    <div class="col-xs-2">
+        <button class="btn btn-primary" onclick="addStaff()">Add Staff Member</button>
+    </div>
 </div>
 
 <div class="row">

@@ -669,6 +669,50 @@ def removeStaffer():
 
     return jsonify(raID)
 
+@app.route("/api/addStaffer", methods=["POST"])
+@login_required
+def addStaffer():
+    userDict = getAuth()
+
+    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
+        return jsonify("NOT AUTHORIZED")
+
+    data = request.json
+
+    checkCur = conn.cursor()
+    checkCur.execute("SELECT * FROM ra WHERE email = '{}';".format(data["email"]))
+    checkRes = checkCur.fetchone()
+
+    if checkRes is not None:
+        cur = conn.cursor()
+        cur.execute("UPDATE ra SET hall_id = {} WHERE email = '{}';".format(userDict["hall_id"], data["email"]))
+        conn.commit()
+
+        cur.execute("SELECT * FROM ra WHERE email = '{}';".format(data["email"]))
+        ret = cur.fetchone()
+        cur.close()
+        return jsonify(ret)
+
+    cur = conn.cursor()
+
+    cur.execute("""
+    INSERT INTO ra (first_name,last_name,hall_id,date_started,points,color,email,auth_level)
+    VALUES ('{}','{}',{},NOW(),0,'{}','{}','{}')
+    RETURNING id;
+    """.format(data["fName"],data["lName"],userDict["hall_id"],data["color"], \
+                data["email"],data["authLevel"]))
+
+    conn.commit()
+    newId = cur.fetchone()[0]
+
+    cur.execute("""SELECT ra.id, first_name, last_name, email, date_started, res_hall.name, points, color, auth_level
+     FROM ra JOIN res_hall ON (ra.hall_id = res_hall.id)
+     WHERE ra.id = {};""".format(newId))
+    raData = cur.fetchone()
+    cur.close()
+
+    return jsonify(raData)
+
 #     -- Error Handling --
 
 @app.route("/error/<string:msg>")
