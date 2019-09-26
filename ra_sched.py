@@ -9,7 +9,7 @@ class RA:
         self.fullName = firstName + " " + lastName
         self.id = id
         self.hallId = hallId
-        self.conflicts = conflicts
+        self.conflicts = list(conflicts)
         self.dateStarted = dateStarted
         self.points = points
 
@@ -57,6 +57,9 @@ class RA:
     def addPoints(self,amt):
         self.points += amt
 
+    def removePoints(self,amt):
+        self.points -= amt
+
     def getName(self):
         return self.fullName
 
@@ -64,15 +67,18 @@ class RA:
         return self.hallId
 
 class Day:
-    def __init__(self,d,numDutySlots=0,ras=set(),customPointVal=0):
+    def __init__(self,d,dow,numDutySlots=1,ras=[],customPointVal=0,id=0,isDoubleDay=False):
         self.date = d
+        self.dow = dow
+        self.isdd = isDoubleDay
+        self.id = id
         self.review = False
         if ras:
             self.ras = ras
             self.numDutySlots = len(ras)
         else:
             self.numDutySlots = numDutySlots
-            self.ras = set()
+            self.ras = []
 
         if customPointVal == 0:
             if numDutySlots > 1:
@@ -83,7 +89,7 @@ class Day:
             self.pointVal = customPointVal
 
     def __str__(self):
-        return "{} with {} on duty".format(self.date,self.ras)
+        return "Day({}.{})".format(self.date,self.id)
 
     def __repr__(self):
         return self.__str__()
@@ -93,35 +99,41 @@ class Day:
             yield ra
 
     def __lt__(self,other):
-        if self.numberDutySlots() == other.numberDutySlots():
-            if self.getDate() < other.getDate():
-                return True
-            else:
-                return False
-
-        elif self.numberDutySlots() > other.numberDutySlots():
-            # This '>' is hardcoded for the expectation that we want to sort in
-            #  reverse order, but we would still like earlier dates before later
-            #  dates in a list.
+        if self.getDate() < other.getDate():
             return True
-        else:
-            return False
+
+        return False
 
     def __hash__(self):
-        return hash(self.date)
+        return hash(self.date) + hash(self.id)
 
     def __eq__(self,other):
         return self.date == other.date
 
     def addRA(self,ra):
         if len(self.ras) < self.numDutySlots:
-            self.ras.add(ra)
+            self.ras.append(ra)
             ra.addPoints(self.pointVal)
         else:
             raise OverflowError("Limit for number on duty exceeded.")
 
+    def addRaWithoutPoints(self,ra):
+        if len(self.ras) < self.numDutySlots:
+            self.ras.append(ra)
+        else:
+            raise OverflowError("Limit for number on duty exceeded.")
+
     def removeRA(self,ra):
-        self.ras.remove(ra)
+        ra.removePoints(self.pointVal)
+        return self.ras.remove(ra)
+
+    def removeAllRAs(self):
+        tmp = self.ras
+        for ra in self.ras:
+            ra.removePoints(self.pointVal)
+
+        self.ras = []
+        return tmp
 
     def numberDutySlots(self):
         return self.numDutySlots
@@ -135,8 +147,17 @@ class Day:
     def getDate(self):
         return self.date
 
+    def getDoW(self):
+        return self.dow
+
+    def getId(self):
+        return self.id
+
     def numberOnDuty(self):
         return len(self.ras)
+
+    def isDoubleDay(self):
+        return self.isdd
 
     def getRAs(self):
         return self.ras
@@ -169,7 +190,7 @@ class Schedule:
                 #           Mon, Tues, Wed, Thurs, Fri, Sat, Sun
                 #            0    1     2     3     4    5    6
                 #
-                # If the day of the week is 0, that means that that respective
+                # If the date is 0, that means that that respective
                 #  date belongs to the next or previous month.
 
                 if d[0] != 0:
