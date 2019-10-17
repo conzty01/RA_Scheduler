@@ -477,6 +477,51 @@ def getMonth(monthNum=None,year=None):
 
     return jsonify(res)
 
+@app.route("/api/runScheduler3", methods=["GET"])
+def runScheduler3():
+    cur = conn.cursor()
+
+    hallId = 1
+    cur = conn.cursor()
+
+    cur.execute("SELECT id FROM month WHERE num = {} AND EXTRACT(YEAR FROM year) = {}".format(10,2018))
+    monthId = cur.fetchone()[0]                                                 # Get the month_id from the database
+    print(monthId)
+
+    if monthId == None:                                                         # If the database does not have the correct month
+        return jsonify("ERROR")                                                 # Send back an error message
+
+    # Select all RAs in a particular hall whose auth_level is below 3 (HD)
+    #  as well as all of their respective conflicts for a given month
+    queryStr = """
+        SELECT first_name, last_name, id, hall_id, date_started,
+               COALESCE(cons.array_agg, ARRAY[]::date[]), points
+        FROM ra LEFT OUTER JOIN (
+            SELECT ra_id, ARRAY_AGG(days.date)
+            FROM conflicts JOIN (
+                SELECT id, date
+                FROM day
+                WHERE month_id = {}
+                ) AS days
+            ON (conflicts.day_id = days.id)
+            GROUP BY ra_id
+            ) AS cons
+        ON (ra.id = cons.ra_id)
+        WHERE ra.hall_id = {} AND
+              ra.auth_level < 3;
+    """.format(monthId, hallId)
+
+    cur.execute(queryStr)       # Query the database for the appropriate RAs and their respective information
+
+    ra_list = [RA(res[0],res[1],res[2],res[3],res[4],res[5],res[6]) for res in cur.fetchall()]
+
+    print(ra_list)
+    for r in ra_list:
+        print(r,r.getPoints(),r.getConflicts())
+
+    return "OK", 200
+
+
 @app.route("/api/runScheduler", methods=["GET"])
 @login_required
 def runScheduler(hallId=None, monthNum=None, year=None):
