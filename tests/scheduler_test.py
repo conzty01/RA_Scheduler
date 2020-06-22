@@ -22,25 +22,59 @@ class TestScheduler(unittest.TestCase):
                                                                  date(self.year, self.month, 14)]),
                        RA("C", "K", 1, 5, date(2017, 8, 22),[date(self.year, self.month, 5)])
                        ]
-        self.noDutyDates = set()
-        self.doubleDays = set()
+        self.noDutyDates = list()
+        self.doubleDays = (4,5)
         self.doublePts = 2
         self.doubleNum = 2
         self.doubleDates = set()
         self.doubleDateNum = 2
-        self.doubleDatePts = 2
+        self.doubleDatePts = 1
 
-    def testCreateDateDict(self):
-        rList = []
-        sList = [6,7,8,9,0]
-        raList, schedList = resetRAList(rList,sList)
+    def testCreateDateDict_ReturnsDict(self):
+        # Arrange #
 
-        self.assertEqual(raList,sList)
-        self.assertEqual(schedList,[])
 
-        self.assertNotEqual(raList,rList)
-        self.assertNotEqual(schedList,sList)
+        # Act #
+        # 31 Days; 4,5 doubleDays; no DoubleDates
+        dateDict = schedule.createDateDict(self.year,self.month,self.noDutyDates,
+                                            self.doubleDays,self.doublePts,
+                                            self.doubleNum,self.doubleDates,
+                                            self.doubleDateNum,self.doubleDatePts)
 
+        # Assert #
+
+    def testCreateDateDict_ReturnsTraversableDict(self):
+        pass
+
+    def testCreateDateDict_CreateMultipleDaysForDoubleDays(self):
+        pass
+
+    def testCreateDateDict_CreateMultipleDaysForDoubleDates(self):
+        pass
+
+    def testCreateDateDict_SetCorrectPointsForDay(self):
+        pass
+
+    def testGetSortedWorkableRAs_RespectsLDATolerance(self):
+        pass
+
+    def testGetSortedWorkableRAs_RespectsNDDTolerance(self):
+        pass
+
+    def testGetSortedWorkableRAs_ReturnsList(self):
+        pass
+
+    def testGenCandScore_ReturnsInt(self):
+        pass
+
+    def testParseSchedule_ReturnsList(self):
+        pass
+
+    def testParseSchedule_CombinesSameDates(self):
+        pass
+
+    def testScheduler3_0_CalculatesRAPoints(self):
+        pass
 
 
 if __name__ == "__main__":
