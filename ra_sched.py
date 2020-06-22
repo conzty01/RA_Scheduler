@@ -170,12 +170,12 @@ class Day:
 
 class Schedule:
 
-    def __init__(self,year,month,noDutyDates=[],sched=[],doubleDays=(4,5)):
+    def __init__(self,year,month,noDutyDates=[],sched=[],doubleDays=(4,5),doubleDates=[]):
         self.review = False
         self.reviewDays = set()
-        self.noDutyDates = noDutyDates
+        self.noDutyDates = list(noDutyDates)
         self.doubleDays = doubleDays
-        self.doubleDates = []
+        self.doubleDates = list(doubleDates)
 
         if sched:
             self.schedule = sched
@@ -195,16 +195,16 @@ class Schedule:
 
                 if d[0] != 0:
                     if d[0] in noDutyDates: # If the date is not a day with duty
-                        self.schedule.append(Day(date(year,month,d[0]),numDutySlots=0))
+                        self.schedule.append(Day(date(year,month,d[0]),d[1],numDutySlots=0))
                     else:
                         if d[1] in doubleDays:
                             # If the day of the week should have two RAs on duty
                             #  By default, this is Friday and Saturday: (4,5)
                             self.doubleDates.append(d[0])
-                            self.schedule.append(Day(date(year,month,d[0]),numDutySlots=2))
+                            self.schedule.append(Day(date(year,month,d[0]),d[1],numDutySlots=2))
                         else:
                             # Else the day should have one RA on duty
-                            self.schedule.append(Day(date(year,month,d[0]),numDutySlots=1))
+                            self.schedule.append(Day(date(year,month,d[0]),d[1],numDutySlots=1))
 
     def __repr__(self):
         return "Schedule({})".format(self.schedule)

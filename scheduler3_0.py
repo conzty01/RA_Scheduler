@@ -33,10 +33,10 @@ def schedule(raList,year,month,noDutyDates=[],doubleDays=(4,5),doublePts=2, \
     #     doubleNum     = number of RAs to be assigned on a double day
     #     doubleDates   = set containing integers denoting the date of the month
     #                      where multiple RAs should be assigned. This is different
-    #                      than the 'doubleDays' set in that it represents dates
-    #                      where multiple RAs should be assigned-- not days of the
-    #                      week. If a date happens to be in both the doubleDates
-    #                      set and the doubleDays set, it act like a double day.
+    #                      than the 'doubleDays' set in that it represents *dates*
+    #                      where multiple RAs should be assigned-- not *days of the
+    #                      week*. If a date happens to be in both the doubleDates
+    #                      set and the doubleDays set, it acts like a double day.
     #     doubleDateNum = number of RAs to be assigned on a double date
     #     doubleDatePts = number of points that are earned on a double date
 
@@ -44,12 +44,12 @@ def schedule(raList,year,month,noDutyDates=[],doubleDays=(4,5),doublePts=2, \
             doubleDates,doubleDateNum,doubleDatePts):
         # Create and return the dictionary that describes how to get from one day
         #  to another. The keys are the numeric date of a given day and the value
-        #  is the numeric date of the date that should follow the given day. The
+        #  is the numeric date of the day that should follow the given day. The
         #  first "day" in the dictionary is always 0 and the last key will have the
         #  value of -1 to deliminate that there are no more days in the chain.
         #  An example can be seen below.
 
-        #     dateDict = { 0: 1, 1: 2, 3: 3.1, 3.1: 4, 4: -1 }
+        #     dateDict = { 0: 1, 1: 2, 2: 3, 3: 3.1, 3.1: 4, 4: -1 }
 
         # In the above example, the start day is 0 which points to day 1 which in
         #  turn points to day 2, which points to day 3. Day 3 has two duties that
@@ -69,14 +69,15 @@ def schedule(raList,year,month,noDutyDates=[],doubleDays=(4,5),doublePts=2, \
             #            0    1     2     3     4    5    6
             #
             # If the day of the week is 0, that means that that respective
-            #  date belongs to the next or previous month.
+            #  date belongs to either the next or previous month.
 
+            # If the current month day belongs to the month being scheduled...
             if curMonthDay != 0:
 
                 # If the date is not a day with duty, then skip it
                 if curMonthDay not in noDutyDates:
 
-                    if (curWeekDay in doubleDays):
+                    if (curWeekDay in doubleDays) or (curMonthDay in doubleDates):
                         # If the day of the week is a double day and should have
                         #  multiple RAs on duty.
                         #  By default, this is Friday and Saturday: (4,5)
@@ -144,7 +145,8 @@ def schedule(raList,year,month,noDutyDates=[],doubleDays=(4,5),doublePts=2, \
 
         #print("  Average Points:",ptsAvg)
 
-        # If isDoubleDay, calculate the average number of double days assigned
+        # If isDoubleDay, calculate the average number of double days
+        #  assigned amongst RAs
         if isDoubleDay:
             s = 0
             for ra in numDoubleDays:
@@ -157,6 +159,7 @@ def schedule(raList,year,month,noDutyDates=[],doubleDays=(4,5),doublePts=2, \
             # Default to -1 when not a doubleDay
             doubleDayAvg = -1
 
+
         retList = []    # List to be returned containing all workable RAs
 
         #print("  Removing candidates")
@@ -166,7 +169,8 @@ def schedule(raList,year,month,noDutyDates=[],doubleDays=(4,5),doublePts=2, \
             isCand = True
 
             # If an RA has a conflict with the duty shift
-            if int( day.getDate() // 1 ) in ra.getConflicts():
+            #print(day.getDate() in ra.getConflicts())
+            if day.getDate() in ra.getConflicts():
                 isCand = False
                 #print("      Removed: Conflict")
 
@@ -244,11 +248,12 @@ def schedule(raList,year,month,noDutyDates=[],doubleDays=(4,5),doublePts=2, \
     lastDateAssigned = {}   # <- Dictionary of RA keys to lists of dates
     numDoubleDays = {}      # <- Dictionary of RA keys to int of the number of double duty days
 
-    # Initialize lastDateAssigned and numDoubleDays
+    # Initialize lastDateAssigned and numDoubleDays for each RA
     for r in raList:
         numDoubleDays[r] = 0
         lastDateAssigned[r] = 0
 
+    # Create calendar
     cal = createDateDict(year,month,noDutyDates,doubleDays,doublePts,doubleNum, \
                 doubleDates,doubleDateNum,doubleDatePts)
 
@@ -259,7 +264,7 @@ def schedule(raList,year,month,noDutyDates=[],doubleDays=(4,5),doublePts=2, \
     #       2: The lastDateAssigned dictionary
     #       3: The numDoubleDays dictionary
 
-    # Calculate the datePts and isDoubleDay for first day
+    # Initialize the first day
     curDay = cal[Day(0,-1)]
 
     # Prime the stack with the first day and raList
@@ -289,7 +294,7 @@ def schedule(raList,year,month,noDutyDates=[],doubleDays=(4,5),doublePts=2, \
         # Check to see if we have come back from a subsequent state. This will
         #  be asserted if an RA has been assigned a duty for the current day.
         if curDay.numberOnDuty() > 0:
-            # If we are returning from a subsequent day, then remove the RA
+            # If we are returning from a subsequent day, then remove the RA(s)
             #  that was assigned.
             #print("   REVISTED DAY")
             curDay.removeAllRAs()
@@ -311,10 +316,10 @@ def schedule(raList,year,month,noDutyDates=[],doubleDays=(4,5),doublePts=2, \
         # Put the updated current state back on the stateStack
         stateStack.push((curDay,candList,lastDateAssigned.copy(),numDoubleDays.copy()))
 
-        # Calculate the next day's data
+        # Get the next Day
         nextDay = cal[curDay]
 
-        #  Get tomorrow's sorted raList
+        #  Get the next Day's sorted raList
         nextList = getSortedWorkableRAs(raList,curDay,lastDateAssigned,\
                                         nextDay.isDoubleDay(),numDoubleDays,\
                                         nextDay.getPoints())
@@ -340,45 +345,47 @@ def schedule(raList,year,month,noDutyDates=[],doubleDays=(4,5),doublePts=2, \
         #  schedule with zero conflicts.
         return []
 
-    #print("==================")
-    # Generate and return the schedule
-    sched = []
-    prev = Day(-1,-1)
-    #print(len(cal))
-    #print(sorted(cal.keys()))
-    for key in sorted(cal.keys()):
 
-        day = cal[key]
-        #print("Prev", prev)
-        #print("Key", key)
-        #print("Day", day)
-        # Calculate the actual date of a Day object
-        d = int( day.getDate() // 1 )
-        # This should effectively floor the date without importing the math module
+    def parseSchedule(cal):
+        print("==================")
+        # Generate and return the schedule
+        sched = []
+        prev = Day(-1,-1)
+        print(len(cal))
+        print(sorted(cal.keys()))
+        for key in sorted(cal.keys()):
 
-        # If the date is the same as the previous date, and the date is not -1
-        if d == prev.getDate() and d != -1:
-            # Then combine this day with the previous
-            #print("  Same as previous")
-            # Add a duty slot
-            prev.addDutySlot()
+            day = cal[key]
+            print("Prev", prev)
+            print("Key", key)
+            print("Day", day)
+            d = day.getDate()
 
-            # Add the RA without adding points
-            prev.addRaWithoutPoints(day.getRAs()[0])
+            # If the date is the same as the previous date, and the date is not -1
+            if d == prev.getDate() and d != -1:
+                # Then combine this day with the previous
+                print("  Same as previous")
+                # Add a duty slot
+                prev.addDutySlot()
 
-        else:
-            #print("  New Day")
-            # Add the previous day to the schedule
-            sched.append(prev)
+                # Add the RA without adding points
+                prev.addRaWithoutPoints(day.getRAs()[0])
 
-            #  and mark the current day as the new prev
-            prev = day
+            else:
+                print("  New Day")
+                # Add the previous day to the schedule
+                sched.append(prev)
 
-        #input()
+                #  and mark the current day as the new prev
+                prev = day
 
-    # Return the completed schedule (minus the first entry as it was just
-    #  a part of the loop-and-a-halfs)
-    return sched[1:]
+            #input()
+
+        # Return the completed schedule (minus the first entry as it was just
+        #  a part of the loop-and-a-half)
+        return sched[1:]
+
+    return parseSchedule(cal)
 
 
 if __name__ == "__main__":

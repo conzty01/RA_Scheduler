@@ -5,7 +5,9 @@ from ra_sched import Schedule, RA
 class TestScheduleObject(unittest.TestCase):
     def setUp(self):
         self.sched = Schedule(2018,5,
-        [date(2018,5,24),date(2018,5,25),date(2018,5,26)])
+        noDutyDates=[date(2018,5,24),date(2018,5,25),date(2018,5,26)],
+        doubleDays=(4,5),
+        doubleDates=[date(2018,5,21),date(2018,5,22),date(2018,5,23)])
 
     def testIter(self):
         for pos,day in enumerate(self.sched):
@@ -21,7 +23,7 @@ class TestScheduleObject(unittest.TestCase):
         self.assertRaises(IndexError,self.sched.getDate,100)
 
     def testAddRA(self):
-        ra = RA("Tyler","Conzett",1234,4321,date(2017,1,1))
+        ra = RA("T","C",1234,4321,date(2017,1,1))
         d = 1
         preAdd = self.sched.getDate(d).getRAs()
         self.sched.addRA(d,ra)
@@ -32,7 +34,7 @@ class TestScheduleObject(unittest.TestCase):
         self.assertRaises(IndexError,self.sched.addRA,100,ra)
 
     def testRemoveRA(self):
-        ra = RA("Ryan","Keene",5,1,date(2017,2,2))
+        ra = RA("R","K",5,1,date(2017,2,2))
         d = 1
 
         preRem = self.sched.getDate(d).getRAs()
