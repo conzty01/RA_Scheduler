@@ -2,7 +2,6 @@ from ra_sched import Schedule, Day, RA
 from calendar import Calendar
 from datetime import datetime
 from pythonds import Stack
-import random
 
 # TODO: Allow the algorithm to take into account when the RA was last assigned
 #        duty in the previous month.
@@ -347,24 +346,24 @@ def schedule(raList,year,month,noDutyDates=[],doubleDays=(4,5),doublePts=2, \
 
 
     def parseSchedule(cal):
-        print("==================")
+        #print("==================")
         # Generate and return the schedule
         sched = []
         prev = Day(-1,-1)
-        print(len(cal))
-        print(sorted(cal.keys()))
+        #print(len(cal))
+        #print(sorted(cal.keys()))
         for key in sorted(cal.keys()):
 
             day = cal[key]
-            print("Prev", prev)
-            print("Key", key)
-            print("Day", day)
+            #print("Prev", prev)
+            #print("Key", key)
+            #print("Day", day)
             d = day.getDate()
 
             # If the date is the same as the previous date, and the date is not -1
             if d == prev.getDate() and d != -1:
                 # Then combine this day with the previous
-                print("  Same as previous")
+                #print("  Same as previous")
                 # Add a duty slot
                 prev.addDutySlot()
 
@@ -372,7 +371,7 @@ def schedule(raList,year,month,noDutyDates=[],doubleDays=(4,5),doublePts=2, \
                 prev.addRaWithoutPoints(day.getRAs()[0])
 
             else:
-                print("  New Day")
+                #print("  New Day")
                 # Add the previous day to the schedule
                 sched.append(prev)
 
@@ -385,7 +384,7 @@ def schedule(raList,year,month,noDutyDates=[],doubleDays=(4,5),doublePts=2, \
         #  a part of the loop-and-a-half)
         return sched[1:]
 
-    return parseSchedule(cal)
+    return Schedule(year,month,noDutyDates,parseSchedule(cal),doubleDays,doubleDates)
 
 
 if __name__ == "__main__":

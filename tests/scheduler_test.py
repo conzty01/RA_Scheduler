@@ -7,21 +7,29 @@ import calendar
 
 class TestScheduler(unittest.TestCase):
     def setUp(self):
+        random.seed(12345)
+
         self.year = 2020
         self.month = 8
-        self.raList = [RA("R", "E", 1, 1, date(2017, 8, 22), [date(self.year, self.month, 1),
-                                                                 date(self.year, self.month, 10),
-                                                                 date(self.year, self.month, 11)]),
-                       RA("J", "L", 1, 2, date(2017, 8, 22), [date(self.year, self.month, 2),
-                                                                 date(self.year, self.month, 12),
-                                                                 date(self.year, self.month, 22)]),
-                       RA("S", "B", 1, 3, date(2017, 8, 22),[date(self.year, self.month, 3),
-                                                                 date(self.year, self.month, 13),
-                                                                 date(self.year, self.month, 30)]),
-                       RA("T", "C", 1, 4, date(2017, 8, 22),[date(self.year, self.month, 4),
-                                                                 date(self.year, self.month, 14)]),
-                       RA("C", "K", 1, 5, date(2017, 8, 22),[date(self.year, self.month, 5)])
-                       ]
+        self.conflictList = [date(self.year, self.month,  1),
+                             date(self.year, self.month,  2),
+                             date(self.year, self.month,  3),
+                             date(self.year, self.month,  4),
+                             date(self.year, self.month,  5),
+                             date(self.year, self.month, 10),
+                             date(self.year, self.month, 11),
+                             date(self.year, self.month, 12),
+                             date(self.year, self.month, 13),
+                             date(self.year, self.month, 14),
+                             date(self.year, self.month, 22),
+                             date(self.year, self.month, 30)]
+
+        self.raList = [RA("R", "E", 1, 1, date(2017, 8, 22)),
+                       RA("J", "L", 1, 2, date(2017, 8, 22)),
+                       RA("S", "B", 1, 3, date(2017, 8, 22)),
+                       RA("T", "C", 1, 4, date(2017, 8, 22)),
+                       RA("C", "K", 1, 5, date(2017, 8, 22))]
+
         self.noDutyDates = list()
         self.doubleDays = (4,5)
         self.doublePts = 2
@@ -30,51 +38,46 @@ class TestScheduler(unittest.TestCase):
         self.doubleDateNum = 2
         self.doubleDatePts = 1
 
-    def testCreateDateDict_ReturnsDict(self):
-        # Arrange #
+    def testScheduler_ReturnsListObjectWhenUnableToGenerateSchedule(self):
+        # Arrange
 
+        sched = schedule(self.raList,self.year,self.month,
+                         self.noDutyDates,self.doubleDays,
+                         self.doublePts,self.doubleNum,
+                         self.doubleDates,self.doubleDateNum,
+                         self.doubleDatePts)
 
-        # Act #
-        # 31 Days; 4,5 doubleDays; no DoubleDates
-        dateDict = schedule.createDateDict(self.year,self.month,self.noDutyDates,
-                                            self.doubleDays,self.doublePts,
-                                            self.doubleNum,self.doubleDates,
-                                            self.doubleDateNum,self.doubleDatePts)
+        # Act
+        # Assert
 
-        # Assert #
+        self.assertIsInstance(sched, list)
 
-    def testCreateDateDict_ReturnsTraversableDict(self):
-        pass
+    def testScheduler_ReturnsScheduleObject(self):
+        # Arrange
 
-    def testCreateDateDict_CreateMultipleDaysForDoubleDays(self):
-        pass
+        additionalRAs = [RA("A", "K", 1, 6, date(2017, 8, 22)),
+                         RA("A", "Z", 1, 7, date(2017, 8, 22)),
+                         RA("F", "P", 1, 8, date(2017, 8, 22)),
+                         RA("I", "O", 1, 9, date(2017, 8, 22)),
+                         RA("Y", "E", 1, 10, date(2017, 8, 22)),
+                         RA("W", "A", 1, 11, date(2017, 8, 22)),
+                         RA("Z", "A", 1, 12, date(2017, 8, 22)),
+                         RA("R", "S", 1, 13, date(2017, 8, 22))]
 
-    def testCreateDateDict_CreateMultipleDaysForDoubleDates(self):
-        pass
+        # Act
 
-    def testCreateDateDict_SetCorrectPointsForDay(self):
-        pass
+        self.raList += additionalRAs
 
-    def testGetSortedWorkableRAs_RespectsLDATolerance(self):
-        pass
+        sched = schedule(self.raList,self.year,self.month,
+                         self.noDutyDates,self.doubleDays,
+                         self.doublePts,self.doubleNum,
+                         self.doubleDates,self.doubleDateNum,
+                         self.doubleDatePts)
 
-    def testGetSortedWorkableRAs_RespectsNDDTolerance(self):
-        pass
+        # Assert
 
-    def testGetSortedWorkableRAs_ReturnsList(self):
-        pass
+        self.assertIsInstance(sched, Schedule)
 
-    def testGenCandScore_ReturnsInt(self):
-        pass
-
-    def testParseSchedule_ReturnsList(self):
-        pass
-
-    def testParseSchedule_CombinesSameDates(self):
-        pass
-
-    def testScheduler3_0_CalculatesRAPoints(self):
-        pass
 
 
 if __name__ == "__main__":
