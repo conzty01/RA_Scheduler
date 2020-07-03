@@ -213,6 +213,9 @@ class Schedule:
         for d in self.schedule:
             yield d
 
+    def __len__(self):
+        return len(self.schedule)
+
     def sort(self):
         self.schedule.sort(reverse=True)
 
