@@ -489,6 +489,7 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
     #  Additionally, the dates that should no have duties are also sent via
     #  request.args and can either be a string of comma separated integers
     #  ("1,2,3,4") or an empty string ("").
+    #print("SCHEDULER")
     userDict = getAuth()                                                        # Get the user's info from our database
     if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
         return jsonify("NOT AUTHORIZED")
@@ -505,7 +506,11 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
     try:                                                                        # Try to get the proper information from the request
         year = int(request.args["year"])
         month = int(request.args["monthNum"])+1
-        noDutyList = [int(d) for d in request.args["noDuty"].split(",")]
+        if request.args["noDuty"] != "":
+            noDutyList = [int(d) for d in request.args["noDuty"].split(",")]
+        else:
+            noDutyList = []
+
     except:                                                                     # If error, send back an error message
         return jsonify("ERROR")
 
@@ -545,6 +550,7 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
 
     # Create the Schedule
     sched = scheduler3_0.schedule(ra_list,year,month,noDutyDates=noDutyList)
+    #print(sched)
 
     if len(sched) == 0:
         return jsonify("UNABLE TO GENERATE SCHEDULE")
@@ -577,6 +583,7 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
                     cur.execute("UPDATE ra SET points = points + {} WHERE id = {};".format(d.getPoints(),r.getId()))
                     conn.commit()
                 except psycopg2.IntegrityError:
+                    #print("ROLLBACK")
                     conn.rollback()
         else:
             try:
@@ -585,6 +592,7 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
                     """.format(hallId,days[d.getDate()],schedId))               # Add the unassigned duty to the database (These should be the dates in the noDutyList)
                 conn.commit()                                                   # Commit additions to the database
             except psycopg2.IntegrityError:
+                #print("ROLLBACK")
                 conn.rollback()
 
     conn.commit()
