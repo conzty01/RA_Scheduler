@@ -10,6 +10,8 @@ def popResHall(cur):
 	for n in ['Brandt','Olson','Larsen']:
 		cur.execute("INSERT INTO res_hall (name) VALUES ('{}')".format(n))
 
+	cur.execute("INSERT INTO res_hall (id,name) VALUES (0,'Not Assigned');")
+
 def popRAs(cur):
 	def randomColor():
 		colors = ['#DEB887','#5F9EA0','#7FFF00','#D2691E','#FF7F50','#6495ED','#DC143C',

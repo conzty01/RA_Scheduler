@@ -4,13 +4,13 @@ from ra_sched import Day, RA
 
 class TestDayObject(unittest.TestCase):
     def setUp(self):
-        s = set()
+        s = []
         n = 5
         for i in range(n):
             ra = RA("T","C",i,1,date(2017,1,1))
-            s.add(ra)
+            s.append(ra)
 
-        self.day = Day(date(2018,5,24),n+1,s)
+        self.day = Day(date(2018,5,24),3,numDutySlots=n+1,ras=s)
 
     def testIter(self):
         for ra in self.day:

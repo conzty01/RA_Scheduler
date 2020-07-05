@@ -9,6 +9,7 @@ from flask_bootstrap import Bootstrap
 from flask.wrappers import Response
 from scheduler import scheduling
 from ra_sched import RA
+import scheduler3_0
 import datetime
 import psycopg2
 import calendar
@@ -181,7 +182,11 @@ def editSched():
 @login_required
 def manStaff():
     userDict = getAuth()                                                        # Get the user's info from our database
-    return render_template("staff.html")
+    cur = conn.cursor()
+    cur.execute("SELECT ra.id, first_name, last_name, email, date_started, res_hall.name, points, color, auth_level \
+     FROM ra JOIN res_hall ON (ra.hall_id = res_hall.id) \
+     WHERE hall_id = {} ORDER BY ra.id ASC;".format(userDict["hall_id"]))
+    return render_template("staff.html",raList=cur.fetchall(),auth_level=userDict["auth_level"])
 
 #     -- Functional --
 
@@ -323,7 +328,7 @@ def getRAStats(hallId=None):
     raList = cur.fetchall()
 
     for ra in raList:                                                           # Append ras and their info to RAList
-        cur.execute("SELECT SUM(pts) FROM duties WHERE ra_id = {}".format(ra[0]))
+        cur.execute("SELECT SUM(point_val) FROM duties WHERE ra_id = {}".format(ra[0]))
         pts = cur.fetchone()
         if type(pts) == type(None):
             pts = (0,)
@@ -366,7 +371,7 @@ def getSchedule(monthNum=None,year=None,hallId=None):
         return jsonify(res)
 
     fromServer = True
-    if monthNum == None and year == None and hallId == None:                    # Effectively: If API was called from the client and not from the server
+    if monthNum is None and year is None and hallId is None:                    # Effectively: If API was called from the client and not from the server
         monthNum = int(request.args.get("monthNum"))
         year = int(request.args.get("year"))
         userDict = getAuth()                                                    # Get the user's info from our database
@@ -376,13 +381,14 @@ def getSchedule(monthNum=None,year=None,hallId=None):
 
     cur = conn.cursor()
     # Get the id, number and name for the month in question
-    cur.execute("SELECT id, num, name FROM month WHERE num = {} AND year = to_date('{}','YYYY')".format(monthNum,year))
+    cur.execute("SELECT id, num, name FROM month WHERE num = {} AND EXTRACT(YEAR FROM year) = {}".format(monthNum,year))
     m = cur.fetchone()
 
     if m == None:
         # If there is not a month matching the criteria, then a blank calendar
         #  will be generated and returned.
         cur.close()
+        print("MISSING INFO 1")
         return missingInfo(year,monthNum)
 
     cur.execute("SELECT id FROM schedule WHERE hall_id = {} AND month_id = {} ORDER BY created DESC, id DESC;".format(hallId,m[0]))
@@ -392,6 +398,7 @@ def getSchedule(monthNum=None,year=None,hallId=None):
         # If there is not a schedule matching the criteria, then a blank calendar
         #  will be generated and returned.
         cur.close()
+        print("MISSING INFO 2")
         return missingInfo(year,monthNum)
 
     res["month"] = m[2]                                                         # Set the month name
@@ -400,7 +407,6 @@ def getSchedule(monthNum=None,year=None,hallId=None):
                    FROM duties JOIN day ON (day.id=duties.day_id) JOIN ra ON (ra.id=duties.ra_id)
                    WHERE duties.hall_id = {} AND duties.sched_id = {}
                    ORDER BY day.date ASC;""".format(hallId,s[0]))                    # Get the duty schedule
-    # hall_id is Brandt until login is made --------^
 
     date_res = cur.fetchall()
     prev_month_days = (calendar.weekday(year,monthNum,1)+1)%7
@@ -444,6 +450,7 @@ def getSchedule(monthNum=None,year=None,hallId=None):
     res["dates"] = datesLst                                                     # Add the dateLst to the result dict
 
     cur.close()
+    print("-=-=-=--=-=-=-",fromServer)
     if fromServer:
         return res
     else:
@@ -474,6 +481,133 @@ def getMonth(monthNum=None,year=None):
     return jsonify(res)
 
 @app.route("/api/runScheduler", methods=["GET"])
+def runScheduler3(hallId=None, monthNum=None, year=None):
+    # TODO: Add ability to query double dates and no duty days from arg values
+
+    # API Hook that will run the scheduler for a given month.
+    #  The month will be given via request.args as 'monthNum' and 'year'.
+    #  Additionally, the dates that should no have duties are also sent via
+    #  request.args and can either be a string of comma separated integers
+    #  ("1,2,3,4") or an empty string ("").
+    #print("SCHEDULER")
+    userDict = getAuth()                                                        # Get the user's info from our database
+    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
+        return jsonify("NOT AUTHORIZED")
+
+    fromServer = True
+    if monthNum == None and year == None and hallId == None:                    # Effectively: If API was called from the client and not from the server
+        monthNum = int(request.args.get("monthNum"))
+        year = int(request.args.get("year"))
+        userDict = getAuth()                                                    # Get the user's info from our database
+        hallId = userDict["hall_id"]
+        fromServer = False
+    res = {}
+
+    try:                                                                        # Try to get the proper information from the request
+        year = int(request.args["year"])
+        month = int(request.args["monthNum"])+1
+        if request.args["noDuty"] != "":
+            noDutyList = [int(d) for d in request.args["noDuty"].split(",")]
+        else:
+            noDutyList = []
+
+    except:                                                                     # If error, send back an error message
+        return jsonify("ERROR")
+
+    hallId = userDict["hall_id"]
+    cur = conn.cursor()
+
+    cur.execute("SELECT id FROM month WHERE num = {} AND EXTRACT(YEAR FROM year) = {}".format(month,year))
+    monthId = cur.fetchone()[0]                                                 # Get the month_id from the database
+    print(monthId)
+
+    if monthId == None:                                                         # If the database does not have the correct month
+        return jsonify("ERROR")                                                 # Send back an error message
+
+    # Select all RAs in a particular hall whose auth_level is below 3 (HD)
+    #  as well as all of their respective conflicts for a given month
+    queryStr = """
+        SELECT first_name, last_name, id, hall_id, date_started,
+               COALESCE(cons.array_agg, ARRAY[]::date[]), points
+        FROM ra LEFT OUTER JOIN (
+            SELECT ra_id, ARRAY_AGG(days.date)
+            FROM conflicts JOIN (
+                SELECT id, date
+                FROM day
+                WHERE month_id = {}
+                ) AS days
+            ON (conflicts.day_id = days.id)
+            GROUP BY ra_id
+            ) AS cons
+        ON (ra.id = cons.ra_id)
+        WHERE ra.hall_id = {} AND
+              ra.auth_level < 3;
+    """.format(monthId, hallId)
+
+    cur.execute(queryStr)       # Query the database for the appropriate RAs and their respective information
+
+    ra_list = [RA(res[0],res[1],res[2],res[3],res[4],res[5],res[6]) for res in cur.fetchall()]
+
+    # Create the Schedule
+    sched = scheduler3_0.schedule(ra_list,year,month,noDutyDates=noDutyList)
+    #print(sched)
+
+    if len(sched) == 0:
+        return jsonify("UNABLE TO GENERATE SCHEDULE")
+
+    # Add the schedule to the database and get its ID
+    cur.execute("INSERT INTO schedule (hall_id, month_id, created) VALUES ({},{},NOW()) RETURNING id;".format(hallId, monthId))
+    schedId = cur.fetchone()[0]
+    conn.commit()
+    #print(schedId)
+
+    # Get the id of the schedule that was just created
+    #cur.execute("SELECT id FROM schedule WHERE hall_id = {} AND month_id = {} ORDER BY created DESC, id DESC;".format(hallId, monthId))
+    #schedId = cur.fetchone()[0]
+
+    # Map the day id to the date
+    days = {}
+    cur.execute("SELECT EXTRACT(DAY FROM date), id FROM day WHERE month_id = {};".format(monthId))
+    for res in cur.fetchall():
+        days[res[0]] = res[1]
+
+    # Iterate through the schedule
+    for d in sched:
+        # If there are RAs assigned to this day
+        if d.numberOnDuty() > 0:
+            for r in d:
+                try:
+                    cur.execute("""
+                        INSERT INTO duties (hall_id,ra_id,day_id,sched_id) VALUES ({},{},{},{});
+                        """.format(hallId,r.getId(),days[d.getDate()],schedId)) # Add the assigned duty to the database
+                    cur.execute("UPDATE ra SET points = points + {} WHERE id = {};".format(d.getPoints(),r.getId()))
+                    conn.commit()
+                except psycopg2.IntegrityError:
+                    #print("ROLLBACK")
+                    conn.rollback()
+        else:
+            try:
+                cur.execute("""
+                    INSERT INTO duties (hall_id,day_id,sched_id) VALUES ({},{},{});
+                    """.format(hallId,days[d.getDate()],schedId))               # Add the unassigned duty to the database (These should be the dates in the noDutyList)
+                conn.commit()                                                   # Commit additions to the database
+            except psycopg2.IntegrityError:
+                #print("ROLLBACK")
+                conn.rollback()
+
+    conn.commit()
+
+    ret = {"schedule":getSchedule(month,year,hallId),"raStats":getRAStats(hallId)}
+    #print(ret)
+    cur.close()
+
+    if fromServer:
+        return ret
+    else:
+        return jsonify(ret)
+
+
+@app.route("/api/runScheduler_old", methods=["GET"])
 @login_required
 def runScheduler(hallId=None, monthNum=None, year=None):
     # API Hook that will run the scheduler for a given month.
@@ -612,6 +746,102 @@ def getEditInfo(hallId=None, monthNum=None, year=None):
         return res
     else:
         return jsonify(res)
+
+@app.route("/api/changeStaffInfo", methods=["POST"])
+@login_required
+def changeStaffInfo():
+    userDict = getAuth()                                                        # Get the user's info from our database
+
+    hallId = userDict["hall_id"]
+
+    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
+        return jsonify("NOT AUTHORIZED")
+
+    data = request.json
+
+    cur = conn.cursor()
+    cur.execute("""UPDATE ra
+                   SET first_name = '{}', last_name = '{}', hall_id = {},
+                       date_started = TO_DATE('{}', 'YYYY-MM-DD'),
+                       points = {}, color = '{}', email = '{}', auth_level = {}
+                   WHERE id = {};
+                """.format(data["fName"],data["lName"],hallId, \
+                        data["startDate"],data["points"],data["color"], \
+                        data["email"],data["authLevel"], data["raID"]))
+
+    conn.commit()
+    cur.close()
+    return data["raID"]
+
+@app.route("/api/removeStaffer", methods=["POST"])
+@login_required
+def removeStaffer():
+    userDict = getAuth()
+
+    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
+        return jsonify("NOT AUTHORIZED")
+
+    raID = request.json
+
+    checkCur = conn.cursor()
+    checkCur.execute("SELECT hall_id FROM ra WHERE id = {};".format(raID))
+
+    if userDict["hall_id"] != checkCur.fetchone()[0]:
+        return jsonify("NOT AUTHORIZED")
+
+    checkCur.close()
+
+    cur = conn.cursor()
+
+    cur.execute("UPDATE ra SET hall_id = 0 WHERE id = {};".format(raID))
+    conn.commit()
+    cur.close()
+
+    return jsonify(raID)
+
+@app.route("/api/addStaffer", methods=["POST"])
+@login_required
+def addStaffer():
+    userDict = getAuth()
+
+    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
+        return jsonify("NOT AUTHORIZED")
+
+    data = request.json
+
+    checkCur = conn.cursor()
+    checkCur.execute("SELECT * FROM ra WHERE email = '{}';".format(data["email"]))
+    checkRes = checkCur.fetchone()
+
+    if checkRes is not None:
+        cur = conn.cursor()
+        cur.execute("UPDATE ra SET hall_id = {} WHERE email = '{}';".format(userDict["hall_id"], data["email"]))
+        conn.commit()
+
+        cur.execute("SELECT * FROM ra WHERE email = '{}';".format(data["email"]))
+        ret = cur.fetchone()
+        cur.close()
+        return jsonify(ret)
+
+    cur = conn.cursor()
+
+    cur.execute("""
+    INSERT INTO ra (first_name,last_name,hall_id,date_started,points,color,email,auth_level)
+    VALUES ('{}','{}',{},NOW(),0,'{}','{}','{}')
+    RETURNING id;
+    """.format(data["fName"],data["lName"],userDict["hall_id"],data["color"], \
+                data["email"],data["authLevel"]))
+
+    conn.commit()
+    newId = cur.fetchone()[0]
+
+    cur.execute("""SELECT ra.id, first_name, last_name, email, date_started, res_hall.name, points, color, auth_level
+     FROM ra JOIN res_hall ON (ra.hall_id = res_hall.id)
+     WHERE ra.id = {};""".format(newId))
+    raData = cur.fetchone()
+    cur.close()
+
+    return jsonify(raData)
 
 #     -- Error Handling --
 

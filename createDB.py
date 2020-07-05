@@ -37,8 +37,8 @@ def createRaDB(conn):
 			date_started	date,
 			points			int,
 			color			varchar(7),
-			email			varchar(256),
-			auth_level		int,
+			email			varchar(256) UNIQUE,
+			auth_level		int DEFAULT 1,
 
 			PRIMARY KEY (id, hall_id),
 			FOREIGN KEY (hall_id) REFERENCES res_hall(id)
