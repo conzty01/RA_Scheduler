@@ -123,7 +123,7 @@ def getAuth():
     cur.execute("""
             SELECT ra.id, username, first_name, last_name, hall_id, auth_level
             FROM "user" JOIN ra ON ("user".ra_id = ra.id)
-            WHERE email = '{}';""".format(uEmail))
+            WHERE username = '{}';""".format(uEmail))
     res = cur.fetchone()                                                        # Get user info from the database
 
     if res == None:                                                             # If user does not exist, go to error url
