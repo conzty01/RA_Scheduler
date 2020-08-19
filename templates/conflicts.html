@@ -1,8 +1,35 @@
 {% extends "base.html" %}
 {% block styles %}
 {{ super() }}
-<link rel="stylesheet" href="{{url_for('.static', filename='calendar.css')}}">
+<!--<link rel="stylesheet" href="{{url_for('.static', filename='calendar.css')}}">-->
 <link rel="stylesheet" href="{{url_for('.static', filename='conflicts.css')}}">
+<link rel="stylesheet" href="{{url_for('.static', filename='main.css')}}">
+<link href='https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.13.1/css/all.css' rel='stylesheet'>
+
+<style>
+    .fc .fc-daygrid-day.fc-day-today {
+        background-color: #90EE90;
+    }
+    .fc-daygrid-day:not(.fc-day-other) {
+        background-color: #90EE90;
+    }
+    .selected {
+        background-color: #FF7F7F !important;
+    }
+    .selected a.fc-daygrid-day-number {
+        color: #FFF !important;
+    }
+    .fc-conflictResetButton-button:hover {
+        background-color: #CC0000 !important;
+        border-color: #AA0000 !important;
+    }
+    .fc-conflictSubmitButton-button:hover {
+        background-color: #00BB00 !important;
+        border-color: #009900 !important;
+    }
+
+</style>
+
 {% endblock %}
 
 {% block headerRow %}
@@ -17,7 +44,10 @@
 <div class="row">
     <div class="wrapper">
         <main>
-            <form id="conflictForm" class="entryForm" action="/enterConflicts/" method="post">
+            <div id="calendar">
+
+            </div>
+            <!--<form id="conflictForm" class="entryForm" action="/enterConflicts/" method="post">
                 <div class="toolbar">
                     <div class="toggle">
                         <div class="toggle__option" onclick="changeMonth(-1,true)">&#60;</div>
@@ -62,8 +92,10 @@
                     </div>
                     {% endfor %}
                 </div>
-            </form>
+            </form>-->
         </main>
+        <form id="conflictForm" class="entryForm" action="/enterConflicts/" method="post">
+        </form>
     </div>
 </div>
 {% endblock %}
@@ -71,4 +103,10 @@
 {% block scripts %}
 {{ super() }}
 <script src="{{url_for('.static', filename='calendar.js')}}"></script>
+<script src="{{url_for('.static', filename='main.js')}}"></script>
+<script src="{{url_for('.static', filename='locales-all.js')}}"></script>
+<script src="{{url_for('.static', filename='fullCal.js')}}"></script>
+<script>
+    initConflictCal();
+</script>
 {% endblock %}
