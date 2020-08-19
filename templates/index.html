@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% block styles %}
 {{ super() }}
-<link rel="stylesheet" href="{{url_for('.static', filename='calendar.css')}}">
+<!-- <link rel="stylesheet" href="{{url_for('.static', filename='calendar.css')}}"> -->
+<link rel="stylesheet" href="{{url_for('.static', filename='main.css')}}">
+<link href='https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.13.1/css/all.css' rel='stylesheet'>
 {% endblock %}
 
 {% block headerRow %}
@@ -13,51 +15,8 @@
 <div class="row">
     <div class="wrapper">
         <main>
-            <div class="toolbar">
-                <div class="toggle">
-                    <div class="toggle__option" onclick="changeMonth(-1)">&#60;</div>
-                    <div class="toggle__option" onclick="changeMonth(1)">&#62;</div>
-                    <div class="toggle__option" onclick="getCurSchedule()">Today</div>
-                </div>
-                <div id="current-month" class="current-month">{{ calDict["text_month"] }}</div>
-                <div>
-                    <img id="loading" align="right" src="{{url_for('.static', filename='loading.svg')}}" alt="Loading..." height="50" width="50">
-                </div>
-            </div>
-            {# The server will only create the calendar when it serves this page
-               and the RA information will be given when the client requests it
-               via a script that will run when the page is fully loaded in the
-               browser. This behavior allows for shorter loading times when
-               loading the page page. Additionally, this behavior might also
-               work nicely for an archive feature where users can look up old
-               schedules.
+            <div id="calendar">
 
-               TODO: Create some sort of way for the user to know that the
-                     calendar is loading when the page is displayed.
-                #}
-            <div id="calendar" class="calendar">
-                <div class="calendar__header">
-                    {% for d in ["sun","mon","tue","wed","thu","fri","sat"]: %}
-                    <div>{{ d }}</div>
-                    {% endfor %}
-                </div>
-                {% for week in cal: %}
-                <div class="calendar__week">
-                    {% for day in week: %}
-
-                    {% if day[0] != 0: %}
-                    <div class="calendar__day day" id="d{{ day[0] }}">
-                        <div class="date">{{ day[0] }}</div>
-                    </div>
-                    {% else %}
-                    <div class="calendar__day day oth">
-                        <div class="date"></div>
-                    </div>
-                    {% endif %}
-
-                    {% endfor %}
-                </div>
-                {% endfor %}
             </div>
         </main>
     </div>
@@ -66,5 +25,10 @@
 
 {% block scripts %}
 {{ super() }}
-<script src="{{url_for('.static', filename='calendar.js')}}"></script>
+<script src="{{url_for('.static', filename='main.js')}}"></script>
+<script src="{{url_for('.static', filename='locales-all.js')}}"></script>
+<script src="{{url_for('.static', filename='fullCal.js')}}"></script>
+<script>
+    initIndexCal();
+</script>
 {% endblock %}
