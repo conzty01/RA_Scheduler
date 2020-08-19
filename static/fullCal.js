@@ -38,6 +38,11 @@ function initIndexCal() {
         initialView: 'dayGridMonth',
         dayMaxEventRows: true,
         moreLinkClick: "popover",
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: ''
+        },
         events: [
             { // This object will be "parsed" into an Event Object
                 title: 'Tyler Conzett',
