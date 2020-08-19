@@ -7,9 +7,27 @@
 <link href='https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.13.1/css/all.css' rel='stylesheet'>
 
 <style>
+    .fc .fc-daygrid-day.fc-day-today {
+        background-color: #90EE90;
+    }
     .fc-daygrid-day:not(.fc-day-other) {
         background-color: #90EE90;
     }
+    .selected {
+        background-color: #FF7F7F !important;
+    }
+    .selected a.fc-daygrid-day-number {
+        color: #FFF !important;
+    }
+    .fc-conflictResetButton-button:hover {
+        background-color: #CC0000 !important;
+        border-color: #AA0000 !important;
+    }
+    .fc-conflictSubmitButton-button:hover {
+        background-color: #00BB00 !important;
+        border-color: #009900 !important;
+    }
+
 </style>
 
 {% endblock %}
@@ -76,6 +94,8 @@
                 </div>
             </form>-->
         </main>
+        <form id="conflictForm" class="entryForm" action="/enterConflicts/" method="post">
+        </form>
     </div>
 </div>
 {% endblock %}
@@ -85,64 +105,8 @@
 <script src="{{url_for('.static', filename='calendar.js')}}"></script>
 <script src="{{url_for('.static', filename='main.js')}}"></script>
 <script src="{{url_for('.static', filename='locales-all.js')}}"></script>
+<script src="{{url_for('.static', filename='fullCal.js')}}"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        var calendarEl = document.getElementById('calendar');
-        var calendar = new FullCalendar.Calendar(calendarEl, {
-            initialView: 'dayGridMonth',
-            dayMaxEventRows: true,
-            moreLinkClick: "popover",
-            dateClick: function(info) {
-                //alert('Clicked on: ' + info.dateStr);
-                //alert('Coordinates: ' + info.jsEvent.pageX + ',' + info.jsEvent.pageY);
-                //alert('Current view: ' + info.view.type);
-                // change the day's background color just for fun
-                if (info.dayEl.style.backgroundColor == 'red') {
-                    info.dayEl.style.backgroundColor = '#90EE90'
-                } else {
-                    info.dayEl.style.backgroundColor = 'red';
-                };
-
-            },
-            //showNonCurrentDates: false,
-
-            events: [
-                { // This object will be "parsed" into an Event Object
-                    title: 'Tyler Conzett',
-                    start: '2020-08-01',
-                    end: '2020-08-02',
-                    color: '#000',
-                    textColor: '#FFF',
-                    id: 'RAID'
-                },
-                { // This object will be "parsed" into an Event Object
-                    title: 'Abigail Korenchan',
-                    start: '2020-08-01',
-                    end: '2020-08-02',
-                    color: '#FF1',
-                    textColor: '#000',
-                    id: 'RAID2'
-                },
-                { // This object will be "parsed" into an Event Object
-                    title: 'Teage Luther',
-                    start: '2020-08-01',
-                    end: '2020-08-02',
-                    color: '#ABABAB',
-                    textColor: '#FFF',
-                    id: 'RAID3'
-                },
-                { // This object will be "parsed" into an Event Object
-                    title: 'Austin Luther',
-                    start: '2020-08-01',
-                    end: '2020-08-02',
-                    color: '#0d1e76',
-                    textColor: '#FFF',
-                    id: 'RAID4'
-                }
-            ]
-
-        });
-        calendar.render();
-    });
+    initConflictCal();
 </script>
 {% endblock %}

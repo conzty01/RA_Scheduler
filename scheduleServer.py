@@ -190,45 +190,32 @@ def manStaff():
 
 #     -- Functional --
 
-@app.route("/enterConflicts/", methods=['POST'])
+@app.route("/api/enterConflicts/", methods=['POST'])
 @login_required
 def processConflicts():
     userDict = getAuth()                                                        # Get the user's info from our database
 
     ra_id = userDict["ra_id"]
     hallId = userDict["hall_id"]
-    month = int(request.form.get("monthInfo").split("/")[0])
-    year = int(request.form.get("monthInfo").split("/")[1])
 
-    if len(str(month)) < 2:                                                     # The following few lines formats the strings into a syntax that psql understands
-        mstr = "0"+str(month)
-    else:
-        mstr = str(month)
+    print(request.json)
+    data = request.json
+
     insert_cur = conn.cursor()
 
     dateList = ()
-    for key in request.form:                                                    # Append all dates to dateList (or in this case dateTUPLE)
-        if "d" in key:
-            d = key.split("d")[-1]                                              # Get only the date (This is due to HTML ids not being allowed to be non-strings)
-
-            if len(str(d)) < 2:                                                 # Format the number to be 2 digits
-                dstr = "0"+str(d)
-            else:
-                dstr = str(d)
-
-            s = "TO_DATE('"+dstr+" "+mstr+" "+str(year)+"','DD MM YYYY')"       # Create TO_DATE string from all date information
-            dateList += (s,)                                                    # Add string to dateList
+    for d in data:                                                              # Append all dates to dateList (or in this case dateTUPLE)
+        s = "TO_DATE('"+d+"','YYYY-MM-DD')"                                     # Create TO_DATE string from all date information
+        dateList += (s,)                                                        # Add string to dateList
 
     bigDateStr = "("                                                            # Begin assembling the psql array string
     for i in dateList:
         bigDateStr+= i+", "
     bigDateStr = bigDateStr[:-2]+")"                                            # Get rid of the extra ", " at the end and cap it with a ")"
 
-    exStr = """SELECT day.id FROM day JOIN month ON (month.id = day.month_id)
-               WHERE month.num = {} AND
-                     month.year = TO_DATE('{}','YYYY') AND
-                     day.date IN {};
-                """.format(month,year,bigDateStr)                               # Format the query string
+    exStr = """SELECT day.id FROM day
+               WHERE day.date IN {};
+                """.format(bigDateStr)                                          # Format the query string
 
     insert_cur.execute(exStr)                                                   # Execute the query
     dIds = insert_cur.fetchall()                                                # Get results
@@ -244,7 +231,7 @@ def processConflicts():
             insert_cur = conn.cursor()                                          # Create a new cursor
 
     insert_cur.close()
-    return redirect(url_for(".index"))                                          # Send the user back to the main page
+    return redirect(url_for(".index"))                                          # Send the user back to the main page (Not utilized by client currently)
 
 @app.route("/runIt/")
 @login_required
