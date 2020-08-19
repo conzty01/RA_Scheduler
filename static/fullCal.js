@@ -41,7 +41,7 @@ function initIndexCal() {
         headerToolbar: {
             left: 'prev,next today',
             center: 'title',
-            right: ''
+            right: 'dayGridMonth,timeGridWeek,timeGridDay'
         },
         events: [
             { // This object will be "parsed" into an Event Object
