@@ -1,9 +1,16 @@
 "use strict"
 
+
+/////////////////////////////////////////////
+/* Functions for the initializing calendar */
+/////////////////////////////////////////////
+
 function initCal( propObject ) {
     document.addEventListener('DOMContentLoaded', function() {
         var calendarEl = document.getElementById('calendar');
         var calendar = new FullCalendar.Calendar(calendarEl, propObject);
+        //console.log(calendar);
+        window.calendar = calendar;
         calendar.render();
     });
 }
@@ -38,47 +45,102 @@ function initIndexCal() {
         initialView: 'dayGridMonth',
         dayMaxEventRows: true,
         moreLinkClick: "popover",
-        headerToolbar: {
-            left: 'prev,next today',
-            center: 'title',
-            right: 'dayGridMonth,timeGridWeek,timeGridDay'
-        },
-        events: [
-            { // This object will be "parsed" into an Event Object
-                title: 'Tyler Conzett',
-                start: '2020-08-01',
-                end: '2020-08-02',
-                color: '#000',
-                textColor: '#FFF',
-                id: 'RAID'
+        customButtons: {
+            customPrevButton: {
+                text: '<',
+                click: movePrev
             },
-            { // This object will be "parsed" into an Event Object
-                title: 'Abigail Korenchan',
-                start: '2020-08-01',
-                end: '2020-08-02',
-                color: '#FF1',
-                textColor: '#000',
-                id: 'RAID2'
+            customNextButton: {
+                text: '>',
+                click: moveNext
             },
-            { // This object will be "parsed" into an Event Object
-                title: 'Teage Luther',
-                start: '2020-08-01',
-                end: '2020-08-02',
-                color: '#ABABAB',
-                textColor: '#FFF',
-                id: 'RAID3'
-            },
-            { // This object will be "parsed" into an Event Object
-                title: 'Austin Luther',
-                start: '2020-08-01',
-                end: '2020-08-02',
-                color: '#0d1e76',
-                textColor: '#FFF',
-                id: 'RAID4'
+            customTodayButton: {
+                text: 'Today',
+                click: moveToday
             }
-        ]
+        },
+        headerToolbar: {
+            left: 'customPrevButton,customNextButton customTodayButton',
+            center: 'title',
+            right: ''
+        },
+        events: {
+            url: '/api/getSchedule',
+            failure: function () {
+                alert('there was an error while fetching events!');
+            },
+            extraParams: function () {
+                return {
+                    monthNum: appConfig.calDate.getMonth() + 1,
+                    year: appConfig.calDate.getFullYear()
+                };
+            }
+        },
+        lazyFetching: true
     });
 }
+
+function moveNext() {
+    console.log("Change Month: Next");
+
+    appConfig.calDate.setMonth(appConfig.calDate.getMonth() + 1);
+    calendar.currentData.calendarApi.next();
+}
+
+function movePrev() {
+    console.log("Change Month: Prev");
+
+    appConfig.calDate.setMonth(appConfig.calDate.getMonth() - 1);
+    calendar.currentData.calendarApi.prev();
+}
+
+function moveToday() {
+    console.log("Change Month: Today");
+
+    appConfig.calDate.setMonth(appConfig.curDate.getMonth());
+    calendar.currentData.calendarApi.today();
+}
+
+
+
+///////////////////////////////////////////
+/*   Functions for the index.html page   */
+///////////////////////////////////////////
+
+function addSchedule( dutyList ){
+    console.log(dutyList);
+
+    for (let duty of dutyList) {
+        // duty : ('Lue', 'Girardin', '#66CDAA', 3, '2020-08-01')
+
+        console.log(1);
+        addSingleEvent(duty[3], duty[0] + ' ' + duty[1], duty[4], duty[2]);
+    }
+    calendar.rerender
+
+}
+
+function addSingleEvent( id, title, startStr, colorStr, allDay = true ) {
+    var date = new Date(startStr + 'T00:00:00'); // will be in local time
+
+    if (!isNaN(date.valueOf())) { // valid?
+        calendar.addEvent({
+            id: id,
+            title: title,
+            start: date,
+            color: colorStr,
+            allDay: allDay
+        });
+    } else {
+        console.log('Invalid date: ' + startStr + ' -> ' + date);
+    }
+}
+
+
+
+/////////////////////////////////////////////
+/*  Functions for the conflicts.html page  */
+/////////////////////////////////////////////
 
 function conflict_DateClick(info) {
     console.log(info);

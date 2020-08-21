@@ -47,52 +47,6 @@
             <div id="calendar">
 
             </div>
-            <!--<form id="conflictForm" class="entryForm" action="/enterConflicts/" method="post">
-                <div class="toolbar">
-                    <div class="toggle">
-                        <div class="toggle__option" onclick="changeMonth(-1,true)">&#60;</div>
-                        <div class="toggle__option" onclick="changeMonth(1,true)">&#62;</div>
-                        <div class="toggle__option" onclick="getCurMonth()">Today</div>
-                    </div>
-
-                    <div id="current-month" class="current-month">{{ calDict["text_month"] }}</div>
-
-                    <input id="monthInfo" type="text" name="monthInfo" style="display:none">
-                    <div style="text-align:right">
-                        <button type="button" onclick="resetForm()">Reset Calendar</button>
-                        <button type="button" onclick="submitForm()">Submit Conflicts</button>
-                    </div>
-                </div>
-                <div id="calendar" class="calendar">
-                    <div class="calendar__header">
-                        {% for d in ["sun","mon","tue","wed","thu","fri","sat"]: %}
-                        <div>{{ d }}</div>
-                        {% endfor %}
-                    </div>
-                    {% for week in cal: %}
-                    <div class="calendar__week">
-                        {% for day in week: %}
-
-                        {% if day[0] != 0: %}
-                        <div class="calendar__day day">
-                            <label class="checkLabel" for="d{{ day[0] }}">
-                                <div class="date">{{ day[0] }}</div>
-                                <div class="check">
-                                    <input id="d{{ day[0] }}" type="checkbox" name="d{{ day[0] }}" onchange="changeCheck(this)">
-                                </div>
-                            </label>
-                        </div>
-                        {% else %}
-                        <div class="calendar__day day oth">
-                            <div class="date"></div>
-                        </div>
-                        {% endif %}
-
-                        {% endfor %}
-                    </div>
-                    {% endfor %}
-                </div>
-            </form>-->
         </main>
         <form id="conflictForm" class="entryForm" action="/enterConflicts/" method="post">
         </form>
