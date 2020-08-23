@@ -276,24 +276,9 @@ def popDuties():
 
 @app.route("/api/testAPI", methods=["GET"])
 def testAPI():
-    cookie = request.cookies.get("username")
-    print(request.cookies)
-    print(cookie)
-    for v in request.args:
-        print(v)
+    #runScheduler3(1,12,2020)
 
-
-    year = 2018
-    month = 5
-    ra_list = [RA("Ryan","E",1,1,datetime.date(2017,8,22),[datetime.date(year,month,1),datetime.date(year,month,10),datetime.date(year,month,11)]),
-               RA("Sarah","L",1,2,datetime.date(2017,8,22),[datetime.date(year,month,2),datetime.date(year,month,12),datetime.date(year,month,22)]),
-               RA("Steve","B",1,3,datetime.date(2017,8,22),[datetime.date(year,month,3),datetime.date(year,month,13),datetime.date(year,month,30)]),
-               RA("Tyler","C",1,4,datetime.date(2017,8,22),[datetime.date(year,month,4),datetime.date(year,month,14)]),
-               RA("Casey","K",1,5,datetime.date(2017,8,22),[datetime.date(year,month,5)])]
-
-    s2 = scheduling(ra_list,year,month,[datetime.date(year,month,14),datetime.date(year,month,15),datetime.date(year,month,16),datetime.date(year,month,17)])
-
-    return jsonify(s2)
+    return jsonify([1])
 
 @app.route("/api/getStats", methods=["GET"])
 @login_required
@@ -378,14 +363,22 @@ def getSchedule2(monthNum=None,year=None,hallId=None):
     """.format(hallId, hallId, start[:-3], end[:-3], start, end))
 
     rawRes = cur.fetchall()
-    print(rawRes)
+    #print(rawRes)
 
     for row in rawRes:
+        # If the ra is the same as the user, then display their color
+        #  Otherwise, display a generic color.
+        #print(userDict["ra_id"] == row[3])
+        if userDict["ra_id"] == row[3]:
+            c = row[2]
+        else:
+            c = "#2C3E50"
+
         res.append({
             "id": row[3],
             "title": row[0] + " " + row[1],
             "start": row[4],
-            "color": row[2]
+            "color": c
         })
 
     if fromServer:
@@ -535,6 +528,7 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
     conn.commit()
 
     ret = {"schedule":getSchedule(month,year,hallId),"raStats":getRAStats(hallId)}
+    #ret = 1
     #print(ret)
     cur.close()
 
