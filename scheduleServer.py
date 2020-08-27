@@ -174,7 +174,7 @@ def conflicts():
 def editSched():
     userDict = getAuth()                                                        # Get the user's info from our database
     cur = conn.cursor()
-    cur.execute("SELECT id, first_name, last_name, points FROM ra WHERE hall_id = {} ORDER BY points DESC;".format(userDict["hall_id"]))
+    cur.execute("SELECT id, first_name, last_name, points, color FROM ra WHERE hall_id = {} ORDER BY last_name, first_name ASC;".format(userDict["hall_id"]))
     return render_template("editSched.html", calDict=cDict, raList=cur.fetchall(), auth_level=userDict["auth_level"], \
                             cal=cc.monthdays2calendar(fDict["year"],fDict["num_month"]))
 
@@ -317,7 +317,7 @@ def getRAStats(hallId=None):
 
 @app.route("/api/getSchedule", methods=["GET"])
 @login_required
-def getSchedule2(monthNum=None,year=None,hallId=None):
+def getSchedule2(monthNum=None,year=None,hallId=None,allColors=None):
     # API Hook that will get the requested schedule for a given month.
     #  The month will be given via request.args as 'monthNum' and 'year'.
     #  The server will then query the database for the appropriate schedule
@@ -326,11 +326,13 @@ def getSchedule2(monthNum=None,year=None,hallId=None):
     #  return an empty list
 
     fromServer = True
-    if monthNum is None and year is None and hallId is None:                    # Effectively: If API was called from the client and not from the server
+    if monthNum is None and year is None and hallId is None and allColors is None:                    # Effectively: If API was called from the client and not from the server
         monthNum = int(request.args.get("monthNum"))
         year = int(request.args.get("year"))
-        start = request.args.get("start").split("T")[0]                    # No need for the timezone in our current application
-        end = request.args.get("end").split("T")[0]                        # No need for the timezone in our current application
+        start = request.args.get("start").split("T")[0]                         # No need for the timezone in our current application
+        end = request.args.get("end").split("T")[0]                             # No need for the timezone in our current application
+        showAllColors = bool(request.args.get("allColors"))                     # Should all colors be displayed or only the current user's colors
+
         userDict = getAuth()                                                    # Get the user's info from our database
         hallId = userDict["hall_id"]
         fromServer = False
@@ -369,10 +371,20 @@ def getSchedule2(monthNum=None,year=None,hallId=None):
         # If the ra is the same as the user, then display their color
         #  Otherwise, display a generic color.
         #print(userDict["ra_id"] == row[3])
-        if userDict["ra_id"] == row[3]:
-            c = row[2]
+        if not(showAllColors):
+            # If the desired behavior is to not show all of the unique RA colors
+            #  then check to see if the current user is the ra on the duty being
+            #  added. If it is the ra, show their unique color, if not, show the
+            #  same color.
+            if userDict["ra_id"] == row[3]:
+                c = row[2]
+            else:
+                c = "#2C3E50"
+
+        # If the desired behavior is to show all of the unique RA colors, then
+        #  simply set their color.
         else:
-            c = "#2C3E50"
+            c = row[2]
 
         res.append({
             "id": row[3],
@@ -773,6 +785,55 @@ def addStaffer():
     cur.close()
 
     return jsonify(raData)
+
+@app.route("/api/changeRAonDuty", methods=["POST"])
+@login_required
+def changeRAforDutyDay():
+    userDict = getAuth()
+
+    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
+        return jsonify("NOT AUTHORIZED")
+
+    data = request.json
+    print("New RA id:", data["id"])
+    print("HallID: ", userDict["hall_id"])
+    # Expected as x/x/xxxx
+    print("DateStr: ", data["dateStr"])
+
+    cur = conn.cursor()
+
+    cur.execute("SELECT id, first_name, last_name, color FROM ra WHERE id = {} AND hall_id = {};".format(data["id"],userDict["hall_id"]))
+    raParams = cur.fetchone()
+
+    cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE('{}', 'MM/DD/YYYY');".format(data["dateStr"]))
+    dayID, monthId = cur.fetchone()
+
+    cur.execute("SELECT id FROM schedule WHERE hall_id = {} AND month_id = {} ORDER BY created DESC;".format(userDict["hall_id"],monthId))
+    schedId = cur.fetchone()
+
+
+    if raParams is not None and dayID is not None and schedId is not None:
+        cur.execute("""UPDATE duties
+                       SET ra_id = {}
+                       WHERE hall_id = {}
+                       AND day_id = {}
+                       AND sched_id = {}
+                       """.format(data["id"],userDict["hall_id"],dayID,schedId[0]))
+
+        conn.commit()
+
+        cur.close()
+
+        return jsonify({"id":raParams[0],"name":raParams[1]+" "+raParams[2],"color":raParams[3],"dateStr":data["dateStr"]})
+
+    else:
+        # Something is not in the DB
+
+        cur.close()
+
+        return jsonify({"error":"Unable to find parameters in DB"})
+
+
 
 #     -- Error Handling --
 
