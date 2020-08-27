@@ -8,10 +8,14 @@ AppBase.prototype.init = function () {
 
 }
 
-AppBase.prototype.callAPI = function (apiStr, params, fun, m="GET") {
+AppBase.prototype.callAPI = function (apiStr, params, fun, m="GET", errorFun=null) {
     // apiStr = remainder of the api address
     // params = data that is to be sent to the server
     //    fun = the function that will handle the returning data
+
+    if (errorFun === null) {
+        errorFun = function(data){console.log("Ajax Error: ",data);}
+    }
 
     let dfd = new $.Deferred();
     console.log("Calling API: " + apiStr);
@@ -25,9 +29,7 @@ AppBase.prototype.callAPI = function (apiStr, params, fun, m="GET") {
         }).done(function(data) {
             fun(data)
             dfd.resolve();
-        }).error(function(data){
-            console.log("Ajax Error: ",data);
-        });
+        }).error(errorFun);
     } else if (m === "POST") {
         $.ajax({
     		url: appConfig.apiURL + apiStr,
@@ -37,9 +39,7 @@ AppBase.prototype.callAPI = function (apiStr, params, fun, m="GET") {
         }).done(function(data) {
             fun(data)
             dfd.resolve();
-        }).error(function(data){
-            console.log("Ajax Error: ",data);
-        });
+        }).error(errorFun);
     }
     return dfd;
 
