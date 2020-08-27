@@ -36,7 +36,8 @@ function initConflictCal() {
             center: 'title',
             right: 'conflictResetButton conflictSubmitButton'
         },
-        //showNonCurrentDates: false,
+        //showNonCurrentDates: false
+        fixedWeekCount: false
     });
 }
 
@@ -76,8 +77,156 @@ function initIndexCal() {
                 };
             }
         },
-        lazyFetching: true
+        lazyFetching: true,
+        fixedWeekCount: false
     });
+}
+
+function initEditSchedCal() {
+    initCal({
+        initialView: 'dayGridMonth',
+        dayMaxEventRows: true,
+        moreLinkClick: "popover",
+        customButtons: {
+            customPrevButton: {
+                text: '<',
+                click: movePrev
+            },
+            customNextButton: {
+                text: '>',
+                click: moveNext
+            },
+            customTodayButton: {
+                text: 'Today',
+                click: moveToday
+            },
+            runSchedulerButton: {
+                text: 'Run Scheduler',
+                click: function () {
+                    let noDutyDays = prompt("Enter the days where no duties should be assigned separated by commas.\n\nFor example: 14,15,30");
+                    let monthNum = appConfig.calDate.getMonth();
+                    let year = appConfig.calDate.getFullYear();
+
+                    console.log("Running Scheduler for month: "+monthNum);
+                    console.log("  with no duties on: "+noDutyDays);
+
+                    //document.getElementById("loading").style.display = "block";
+                    appConfig.base.callAPI("runScheduler",{"monthNum":monthNum,"year":year,"noDuty":noDutyDays},reviewSched);
+                }
+            }
+        },
+        headerToolbar: {
+            left: 'customPrevButton,customNextButton customTodayButton',
+            center: 'title',
+            right: 'runSchedulerButton'
+        },
+        events: {
+            url: '/api/getSchedule',
+            failure: function () {
+                alert('there was an error while fetching events!');
+            },
+            extraParams: function () {
+                return {
+                    monthNum: appConfig.calDate.getMonth() + 1,
+                    year: appConfig.calDate.getFullYear(),
+                    allColors: true
+                };
+            }
+        },
+        lazyFetching: true,
+        showNonCurrentDates: false,
+        fixedWeekCount: false,
+        eventClick: eventClicked
+    });
+}
+
+function eventClicked(info) {
+    console.log(info);
+
+    console.log(info.event.start);
+    console.log(info.event.title);
+    console.log(info.event.backgroundColor);
+    // Get the data clicked and make that the title of the modal
+    // Get the name of the selected event (the ra on duty) and show that that
+    // was the previous value.
+
+    let modalTitle = document.getElementById("editModalLongTitle");
+    modalTitle.innerHTML = info.event.start.toLocaleDateString();
+
+    let prevRA = document.getElementById("editModalPrevRA");
+    prevRA.innerHTML = info.event.title;
+
+    let selector = document.getElementById("editModalNextRA");
+    selector.value = info.event.backgroundColor;
+
+    // Set the ID of the clicked element so that we can find the event later
+    info.el.id = "lastEventSelected";
+
+    // Display the modal with RAs
+    $('#editModal').modal('toggle');
+}
+
+function saveModal() {
+    let selRAOption = document.getElementById("editModalNextRA").selectedOptions[0];
+
+    let dateStr = document.getElementById("editModalLongTitle").textContent;
+
+    let oldName = document.getElementById("editModalPrevRA").textContent;
+
+    let newColor = selRAOption.value;
+    let newName = selRAOption.text;
+    // id = "selector_xxxxxx"
+    // There are 9 characters before the id
+    let newId = parseInt(selRAOption.id.slice(9));
+
+    // If the new RA is different than the current RA,
+    if (oldName !== newName) {
+        // Save the changes
+        console.log(dateStr+": Switching RA '"+oldName+"' for '"+newName+"'");
+
+        let changeParams = {
+            "dateStr": dateStr,
+            "id": newId
+        }
+
+        appConfig.base.callAPI("changeRAonDuty", changeParams, passModalSave, "POST", failModalSave);
+
+    } else {
+        // No change -- do nothing
+        console.log(dateStr+": No change detected - Nothing to save");
+
+    }
+
+
+
+}
+
+function passModalSave(raInfo) {
+    // We successfully saved the changes
+    console.log("Successfully updated duty for: "+raInfo.dateStr);
+
+    // FullCalendar API allows for us to update the event if we can pass it back
+    //  to the calendar. As I quickly try to get this to an MVP, I have not gone
+    //  that route. TODO: use the API rather than hodgepodge this.
+
+    let lastEvent = document.getElementById("lastEventSelected");
+
+    lastEvent.setAttribute("style","border-color: "+raInfo.color+"; background-color: "+raInfo.color);
+
+    // Edit the text for the name
+    lastEvent.getElementsByClassName("fc-event-title fc-sticky")[0].textContent = raInfo.name;
+
+
+    $('#editModal').modal('toggle');
+
+    // edit the event
+}
+
+function failModalSave(err) {
+    // We received an error when saving the changes
+
+    // tell user there was an error
+    console.log(err)
 }
 
 function moveNext() {
