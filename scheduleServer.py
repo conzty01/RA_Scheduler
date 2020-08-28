@@ -795,15 +795,23 @@ def changeRAforDutyDay():
         return jsonify("NOT AUTHORIZED")
 
     data = request.json
-    print("New RA id:", data["id"])
+    print("New RA id:", data["newId"])
+    print("Old RA Name:", data["oldName"])
     print("HallID: ", userDict["hall_id"])
     # Expected as x/x/xxxx
     print("DateStr: ", data["dateStr"])
 
+    fName, lName = data["oldName"].split()
+
     cur = conn.cursor()
 
-    cur.execute("SELECT id, first_name, last_name, color FROM ra WHERE id = {} AND hall_id = {};".format(data["id"],userDict["hall_id"]))
+    # Find New RA
+    cur.execute("SELECT id, first_name, last_name, color FROM ra WHERE id = {} AND hall_id = {};".format(data["newId"],userDict["hall_id"]))
     raParams = cur.fetchone()
+
+    # Find Old RA
+    cur.execute("SELECT id FROM ra WHERE first_name LIKE '{}' AND last_name LIKE '{}' AND hall_id = {}".format(fName, lName, userDict["hall_id"]))
+    oldRA = cur.fetchone()
 
     cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE('{}', 'MM/DD/YYYY');".format(data["dateStr"]))
     dayID, monthId = cur.fetchone()
@@ -812,13 +820,14 @@ def changeRAforDutyDay():
     schedId = cur.fetchone()
 
 
-    if raParams is not None and dayID is not None and schedId is not None:
+    if raParams is not None and dayID is not None and schedId is not None and oldRA is not None:
         cur.execute("""UPDATE duties
                        SET ra_id = {}
                        WHERE hall_id = {}
                        AND day_id = {}
                        AND sched_id = {}
-                       """.format(data["id"],userDict["hall_id"],dayID,schedId[0]))
+                       AND ra_id = {}
+                       """.format(raParams[0],userDict["hall_id"],dayID,schedId[0],oldRA[0]))
 
         conn.commit()
 
