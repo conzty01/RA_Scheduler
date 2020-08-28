@@ -834,6 +834,49 @@ def changeRAforDutyDay():
         return jsonify({"error":"Unable to find parameters in DB"})
 
 
+@app.route("/api/addNewDuty", methods=["POST"])
+@login_required
+def addNewDuty():
+    userDict = getAuth()
+
+    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
+        return jsonify("NOT AUTHORIZED")
+
+    data = request.json
+
+    print("New RA id:", data["id"])
+    print("HallID: ", userDict["hall_id"])
+    # Expected as x-x-xxxx
+    print("DateStr: ", data["dateStr"])
+
+    cur = conn.cursor()
+
+    cur.execute("SELECT id, first_name, last_name, color FROM ra WHERE id = {} AND hall_id = {};".format(data["id"],userDict["hall_id"]))
+    raParams = cur.fetchone()
+
+    cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE('{}', 'YYYY-MM-DD');".format(data["dateStr"]))
+    dayID, monthId = cur.fetchone()
+
+    cur.execute("SELECT id FROM schedule WHERE hall_id = {} AND month_id = {} ORDER BY created DESC;".format(userDict["hall_id"],monthId))
+    schedId = cur.fetchone()
+
+    if raParams is not None and dayID is not None and schedId is not None:
+        cur.execute("""INSERT INTO duties (hall_id, ra_id, day_id, sched_id)
+                        VALUES ({}, {}, {}, {});""".format(userDict["hall_id"], raParams[0], dayID, schedId[0]))
+
+        conn.commit()
+
+        cur.close()
+
+        return jsonify({"id":raParams[0],"name":raParams[1]+" "+raParams[2],"color":raParams[3],"dateStr":data["dateStr"]})
+
+    else:
+        # Something is not in the DB
+
+        cur.close()
+
+        return jsonify({"error":"Unable to find parameters in DB"})
+
 
 #     -- Error Handling --
 
