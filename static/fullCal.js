@@ -184,7 +184,7 @@ function saveModal() {
             oldName: oldName
         }
 
-        appConfig.base.callAPI("changeRAonDuty", changeParams, passModalSave, "POST", failModalSave);
+        appConfig.base.callAPI("changeRAonDuty", changeParams, function(msg) {passModalSave('#editModal',msg)}, "POST", failModalSave);
 
     } else {
         // No change -- do nothing
@@ -196,9 +196,9 @@ function saveModal() {
 
 }
 
-function passModalSave(raInfo) {
-    // We successfully saved the changes
-    console.log("Successfully updated duty for: "+raInfo.dateStr);
+function passModalSave(modalId, msg) {
+
+    console.log(msg);
 
     // Check if hanlded expection occurred or if the save was successful.
     //  If successful, hide the modal. If not, inform user.
@@ -206,9 +206,10 @@ function passModalSave(raInfo) {
     // TODO: Check if save succeeded and inform user if unsuccessful
 
     calendar.currentData.calendarApi.refetchEvents();
+
     // TODO: update the points displayed
 
-    $('#editModal').modal('toggle');
+    $(modalId).modal('toggle');
 
     // edit the event
 }
@@ -282,8 +283,12 @@ function addDuty() {
     }
 
     // Pass the parameters to the server and send results to passNewDutyModal
-    appConfig.base.callAPI("addNewDuty", newParams, passNewDutyModal, "POST", failModalSave);
+    appConfig.base.callAPI("addNewDuty", newParams, function(msg) {passModalSave('#addDutyModal',msg)}, "POST", failModalSave);
 
+}
+
+function deleteDuty() {
+    // Get the RA that is assigned to the duty and the date and send to API
 }
 
 function passNewDutyModal() {
