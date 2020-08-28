@@ -886,6 +886,53 @@ def addNewDuty():
 
         return jsonify({"error":"Unable to find parameters in DB"})
 
+@app.route("/api/deleteDuty", methods=["POST"])
+@login_required
+def daleteDuty():
+    userDict = getAuth()
+
+    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
+        return jsonify("NOT AUTHORIZED")
+
+    data = request.json
+
+    print("Deleted Duty RA Name:", data["raName"])
+    print("HallID: ", userDict["hall_id"])
+    # Expected as x-x-xxxx
+    print("DateStr: ", data["dateStr"])
+
+    fName, lName = data["raName"].split()
+
+    cur = conn.cursor()
+
+    cur.execute("SELECT id FROM ra WHERE first_name LIKE '{}' AND last_name LIKE '{}' AND hall_id = {};".format(fName,lName,userDict["hall_id"]))
+    raId = cur.fetchone()
+
+    cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE('{}', 'MM/DD/YYYY');".format(data["dateStr"]))
+    dayID, monthId = cur.fetchone()
+
+    cur.execute("SELECT id FROM schedule WHERE hall_id = {} AND month_id = {} ORDER BY created DESC;".format(userDict["hall_id"],monthId))
+    schedId = cur.fetchone()
+
+    if raId is not None and dayID is not None and schedId is not None:
+        cur.execute("""DELETE FROM duties
+                        WHERE ra_id = {}
+                        AND hall_id = {}
+                        AND day_id = {}
+                        AND sched_id = {}""".format(raId[0], userDict["hall_id"], dayID, schedId[0]))
+
+        conn.commit()
+
+        cur.close()
+
+        return jsonify({"status":1})
+
+    else:
+
+        cur.close()
+
+        return jsonify({"status":0,"error":"Unable to find parameters in DB"})
+
 
 #     -- Error Handling --
 

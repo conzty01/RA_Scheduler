@@ -289,6 +289,18 @@ function addDuty() {
 
 function deleteDuty() {
     // Get the RA that is assigned to the duty and the date and send to API
+
+    let dateStr = document.getElementById("editModalLongTitle").textContent;
+    let oldName = document.getElementById("editModalPrevRA").textContent;
+
+    let changeParams = {
+        dateStr: dateStr,
+        raName: oldName
+    }
+
+    appConfig.base.callAPI("deleteDuty", changeParams,
+            function(msg) {passModalSave('#editModal',msg)}, "POST", failModalSave);
+
 }
 
 function passNewDutyModal() {
