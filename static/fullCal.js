@@ -102,23 +102,17 @@ function initEditSchedCal() {
             },
             runSchedulerButton: {
                 text: 'Run Scheduler',
-                click: function () {
-                    let noDutyDays = prompt("Enter the days where no duties should be assigned separated by commas.\n\nFor example: 14,15,30");
-                    let monthNum = appConfig.calDate.getMonth();
-                    let year = appConfig.calDate.getFullYear();
-
-                    console.log("Running Scheduler for month: "+monthNum);
-                    console.log("  with no duties on: "+noDutyDays);
-
-                    //document.getElementById("loading").style.display = "block";
-                    appConfig.base.callAPI("runScheduler",{"monthNum":monthNum,"year":year,"noDuty":noDutyDays},reviewSched);
-                }
+                click: runScheduler
+            },
+            addEventButton: {
+                text: 'Add Addtional Duty',
+                click: showAddDutyModal
             }
         },
         headerToolbar: {
             left: 'customPrevButton,customNextButton customTodayButton',
             center: 'title',
-            right: 'runSchedulerButton'
+            right: 'addEventButton runSchedulerButton'
         },
         events: {
             url: '/api/getSchedule',
@@ -185,8 +179,9 @@ function saveModal() {
         console.log(dateStr+": Switching RA '"+oldName+"' for '"+newName+"'");
 
         let changeParams = {
-            "dateStr": dateStr,
-            "id": newId
+            dateStr: dateStr,
+            newId: newId,
+            oldName: oldName
         }
 
         appConfig.base.callAPI("changeRAonDuty", changeParams, passModalSave, "POST", failModalSave);
@@ -205,17 +200,13 @@ function passModalSave(raInfo) {
     // We successfully saved the changes
     console.log("Successfully updated duty for: "+raInfo.dateStr);
 
-    // FullCalendar API allows for us to update the event if we can pass it back
-    //  to the calendar. As I quickly try to get this to an MVP, I have not gone
-    //  that route. TODO: use the API rather than hodgepodge this.
+    // Check if hanlded expection occurred or if the save was successful.
+    //  If successful, hide the modal. If not, inform user.
 
-    let lastEvent = document.getElementById("lastEventSelected");
+    // TODO: Check if save succeeded and inform user if unsuccessful
 
-    lastEvent.setAttribute("style","border-color: "+raInfo.color+"; background-color: "+raInfo.color);
-
-    // Edit the text for the name
-    lastEvent.getElementsByClassName("fc-event-title fc-sticky")[0].textContent = raInfo.name;
-
+    calendar.currentData.calendarApi.refetchEvents();
+    // TODO: update the points displayed
 
     $('#editModal').modal('toggle');
 
@@ -227,6 +218,82 @@ function failModalSave(err) {
 
     // tell user there was an error
     console.log(err)
+}
+
+function runScheduler() {
+    let noDutyDays = prompt("Enter the days where no duties should be assigned separated by commas.\n\nFor example: 14,15,30");
+    let monthNum = appConfig.calDate.getMonth();
+    let year = appConfig.calDate.getFullYear();
+
+    console.log("Running Scheduler for month: "+monthNum);
+    console.log("  with no duties on: "+noDutyDays);
+
+    //document.getElementById("loading").style.display = "block";
+    appConfig.base.callAPI("runScheduler",{"monthNum":monthNum,"year":year,"noDuty":noDutyDays},reviewSched);
+}
+
+function showAddDutyModal() {
+    // set the addDateDate input to point to the selected month with the appropriate range
+
+    let datePicker = document.getElementById("addDateDate");
+
+    // Format the min and max dates for the DatePicker
+
+    let monthNum = appConfig.calDate.getMonth();
+    let minDayNum = new Date(appConfig.calDate.getFullYear(), appConfig.calDate.getMonth(),1).getDate();
+    let maxDayNum = new Date(appConfig.calDate.getFullYear(), appConfig.calDate.getMonth(),0).getDate();
+
+    let month = monthNum + 1;
+    if(month <= 9)
+        month = '0' + month;
+
+    if(minDayNum <= 9)
+        minDayNum = '0' + minDayNum;
+
+    let partialDateStr = appConfig.calDate.getFullYear() +'-'+ month +'-';
+
+    //console.log(partialDateStr);
+    //console.log(minDayNum);
+    //console.log(maxDayNum);
+
+    // Assign values to DatePicker
+    datePicker.min = partialDateStr + minDayNum;
+    datePicker.max = partialDateStr + maxDayNum;
+    datePicker.value = partialDateStr + minDayNum;
+
+    //console.log(datePicker);
+
+    $('#addDutyModal').modal('toggle');
+}
+
+function addDuty() {
+    // Get the selected date and RA from the addDutyModal and pass it to the server
+
+    let dateVal = document.getElementById("addDateDate").value;
+    let selRAOption = document.getElementById("addDateRASelect").selectedOptions[0];
+
+    // id = "selector_xxxxxx"
+    // There are 9 characters before the id
+    let newId = parseInt(selRAOption.id.slice(9));
+
+    let newParams = {
+        id: newId,
+        dateStr: dateVal
+    }
+
+    // Pass the parameters to the server and send results to passNewDutyModal
+    appConfig.base.callAPI("addNewDuty", newParams, passNewDutyModal, "POST", failModalSave);
+
+}
+
+function passNewDutyModal() {
+    // Check if hanlded expection occurred or if the save was successful.
+    //  If successful, hide the modal. If not, inform user.
+
+    // TODO: Check if save succeeded and inform user if unsuccessful
+
+    calendar.currentData.calendarApi.refetchEvents();
+    $('#addDutyModal').modal('toggle');
 }
 
 function moveNext() {
