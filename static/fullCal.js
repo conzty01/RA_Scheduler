@@ -102,7 +102,7 @@ function initEditSchedCal() {
             },
             runSchedulerButton: {
                 text: 'Run Scheduler',
-                click: runScheduler
+                click: showRunModal
             },
             addEventButton: {
                 text: 'Add Addtional Duty',
@@ -196,7 +196,7 @@ function saveModal() {
 
 }
 
-function passModalSave(modalId, msg) {
+function passModalSave(modalId, msg, extraWork) {
 
     console.log(msg);
 
@@ -208,6 +208,9 @@ function passModalSave(modalId, msg) {
     calendar.currentData.calendarApi.refetchEvents();
 
     // TODO: update the points displayed
+
+    // Complete any additional working
+    extraWork();
 
     $(modalId).modal('toggle');
 
@@ -221,16 +224,43 @@ function failModalSave(err) {
     console.log(err)
 }
 
+function showRunModal() {
+    let title = document.getElementById("runModalLongTitle");
+
+    title.textContent = appConfig.calDate.toLocaleString('default', { month: 'long' });
+
+    $('#runModal').modal('toggle');
+}
+
+
 function runScheduler() {
-    let noDutyDays = prompt("Enter the days where no duties should be assigned separated by commas.\n\nFor example: 14,15,30");
+    let noDutyDays = document.getElementById("runNoDutyDates").value;
+    let eligibleRAs = [];
+
+    // Assemble list of RA ids that are eligible for the scheduler
+    for (let li of document.getElementById("runRAList").getElementsByTagName("input")) {
+        if (li.checked) {
+            eligibleRAs.push(li.id);
+        }
+    }
+
     let monthNum = appConfig.calDate.getMonth();
     let year = appConfig.calDate.getFullYear();
 
     console.log("Running Scheduler for month: "+monthNum);
     console.log("  with no duties on: "+noDutyDays);
+    console.log("  and RAs: "+eligibleRAs);
+
+    document.getElementById("runButton").disabled = true;
 
     //document.getElementById("loading").style.display = "block";
-    appConfig.base.callAPI("runScheduler",{"monthNum":monthNum,"year":year,"noDuty":noDutyDays},reviewSched);
+    appConfig.base.callAPI("runScheduler",
+            {monthNum:monthNum, year:year, noDuty:noDutyDays, eligibleRAs:eligibleRAs},
+            function(msg) {
+                passModalSave("runModal", msg, () => {
+                    document.getElementById("runButton").disabled = false;
+                });
+            });
 }
 
 function showAddDutyModal() {
