@@ -251,7 +251,9 @@ function runScheduler() {
     console.log("  with no duties on: "+noDutyDays);
     console.log("  and RAs: "+eligibleRAs);
 
+    // Indicate to user that scheduler is running
     document.getElementById("runButton").disabled = true;
+    $("body").css("cursor", "wait");
 
     //document.getElementById("loading").style.display = "block";
     appConfig.base.callAPI("runScheduler",
@@ -259,6 +261,7 @@ function runScheduler() {
             function(msg) {
                 passModalSave("runModal", msg, () => {
                     document.getElementById("runButton").disabled = false;
+                    $("body").css("cursor", "auto");
                 });
             });
 }
