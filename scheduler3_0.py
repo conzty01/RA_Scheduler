@@ -7,7 +7,8 @@ from pythonds import Stack
 #        duty in the previous month.
 
 def schedule(raList,year,month,noDutyDates=[],doubleDays=(4,5),doublePts=2, \
-    doubleNum=2,doubleDates=set(),doubleDateNum=2,doubleDatePts=1):
+    doubleNum=2,doubleDates=set(),doubleDateNum=2,doubleDatePts=1,
+    ldaTolerance=8,nddTolerance=.1):
     # This algorithm will schedule RAs for duties based on ...
     #
     # The algorithm returns a Schedule object that contains Day objects which, in
@@ -131,7 +132,7 @@ def schedule(raList,year,month,noDutyDates=[],doubleDays=(4,5),doublePts=2, \
         return dateDict
 
     def getSortedWorkableRAs(raList,day,lastDateAssigned,isDoubleDay,\
-            numDoubleDays,datePts,ldaTolerance=8,nddTolerance=.1):
+            numDoubleDays,datePts,ldaTolerance,nddTolerance):
         # Create and return a new sorted list of RAs that are available for duty
         #  on the provided day.
 
@@ -243,7 +244,6 @@ def schedule(raList,year,month,noDutyDates=[],doubleDays=(4,5),doublePts=2, \
 
         return retList
 
-
     lastDateAssigned = {}   # <- Dictionary of RA keys to lists of dates
     numDoubleDays = {}      # <- Dictionary of RA keys to int of the number of double duty days
 
@@ -270,7 +270,7 @@ def schedule(raList,year,month,noDutyDates=[],doubleDays=(4,5),doublePts=2, \
     stateStack.push((curDay,
                      getSortedWorkableRAs(raList,curDay,lastDateAssigned,\
                                           curDay.isDoubleDay(),numDoubleDays,\
-                                          curDay.getPoints()),
+                                          curDay.getPoints(),ldaTolerance,nddTolerance),
                      lastDateAssigned,
                      numDoubleDays))
 
@@ -321,7 +321,7 @@ def schedule(raList,year,month,noDutyDates=[],doubleDays=(4,5),doublePts=2, \
         #  Get the next Day's sorted raList
         nextList = getSortedWorkableRAs(raList,curDay,lastDateAssigned,\
                                         nextDay.isDoubleDay(),numDoubleDays,\
-                                        nextDay.getPoints())
+                                        nextDay.getPoints(),ldaTolerance,nddTolerance)
 
         # If there is at least one RA that can be scheduled for the next day,
         #  then add the current state and the next day to the stateStack. Otherwise,
