@@ -196,7 +196,7 @@ function saveModal() {
 
 }
 
-function passModalSave(modalId, msg, extraWork) {
+function passModalSave(modalId, msg, extraWork=() => {}) {
 
     console.log(msg);
 
@@ -263,7 +263,7 @@ function runScheduler() {
                     document.getElementById("runButton").disabled = false;
                     $("body").css("cursor", "auto");
                 });
-            });
+            }, "POST", failModalSave);
 }
 
 function showAddDutyModal() {
@@ -350,6 +350,7 @@ function moveNext() {
     console.log("Change Month: Next");
 
     appConfig.calDate.setMonth(appConfig.calDate.getMonth() + 1);
+    console.log(appConfig.calDate);
     calendar.currentData.calendarApi.next();
 }
 
@@ -357,6 +358,7 @@ function movePrev() {
     console.log("Change Month: Prev");
 
     appConfig.calDate.setMonth(appConfig.calDate.getMonth() - 1);
+    console.log(appConfig.calDate);
     calendar.currentData.calendarApi.prev();
 }
 

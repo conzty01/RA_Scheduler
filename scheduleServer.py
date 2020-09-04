@@ -422,7 +422,7 @@ def getMonth(monthNum=None,year=None):
 
     return jsonify(res)
 
-@app.route("/api/runScheduler", methods=["GET"])
+@app.route("/api/runScheduler", methods=["POST"])
 def runScheduler3(hallId=None, monthNum=None, year=None):
     # TODO: Add ability to query double dates and no duty days from arg values
 
@@ -436,22 +436,30 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
     if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
         return jsonify("NOT AUTHORIZED")
 
+    #print(request.json)
+
     fromServer = True
     if monthNum == None and year == None and hallId == None:                    # Effectively: If API was called from the client and not from the server
-        monthNum = int(request.args.get("monthNum"))
-        year = int(request.args.get("year"))
+        month = int(request.json["monthNum"])
+        year = int(request.json["year"])
         userDict = getAuth()                                                    # Get the user's info from our database
         hallId = userDict["hall_id"]
         fromServer = False
     res = {}
 
-    try:                                                                        # Try to get the proper information from the request
-        year = int(request.args["year"])
-        month = int(request.args["monthNum"])+1
-        if request.args["noDuty"] != "":
-            noDutyList = [int(d) for d in request.args["noDuty"].split(",")]
+    try:
+        if request.json["noDuty"] != "":
+            noDutyList = [int(d) for d in request.json["noDuty"].split(",")]
+
         else:
             noDutyList = []
+
+        if request.json["eligibleRAs"] != "":
+            eligibleRAs = [int(i) for i in request.json["eligibleRAs"]]
+            eligibleRAStr = "AND ra.id IN ({});".format(str(eligibleRAs)[1:-1])
+
+        else:
+            eligibleRAStr = ";"
 
     except:                                                                     # If error, send back an error message
         return jsonify("ERROR")
@@ -461,7 +469,7 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
 
     cur.execute("SELECT id FROM month WHERE num = {} AND EXTRACT(YEAR FROM year) = {}".format(month,year))
     monthId = cur.fetchone()[0]                                                 # Get the month_id from the database
-    print(monthId)
+    #print(monthId)
 
     if monthId == None:                                                         # If the database does not have the correct month
         return jsonify("ERROR")                                                 # Send back an error message
@@ -482,20 +490,27 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
             GROUP BY ra_id
             ) AS cons
         ON (ra.id = cons.ra_id)
-        WHERE ra.hall_id = {} AND
-              ra.auth_level < 3;
-    """.format(monthId, hallId)
+        WHERE ra.hall_id = {}
+        AND ra.auth_level < 3 {}
+    """.format(monthId, hallId, eligibleRAStr)
+
+    #print(queryStr)
 
     cur.execute(queryStr)       # Query the database for the appropriate RAs and their respective information
 
     ra_list = [RA(res[0],res[1],res[2],res[3],res[4],res[5],res[6]) for res in cur.fetchall()]
 
+    # Set the Last Duty Assigned Tolerance based on floor dividing the number of
+    #  RAs by 2 then adding 1. For example, with a staff of 15, the LDA Tolerance
+    #  would be 8 days.
+    ldat = (len(ra_list) // 2) + 1
+
     # Create the Schedule
-    sched = scheduler3_0.schedule(ra_list,year,month,noDutyDates=noDutyList)
+    sched = scheduler3_0.schedule(ra_list,year,month,noDutyDates=noDutyList,ldaTolerance=ldat)
     #print(sched)
 
     if len(sched) == 0:
-        return jsonify("UNABLE TO GENERATE SCHEDULE")
+        return jsonify({"status":-1,"msg":"UNABLE TO GENERATE SCHEDULE"})
 
     # Add the schedule to the database and get its ID
     cur.execute("INSERT INTO schedule (hall_id, month_id, created) VALUES ({},{},NOW()) RETURNING id;".format(hallId, monthId))
@@ -539,7 +554,7 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
 
     conn.commit()
 
-    ret = {"schedule":getSchedule(month,year,hallId),"raStats":getRAStats(hallId)}
+    ret = {"raStats":getRAStats(hallId)}
     #ret = 1
     #print(ret)
     cur.close()
