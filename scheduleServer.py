@@ -10,6 +10,7 @@ from flask.wrappers import Response
 from scheduler import scheduling
 from ra_sched import RA
 import scheduler3_0
+import copy as cp
 import datetime
 import psycopg2
 import calendar
@@ -424,7 +425,7 @@ def getMonth(monthNum=None,year=None):
 
 @app.route("/api/runScheduler", methods=["POST"])
 def runScheduler3(hallId=None, monthNum=None, year=None):
-    # TODO: Add ability to query double dates and no duty days from arg values
+    # TODO: Add ability to query double dates from arg values
 
     # API Hook that will run the scheduler for a given month.
     #  The month will be given via request.args as 'monthNum' and 'year'.
@@ -505,11 +506,43 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
     #  would be 8 days.
     ldat = (len(ra_list) // 2) + 1
 
-    # Create the Schedule
-    sched = scheduler3_0.schedule(ra_list,year,month,noDutyDates=noDutyList,ldaTolerance=ldat)
+    # Attempt to run the scheduler using deep copies of the raList and noDutyList.
+    #  This is so that if the scheduler does not resolve on the first run, we
+    #  can modify the parameters and try again with a fresh copy of the raList
+    #  and noDutyList.
+    copy_raList = cp.deepcopy(ra_list)
+    copy_noDutyList = cp.copy(noDutyList)
+
+    completed = False
+    successful = True
+    while not completed:
+        # Create the Schedule
+        sched = scheduler3_0.schedule(copy_raList,year,month,noDutyDates=copy_noDutyList,ldaTolerance=ldat)
+
+        if len(sched) == 0:
+            # If we were unable to schedule with the previous parameters,
+
+            if ldat > 1:
+                # And the LDATolerance is greater than 1
+                #  then decrement the LDATolerance by 1 and try again
+
+                #print("DECREASE LDAT: ", ldat)
+                ldat -= 1
+                copy_raList = cp.deepcopy(ra_list)
+                copy_noDutyList = cp.copy(noDutyList)
+
+            else:
+                # The LDATolerance is not greater than 1 and we were unable to schedule
+                completed = True
+                successful = False
+
+        else:
+            # We were able to create a schedule
+            completed = True
+
     #print(sched)
 
-    if len(sched) == 0:
+    if not successful:
         return jsonify({"status":-1,"msg":"UNABLE TO GENERATE SCHEDULE"})
 
     # Add the schedule to the database and get its ID
@@ -529,28 +562,34 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
         days[res[0]] = res[1]
 
     # Iterate through the schedule
+    dutyDayStr = ""
+    noDutyDayStr = ""
     for d in sched:
         # If there are RAs assigned to this day
         if d.numberOnDuty() > 0:
             for r in d:
-                try:
-                    cur.execute("""
-                        INSERT INTO duties (hall_id,ra_id,day_id,sched_id) VALUES ({},{},{},{});
-                        """.format(hallId,r.getId(),days[d.getDate()],schedId)) # Add the assigned duty to the database
-                    cur.execute("UPDATE ra SET points = points + {} WHERE id = {};".format(d.getPoints(),r.getId()))
-                    conn.commit()
-                except psycopg2.IntegrityError:
-                    #print("ROLLBACK")
-                    conn.rollback()
+                dutyDayStr += "({},{},{},{}),".format(hallId, r.getId(), days[d.getDate()], schedId)
+                cur.execute("UPDATE ra SET points = points + {} WHERE id = {};".format(d.getPoints(),r.getId()))
         else:
-            try:
-                cur.execute("""
-                    INSERT INTO duties (hall_id,day_id,sched_id) VALUES ({},{},{});
-                    """.format(hallId,days[d.getDate()],schedId))               # Add the unassigned duty to the database (These should be the dates in the noDutyList)
-                conn.commit()                                                   # Commit additions to the database
-            except psycopg2.IntegrityError:
-                #print("ROLLBACK")
-                conn.rollback()
+            noDutyDayStr += "({},{},{}),".format(hallId, days[d.getDate()], schedId)
+
+    # Attempt to save the schedule to the DB
+    try:
+        # Add all of the duties that were scheduled for the month
+        if dutyDayStr != "":
+            cur.execute("""
+                    INSERT INTO duties (hall_id, ra_id, day_id, sched_id) VALUES {};
+                    """.format(dutyDayStr[:-1]))
+
+        # Add all of the blank duty values for days that were not scheduled
+        if noDutyDayStr != "":
+            cur.execute("""
+                    INSERT INTO duties (hall_id, day_id, sched_id) VALUES {};
+                    """.format(noDutyDayStr[:-1]))
+
+    except psycopg2.IntegrityError:
+        #print("ROLLBACK")
+        conn.rollback()
 
     conn.commit()
 
