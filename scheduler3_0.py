@@ -77,13 +77,13 @@ def schedule(raList,year,month,noDutyDates=[],doubleDays=(4,5),doublePts=2, \
                 # If the date is not a day with duty, then skip it
                 if curMonthDay not in noDutyDates:
 
-                    if (curWeekDay in doubleDays) or (curMonthDay in doubleDates):
+                    if (curWeekDay in doubleDays):
                         # If the day of the week is a double day and should have
                         #  multiple RAs on duty.
                         #  By default, this is Friday and Saturday: (4,5)
 
                         # Current date and point val
-                        d1 = Day(curMonthDay,curWeekDay,customPointVal=doubleDatePts,isDoubleDay=True)
+                        d1 = Day(curMonthDay,curWeekDay,customPointVal=doublePts,isDoubleDay=True)
                         dateDict[prevDay] = d1      # <- Set to the previous day
 
                         d_ = d1
@@ -92,7 +92,7 @@ def schedule(raList,year,month,noDutyDates=[],doubleDays=(4,5),doublePts=2, \
                             #  then d_ will equal 1.1, 1.2, 1.3 etc...
 
                             # Second node for current date and point val
-                            tmp = Day(curMonthDay,curWeekDay,id=i,customPointVal=doubleDatePts,isDoubleDay=True)
+                            tmp = Day(curMonthDay,curWeekDay,id=i,customPointVal=doublePts,isDoubleDay=True)
                             dateDict[d_] = tmp
                             d_ = tmp
 
