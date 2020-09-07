@@ -336,7 +336,7 @@ function passModalSave(modalId, msg, extraWork=() => {}) {
 
     //console.log(msg);
 
-    let modal = document.getElementById(modalId);
+    let modal = document.getElementById(modalId.slice(1));
 
     // If the status is '1', then the save was successful
     switch (msg.status) {
@@ -420,7 +420,7 @@ function runScheduler() {
 
     //document.getElementById("loading").style.display = "block";
     appConfig.base.callAPI("runScheduler",
-            {monthNum:monthNum, year:year, noDuty:noDutyDays, eligibleRAs:eligibleRAs},
+            {monthNum:monthNum+1, year:year, noDuty:noDutyDays, eligibleRAs:eligibleRAs},
             function(msg) {
                 passModalSave("#runModal", msg, () => {
                     document.getElementById("runButton").disabled = false;

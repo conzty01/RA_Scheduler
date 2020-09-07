@@ -570,23 +570,24 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
         # If there are RAs assigned to this day
         if d.numberOnDuty() > 0:
             for r in d:
-                dutyDayStr += "({},{},{},{}),".format(hallId, r.getId(), days[d.getDate()], schedId)
+                dutyDayStr += "({},{},{},{},{}),".format(hallId, r.getId(), days[d.getDate()], schedId, d.getPoints())
+                # TODO: Determine if the below line is needed since the duties have point values associated with them.
                 cur.execute("UPDATE ra SET points = points + {} WHERE id = {};".format(d.getPoints(),r.getId()))
         else:
-            noDutyDayStr += "({},{},{}),".format(hallId, days[d.getDate()], schedId)
+            noDutyDayStr += "({},{},{},{}),".format(hallId, days[d.getDate()], schedId, d.getPoints())
 
     # Attempt to save the schedule to the DB
     try:
         # Add all of the duties that were scheduled for the month
         if dutyDayStr != "":
             cur.execute("""
-                    INSERT INTO duties (hall_id, ra_id, day_id, sched_id) VALUES {};
+                    INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val) VALUES {};
                     """.format(dutyDayStr[:-1]))
 
         # Add all of the blank duty values for days that were not scheduled
         if noDutyDayStr != "":
             cur.execute("""
-                    INSERT INTO duties (hall_id, day_id, sched_id) VALUES {};
+                    INSERT INTO duties (hall_id, day_id, sched_id, point_val) VALUES {};
                     """.format(noDutyDayStr[:-1]))
 
     except psycopg2.IntegrityError:
@@ -595,15 +596,12 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
 
     conn.commit()
 
-    ret = {"raStats":getRAStats(hallId)}
-    #ret = 1
-    #print(ret)
     cur.close()
 
     if fromServer:
-        return ret
+        return stdRet(1,"successful")
     else:
-        return jsonify(ret)
+        return jsonify(stdRet(1,"successful"))
 
 
 @app.route("/api/runScheduler_old", methods=["GET"])
