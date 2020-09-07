@@ -135,6 +135,11 @@ def getAuth():
     return {"uEmail":uEmail,"ra_id":res[0],"name":res[2]+" "+res[3],
             "hall_id":res[4],"auth_level":res[5]}
 
+def stdRet(status, msg):
+    # Helper function to create a standard return object to help simplify code
+    #  going back to the client when no additional data is to be sent.
+    return {"status":status,"msg":msg}
+
 #     -- Views --
 
 @app.route("/logout")
@@ -294,18 +299,15 @@ def getRAStats(hallId=None):
         userDict = getAuth()                                                    # Get the user's info from our database
         hallId = userDict["hall_id"]
         fromServer = False
-    res = []
+    res = {}
 
     cur = conn.cursor()
-    cur.execute("SELECT id, first_name, last_name FROM ra WHERE hall_id = {} ORDER BY last_name ASC;".format(hallId))
+    cur.execute("SELECT id, points FROM ra WHERE hall_id = {} ORDER BY last_name ASC;".format(hallId))
     raList = cur.fetchall()
 
-    for ra in raList:                                                           # Append ras and their info to RAList
-        cur.execute("SELECT SUM(point_val) FROM duties WHERE ra_id = {}".format(ra[0]))
-        pts = cur.fetchone()
-        if type(pts) == type(None):
-            pts = (0,)
-        res.append({"id":ra[0],"name":ra[1]+" "+ra[2],"pts":pts[0]})
+    # Create dict of RA id:point mapping
+    for ra in raList:
+        res[ra[0]] = ra[1]
 
     cur.close()
     if fromServer:
@@ -846,7 +848,7 @@ def changeRAforDutyDay():
     userDict = getAuth()
 
     if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
-        return jsonify("NOT AUTHORIZED")
+        return jsonify({"status":-1,"msg":"NOT AUTHORIZED"})
 
     data = request.json
     print("New RA id:", data["newId"])
@@ -873,6 +875,7 @@ def changeRAforDutyDay():
     cur.execute("SELECT id FROM schedule WHERE hall_id = {} AND month_id = {} ORDER BY created DESC;".format(userDict["hall_id"],monthId))
     schedId = cur.fetchone()
 
+    # TODO: Update points for RAs
 
     if raParams is not None and dayID is not None and schedId is not None and oldRA is not None:
         cur.execute("""UPDATE duties
@@ -887,14 +890,14 @@ def changeRAforDutyDay():
 
         cur.close()
 
-        return jsonify({"id":raParams[0],"name":raParams[1]+" "+raParams[2],"color":raParams[3],"dateStr":data["dateStr"]})
+        return jsonify(stdRet(1,"successful"))
 
     else:
         # Something is not in the DB
 
         cur.close()
 
-        return jsonify({"error":"Unable to find parameters in DB"})
+        return jsonify(stdRet(0,"Unable to find parameters in DB"))
 
 
 @app.route("/api/addNewDuty", methods=["POST"])
