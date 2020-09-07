@@ -410,7 +410,7 @@ function runScheduler() {
     let monthNum = appConfig.calDate.getMonth();
     let year = appConfig.calDate.getFullYear();
 
-    console.log("Running Scheduler for month: "+monthNum);
+    console.log("Running Scheduler for month: "+(monthNum+1));
     console.log("  with no duties on: "+noDutyDays);
     console.log("  and RAs: "+eligibleRAs);
 
