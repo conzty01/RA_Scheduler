@@ -183,7 +183,7 @@
             <div id="raList" class="raList">
                 <ul>
                     {% for ra in raList: %}
-                    <li id="list_{{ ra[0] }}" onclick="highlightRA({{ ra[0] }})">
+                    <li id="list_{{ ra[0] }}">
                         <div id="list_name_{{ ra[0] }}" class="tName">{{ ra[1] }} {{ ra[2] }}</div>
                         <div id="list_points_{{ ra[0] }}" class="tPoints">{{ ra[3] }}</div>
                     </li>
@@ -200,6 +200,7 @@
 <script src="{{url_for('.static', filename='main.js')}}"></script>
 <script src="{{url_for('.static', filename='locales-all.js')}}"></script>
 <script src="{{url_for('.static', filename='fullCal.js')}}"></script>
+<script src="{{url_for('.static', filename='editSched.js')}}"></script>
 <script>
     initEditSchedCal();
 </script>
