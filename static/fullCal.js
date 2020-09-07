@@ -135,11 +135,11 @@ function initEditSchedCal() {
 }
 
 function eventClicked(info) {
-    console.log(info);
+    //console.log(info);
 
-    console.log(info.event.start);
-    console.log(info.event.title);
-    console.log(info.event.backgroundColor);
+    //console.log(info.event.start);
+    //console.log(info.event.title);
+    //console.log(info.event.backgroundColor);
     // Get the data clicked and make that the title of the modal
     // Get the name of the selected event (the ra on duty) and show that that
     // was the previous value.
@@ -155,6 +155,11 @@ function eventClicked(info) {
 
     // Set the ID of the clicked element so that we can find the event later
     info.el.id = "lastEventSelected";
+
+    // Hide any errors from previous event clicks
+    let modal = document.getElementById("editModal");
+    let errDiv = modal.getElementsByClassName("modalError")[0];
+    errDiv.style.display = "none";
 
     // Display the modal with RAs
     $('#editModal').modal('toggle');
@@ -184,50 +189,73 @@ function saveModal() {
             oldName: oldName
         }
 
-        appConfig.base.callAPI("changeRAonDuty", changeParams, function(msg) {passModalSave('#editModal',msg)}, "POST", failModalSave);
+        appConfig.base.callAPI("changeRAonDuty", changeParams, function(msg) {
+            passModalSave('#editModal',msg)}, "POST",
+            passModalSave("#runModal", {status:-1,msg:msg}));
 
     } else {
         // No change -- do nothing
         console.log(dateStr+": No change detected - Nothing to save");
 
     }
-
-
-
 }
 
 function passModalSave(modalId, msg, extraWork=() => {}) {
 
-    console.log(msg);
+    //console.log(msg);
 
-    // Check if hanlded expection occurred or if the save was successful.
-    //  If successful, hide the modal. If not, inform user.
+    let modal = document.getElementById(modalId);
 
-    // TODO: Check if save succeeded and inform user if unsuccessful
+    // If the status is '1', then the save was successful
+    switch (msg.status) {
+        case 1:
+            // If the status is '1', then the save was successful
 
-    calendar.currentData.calendarApi.refetchEvents();
+            // Refetch the current month's calendar
+            calendar.currentData.calendarApi.refetchEvents();
+            // Complete any additional work
+            extraWork();
+            // Hide the modal
+            $(modalId).modal('toggle');
 
-    // TODO: update the points displayed
+            // Ensure the respective errorDiv is hidden
+            modal.getElementsByClassName("modalError")[0].style.display = "none";
 
-    // Complete any additional working
-    extraWork();
+            // TODO: update the points displayed
+            break;
 
-    $(modalId).modal('toggle');
+        case -1:
+            // If the status is '-1', then there was an error
 
-    // edit the event
-}
+            // Log the Error
+            console.error(msg.msg);
 
-function failModalSave(err) {
-    // We received an error when saving the changes
+            // Continue to handle the unsuccessful save
+        case 0:
+            // If the status is '0', then the save was unsuccessful
 
-    // tell user there was an error
-    console.log(err)
+            console.log(msg.msg);
+            // Get the modal's errorDiv
+            let errDiv = modal.getElementsByClassName("modalError")[0];
+
+            // Update the errorDiv with the message
+            errDiv.getElementsByClassName("msg")[0].innerHTML = msg.msg;
+            // Display the errorDiv
+            errDiv.style.display = "block";
+
+            break;
+    }
 }
 
 function showRunModal() {
     let title = document.getElementById("runModalLongTitle");
 
     title.textContent = appConfig.calDate.toLocaleString('default', { month: 'long' });
+
+    // Hide any errors from previous scheduler runs
+    let modal = document.getElementById("runModal");
+    let errDiv = modal.getElementsByClassName("modalError")[0];
+    errDiv.style.display = "none";
 
     $('#runModal').modal('toggle');
 }
@@ -259,11 +287,11 @@ function runScheduler() {
     appConfig.base.callAPI("runScheduler",
             {monthNum:monthNum, year:year, noDuty:noDutyDays, eligibleRAs:eligibleRAs},
             function(msg) {
-                passModalSave("runModal", msg, () => {
+                passModalSave("#runModal", msg, () => {
                     document.getElementById("runButton").disabled = false;
                     $("body").css("cursor", "auto");
                 });
-            }, "POST", failModalSave);
+            }, "POST", passModalSave("#runModal", {status:-1,msg:msg}));
 }
 
 function showAddDutyModal() {
@@ -297,6 +325,11 @@ function showAddDutyModal() {
 
     //console.log(datePicker);
 
+    // Hide any errors from previous event clicks
+    let modal = document.getElementById("addDutyModal");
+    let errDiv = modal.getElementsByClassName("modalError")[0];
+    errDiv.style.display = "none";
+
     $('#addDutyModal').modal('toggle');
 }
 
@@ -316,7 +349,9 @@ function addDuty() {
     }
 
     // Pass the parameters to the server and send results to passNewDutyModal
-    appConfig.base.callAPI("addNewDuty", newParams, function(msg) {passModalSave('#addDutyModal',msg)}, "POST", failModalSave);
+    appConfig.base.callAPI("addNewDuty", newParams, function(msg) {
+        passModalSave('#addDutyModal',msg)}, "POST",
+        passModalSave("#runModal", {status:-1,msg:msg}));
 
 }
 
@@ -332,7 +367,8 @@ function deleteDuty() {
     }
 
     appConfig.base.callAPI("deleteDuty", changeParams,
-            function(msg) {passModalSave('#editModal',msg)}, "POST", failModalSave);
+            function(msg) {passModalSave('#editModal',msg)}, "POST",
+            passModalSave("#runModal", {status:-1,msg:msg}));
 
 }
 

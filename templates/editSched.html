@@ -32,6 +32,10 @@
     #runRAList li label {
         cursor: pointer;
     }
+    .modalError {
+        display: none;
+        color: rgb(255,0,0);
+    }
 </style>
 {% endblock %}
 
@@ -84,6 +88,7 @@
 
           </div>
       </div>
+      <div class="modalError">Update Assignment Failed: <span class="msg"></span></div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
         <button type="button" class="btn btn-danger" onclick="deleteDuty()">Delete Duty</button>
@@ -113,6 +118,7 @@
               </select>
          </div>
       </div>
+      <div class="modalError">Update Assignment Failed: <span class="msg"></span></div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
         <button type="button" class="btn btn-primary" onclick="addDuty()">Save Changes</button>
@@ -157,6 +163,7 @@
               <input id="runNoDutyDates" type="text" placeholder="Example: 14,15,30" />
           </div>-->
       </div>
+      <div class="modalError">Update Assignment Failed: <span class="msg"></span></div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
         <button id="runButton" type="button" class="btn btn-primary" onclick="runScheduler()">Run Scheduler</button>

@@ -543,7 +543,7 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
     #print(sched)
 
     if not successful:
-        return jsonify({"status":-1,"msg":"UNABLE TO GENERATE SCHEDULE"})
+        return jsonify({"status":0,"msg":"UNABLE TO GENERATE SCHEDULE"})
 
     # Add the schedule to the database and get its ID
     cur.execute("INSERT INTO schedule (hall_id, month_id, created) VALUES ({},{},NOW()) RETURNING id;".format(hallId, monthId))
