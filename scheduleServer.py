@@ -360,7 +360,7 @@ def getSchedule2(monthNum=None,year=None,hallId=None,allColors=None):
                         WHERE month.year >= TO_DATE('{}','YYYY-MM')
                         AND month.year <= TO_DATE('{}','YYYY-MM')
                     )
-                ORDER BY schedule.month_id, schedule.created DESC
+                ORDER BY schedule.month_id, schedule.created DESC, schedule.id DESC
                 )
         AND day.date >= TO_DATE('{}','YYYY-MM-DD')
         AND day.date <= TO_DATE('{}','YYYY-MM-DD')
