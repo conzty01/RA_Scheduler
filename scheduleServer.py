@@ -629,8 +629,7 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
         if d.numberOnDuty() > 0:
             for r in d:
                 dutyDayStr += "({},{},{},{},{}),".format(hallId, r.getId(), days[d.getDate()], schedId, d.getPoints())
-                # TODO: Determine if the below line is needed since the duties have point values associated with them.
-                cur.execute("UPDATE ra SET points = points + {} WHERE id = {};".format(d.getPoints(),r.getId()))
+
         else:
             noDutyDayStr += "({},{},{},{}),".format(hallId, days[d.getDate()], schedId, d.getPoints())
 
@@ -946,30 +945,30 @@ def changeRAforDutyDay():
 
         cur.close()
 
-        # Figure out what school year we are looking for
-        month, day, year = data["dateStr"].split("/")
-        #print(year,month,day)
-
-        if int(month) >= 8:
-            # If the current month is August or later
-            #  then the current year is the startYear
-            startYear = int(year)
-            endYear = int(year) + 1
-
-        else:
-            # If the current month is earlier than August
-            #  then the current year is the endYear
-            startYear = int(year) - 1
-            endYear = int(year)
-
-        # TODO: Currently, a school year is considered from August to August.
-        #        Perhaps this should be configurable by the AHD/HDs?
-
-        start = str(startYear) + '-08-01'
-        end = str(endYear) + '-08-01'
+        # # Figure out what school year we are looking for
+        # month, day, year = data["dateStr"].split("/")
+        # #print(year,month,day)
+        #
+        # if int(month) >= 8:
+        #     # If the current month is August or later
+        #     #  then the current year is the startYear
+        #     startYear = int(year)
+        #     endYear = int(year) + 1
+        #
+        # else:
+        #     # If the current month is earlier than August
+        #     #  then the current year is the endYear
+        #     startYear = int(year) - 1
+        #     endYear = int(year)
+        #
+        # # TODO: Currently, a school year is considered from August to August.
+        # #        Perhaps this should be configurable by the AHD/HDs?
+        #
+        # start = str(startYear) + '-08-01'
+        # end = str(endYear) + '-08-01'
 
         ret = stdRet(1,"successful")
-        ret["pointDict"] = getRAStats(userDict["hall_id"], start, end)
+        # ret["pointDict"] = getRAStats(userDict["hall_id"], start, end)
 
         return jsonify(ret)
 
@@ -991,38 +990,38 @@ def addNewDuty():
 
     data = request.json
 
-    print("New RA id:", data["id"])
-    print("HallID: ", userDict["hall_id"])
+    #print("New RA id:", data["id"])
+    #print("HallID: ", userDict["hall_id"])
     # Expected as x-x-xxxx
-    print("DateStr: ", data["dateStr"])
+    #print("DateStr: ", data["dateStr"])
 
     cur = conn.cursor()
 
-    cur.execute("SELECT id, first_name, last_name, color FROM ra WHERE id = {} AND hall_id = {};".format(data["id"],userDict["hall_id"]))
-    raParams = cur.fetchone()
+    cur.execute("SELECT id FROM ra WHERE id = {} AND hall_id = {};".format(data["id"],userDict["hall_id"]))
+    raId = cur.fetchone()
 
     cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE('{}', 'YYYY-MM-DD');".format(data["dateStr"]))
     dayID, monthId = cur.fetchone()
 
-    cur.execute("SELECT id FROM schedule WHERE hall_id = {} AND month_id = {} ORDER BY created DESC;".format(userDict["hall_id"],monthId))
+    cur.execute("SELECT id FROM schedule WHERE hall_id = {} AND month_id = {} ORDER BY created DESC, id DESC;".format(userDict["hall_id"],monthId))
     schedId = cur.fetchone()
 
-    if raParams is not None and dayID is not None and schedId is not None:
-        cur.execute("""INSERT INTO duties (hall_id, ra_id, day_id, sched_id)
-                        VALUES ({}, {}, {}, {});""".format(userDict["hall_id"], raParams[0], dayID, schedId[0]))
+    if raId is not None and dayID is not None and schedId is not None:
+        cur.execute("""INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val)
+                        VALUES ({}, {}, {}, {}, {});""".format(userDict["hall_id"], raId[0], dayID, schedId[0], data["pts"]))
 
         conn.commit()
 
         cur.close()
 
-        return jsonify({"id":raParams[0],"name":raParams[1]+" "+raParams[2],"color":raParams[3],"dateStr":data["dateStr"]})
+        return jsonify(stdRet(1,"successful"))
 
     else:
         # Something is not in the DB
 
         cur.close()
 
-        return jsonify({"error":"Unable to find parameters in DB"})
+        return jsonify(stdRet(-1,"Unable to find parameters in DB"))
 
 @app.route("/api/deleteDuty", methods=["POST"])
 @login_required
@@ -1034,10 +1033,10 @@ def daleteDuty():
 
     data = request.json
 
-    print("Deleted Duty RA Name:", data["raName"])
-    print("HallID: ", userDict["hall_id"])
+    #print("Deleted Duty RA Name:", data["raName"])
+    #print("HallID: ", userDict["hall_id"])
     # Expected as x-x-xxxx
-    print("DateStr: ", data["dateStr"])
+    #print("DateStr: ", data["dateStr"])
 
     fName, lName = data["raName"].split()
 
@@ -1049,7 +1048,7 @@ def daleteDuty():
     cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE('{}', 'MM/DD/YYYY');".format(data["dateStr"]))
     dayID, monthId = cur.fetchone()
 
-    cur.execute("SELECT id FROM schedule WHERE hall_id = {} AND month_id = {} ORDER BY created DESC;".format(userDict["hall_id"],monthId))
+    cur.execute("SELECT id FROM schedule WHERE hall_id = {} AND month_id = {} ORDER BY created DESC, id DESC;".format(userDict["hall_id"],monthId))
     schedId = cur.fetchone()
 
     if raId is not None and dayID is not None and schedId is not None:
