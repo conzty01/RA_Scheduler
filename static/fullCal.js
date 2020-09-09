@@ -323,9 +323,7 @@ function saveModal() {
 
         appConfig.base.callAPI("changeRAonDuty", changeParams,
             function(msg) {
-                passModalSave('#editModal',msg, () => {
-                    updatePoints(msg.pointDict);
-                });
+                passModalSave('#editModal',msg);
             }, "POST",
             function(msg) {passModalSave("#editModal", {status:-1,msg:msg})});
 
@@ -349,6 +347,8 @@ function passModalSave(modalId, msg, extraWork=() => {}) {
 
             // Refetch the current month's calendar
             calendar.currentData.calendarApi.refetchEvents();
+            // Get the updated points
+            getPoints();
             // Complete any additional work
             extraWork();
             // Hide the modal
@@ -357,7 +357,6 @@ function passModalSave(modalId, msg, extraWork=() => {}) {
             // Ensure the respective errorDiv is hidden
             modal.getElementsByClassName("modalError")[0].style.display = "none";
 
-            // TODO: update the points displayed
             break;
 
         case -1:
@@ -477,6 +476,7 @@ function addDuty() {
 
     let dateVal = document.getElementById("addDateDate").value;
     let selRAOption = document.getElementById("addDateRASelect").selectedOptions[0];
+    let ptVal = document.getElementById("addDatePts").value;
 
     // id = "selector_xxxxxx"
     // There are 9 characters before the id
@@ -484,7 +484,8 @@ function addDuty() {
 
     let newParams = {
         id: newId,
-        dateStr: dateVal
+        dateStr: dateVal,
+        pts: ptVal
     }
 
     // Pass the parameters to the server and send results passModalSave
