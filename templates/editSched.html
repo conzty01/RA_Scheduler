@@ -182,10 +182,10 @@
         <div class="col-lg-3">
             <div id="raList" class="raList">
                 <ul>
-                    {% for ra in raList: %}
-                    <li id="list_{{ ra[0] }}">
-                        <div id="list_name_{{ ra[0] }}" class="tName">{{ ra[1] }} {{ ra[2] }}</div>
-                        <div id="list_points_{{ ra[0] }}" class="tPoints">{{ ra[3] }}</div>
+                    {% for idKey, idVal in ptDict: %}
+                    <li id="list_{{ idKey }}">
+                        <div id="list_name_{{ idKey }}" class="tName">{{ idVal["name"] }}</div>
+                        <div id="list_points_{{ idKey }}" class="tPoints">{{ idVal["pts"] }}</div>
                     </li>
                     {% endfor %}
                 </ul>
