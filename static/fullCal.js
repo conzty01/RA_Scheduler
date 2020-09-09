@@ -321,8 +321,12 @@ function saveModal() {
             oldName: oldName
         }
 
-        appConfig.base.callAPI("changeRAonDuty", changeParams, function(msg) {
-            passModalSave('#editModal',msg)}, "POST",
+        appConfig.base.callAPI("changeRAonDuty", changeParams,
+            function(msg) {
+                passModalSave('#editModal',msg, () => {
+                    updatePoints(msg.pointDict);
+                });
+            }, "POST",
             function(msg) {passModalSave("#editModal", {status:-1,msg:msg})});
 
     } else {
