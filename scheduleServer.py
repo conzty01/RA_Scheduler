@@ -179,10 +179,43 @@ def conflicts():
 @login_required
 def editSched():
     userDict = getAuth()                                                        # Get the user's info from our database
+
+    # Figure out what school year we are looking for
+    month = datetime.date.today().month
+    year = datetime.date.today().year
+    #print(year,month,day)
+
+    if int(month) >= 8:
+        # If the current month is August or later
+        #  then the current year is the startYear
+        startYear = int(year)
+        endYear = int(year) + 1
+
+    else:
+        # If the current month is earlier than August
+        #  then the current year is the endYear
+        startYear = int(year) - 1
+        endYear = int(year)
+
+    # TODO: Currently, a school year is considered from August to August.
+    #        Perhaps this should be configurable by the AHD/HDs?
+
+    start = str(startYear) + '-08-01'
+    end = str(endYear) + '-08-01'
+
+    ptDict = getRAStats(userDict["hall_id"], start, end)
+
+    print(ptDict)
+
     cur = conn.cursor()
-    cur.execute("SELECT id, first_name, last_name, points, color FROM ra WHERE hall_id = {} ORDER BY last_name, first_name ASC;".format(userDict["hall_id"]))
+    cur.execute("SELECT id, first_name, last_name, points, color FROM ra WHERE hall_id = {} ORDER BY points DESC;".format(userDict["hall_id"]))
+
+    # Sort alphabetically by last name of RA
+    #ptDictSort = lambda kv: kv[1]["name"].split(" ")[1]
+
     return render_template("editSched.html", calDict=cDict, raList=cur.fetchall(), auth_level=userDict["auth_level"], \
-                            cal=cc.monthdays2calendar(fDict["year"],fDict["num_month"]))
+                            cal=cc.monthdays2calendar(fDict["year"],fDict["num_month"]), \
+                            ptDict=sorted(ptDict.items(), key=lambda x: x[1]["name"].split(" ")[1] ))
 
 @app.route("/staff")
 @login_required
@@ -288,26 +321,51 @@ def testAPI():
 
 @app.route("/api/getStats", methods=["GET"])
 @login_required
-def getRAStats(hallId=None):
+def getRAStats(hallId=None,startDateStr=None,endDateStr=None):
     # API Hook that will get the RA stats for a given month.
     #  The month will be given via request.args as 'monthNum' and 'year'.
     #  The server will then query the database for the appropriate statistics
     #  and send back a json object.
 
     fromServer = True
-    if hallId == None:                                                          # Effectively: If API was called from the client and not from the server
+    if hallId is None and startDateStr is None and endDateStr is None:          # Effectively: If API was called from the client and not from the server
         userDict = getAuth()                                                    # Get the user's info from our database
         hallId = userDict["hall_id"]
         fromServer = False
+        startDateStr = request.args.get("start")
+        endDateStr = request.args.get("end")
+
     res = {}
 
     cur = conn.cursor()
-    cur.execute("SELECT id, points FROM ra WHERE hall_id = {} ORDER BY last_name ASC;".format(hallId))
+
+    cur.execute("""SELECT ra.id, ra.first_name, ra.last_name, COALESCE(ptQuery.pts,0)
+                   FROM (SELECT ra.id AS rid, SUM(duties.point_val) AS pts
+                         FROM duties JOIN day ON (day.id=duties.day_id)
+                                     JOIN ra ON (ra.id=duties.ra_id)
+                         WHERE duties.hall_id = {}
+                         AND duties.sched_id IN
+                         (
+                            SELECT DISTINCT ON (schedule.month_id) schedule.id
+                            FROM schedule
+                            WHERE schedule.hall_id = {}
+                            AND schedule.month_id IN
+                            (
+                                SELECT month.id
+                                FROM month
+                                WHERE month.year >= TO_DATE('{}', 'YYYY-MM-DD')
+                                AND month.year <= TO_DATE('{}', 'YYYY-MM-DD')
+                            )
+                            ORDER BY schedule.month_id, schedule.created DESC, schedule.id DESC
+                        )
+                        GROUP BY rid) AS ptQuery
+                   RIGHT JOIN ra ON (ptQuery.rid = ra.id)
+                   WHERE ra.hall_id = {};""".format(hallId, hallId, startDateStr, endDateStr, hallId))
+
     raList = cur.fetchall()
 
-    # Create dict of RA id:point mapping
     for ra in raList:
-        res[ra[0]] = ra[1]
+        res[ra[0]] = { "name": ra[1] + " " + ra[2], "pts": ra[3] }
 
     cur.close()
     if fromServer:
@@ -849,11 +907,11 @@ def changeRAforDutyDay():
         return jsonify({"status":-1,"msg":"NOT AUTHORIZED"})
 
     data = request.json
-    print("New RA id:", data["newId"])
-    print("Old RA Name:", data["oldName"])
-    print("HallID: ", userDict["hall_id"])
+    #print("New RA id:", data["newId"])
+    #print("Old RA Name:", data["oldName"])
+    #print("HallID: ", userDict["hall_id"])
     # Expected as x/x/xxxx
-    print("DateStr: ", data["dateStr"])
+    #print("DateStr: ", data["dateStr"])
 
     fName, lName = data["oldName"].split()
 
@@ -870,7 +928,7 @@ def changeRAforDutyDay():
     cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE('{}', 'MM/DD/YYYY');".format(data["dateStr"]))
     dayID, monthId = cur.fetchone()
 
-    cur.execute("SELECT id FROM schedule WHERE hall_id = {} AND month_id = {} ORDER BY created DESC;".format(userDict["hall_id"],monthId))
+    cur.execute("SELECT id FROM schedule WHERE hall_id = {} AND month_id = {} ORDER BY created DESC, id DESC;".format(userDict["hall_id"],monthId))
     schedId = cur.fetchone()
 
     # TODO: Update points for RAs
@@ -888,7 +946,32 @@ def changeRAforDutyDay():
 
         cur.close()
 
-        return jsonify(stdRet(1,"successful"))
+        # Figure out what school year we are looking for
+        month, day, year = data["dateStr"].split("/")
+        #print(year,month,day)
+
+        if int(month) >= 8:
+            # If the current month is August or later
+            #  then the current year is the startYear
+            startYear = int(year)
+            endYear = int(year) + 1
+
+        else:
+            # If the current month is earlier than August
+            #  then the current year is the endYear
+            startYear = int(year) - 1
+            endYear = int(year)
+
+        # TODO: Currently, a school year is considered from August to August.
+        #        Perhaps this should be configurable by the AHD/HDs?
+
+        start = str(startYear) + '-08-01'
+        end = str(endYear) + '-08-01'
+
+        ret = stdRet(1,"successful")
+        ret["pointDict"] = getRAStats(userDict["hall_id"], start, end)
+
+        return jsonify(ret)
 
     else:
         # Something is not in the DB
