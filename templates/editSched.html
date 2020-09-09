@@ -108,14 +108,19 @@
       <div class="modal-body">
           <div class="row">
               <label for="addDateDate">Duty Date:</label>
-              <input type="date" id="addDateDate" name="trip-start">
-
+              <input type="date" id="addDateDate">
+          </div>
+          <div class="row">
               <label for="addDateRASelect">Assigned RA:</label>
               <select id="addDateRASelect">
                   {% for ra in raList: %}
                   <option id="selector_{{ ra[0] }}" value="{{ ra[4] }}">{{ ra[1] }} {{ ra[2] }}</option>
                   {% endfor %}
               </select>
+          </div>
+          <div class="row">
+              <label for="addDatePts">Point Value:</label>
+              <input type="number" id="addDatePts" name="addDatePts">
          </div>
       </div>
       <div class="modalError">Update Assignment Failed: <span class="msg"></span></div>
