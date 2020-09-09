@@ -1,88 +1,212 @@
 {% extends "base.html" %}
 {% block styles %}
 {{ super() }}
-<link rel="stylesheet" href="{{url_for('.static', filename='calendar.css')}}">
+<!-- <link rel="stylesheet" href="{{url_for('.static', filename='calendar.css')}}"> -->
 <link rel="stylesheet" href="{{url_for('.static', filename='editSched.css')}}">
+<link rel="stylesheet" href="{{url_for('.static', filename='main.css')}}">
+<link href='https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.13.1/css/all.css' rel='stylesheet'>
+
+<style>
+    .fc-day-other a.fc-event {
+        background-color: #D0D0D0 !important;
+        border-color: #C1C1C1 !important;
+    }
+    .fc-event-main {
+        cursor: pointer;
+    }
+    #runRAList {
+        max-height: 200px;
+        overflow-y: scroll;
+    }
+    #runRAList {
+        list-style: none;
+    }
+    #runRAList li {
+        display: block;
+        clear: left;
+        overflow: auto;
+    }
+    #runRAList li:hover {
+        background-color: #E1E1E1;
+    }
+    #runRAList li label {
+        cursor: pointer;
+    }
+    .modalError {
+        display: none;
+        color: rgb(255,0,0);
+    }
+</style>
 {% endblock %}
 
-{% block content %}
-<div class="container" style="width:80%">
-    <div class="row"></div>
-    <div class="row">
-        <div class="col-md-9">
-            <div class="row">
-                <div class="wrapper">
-                    <main>
-                        <div class="toolbar">
-                            <div class="toggle">
-                                <div class="toggle__option" onclick="changeMonth(-1)">&#60;</div>
-                                <div class="toggle__option" onclick="changeMonth(1)">&#62;</div>
-                                <div class="toggle__option" onclick="getCurSchedule()">Today</div>
-                            </div>
-                            <div id="current-month" class="current-month">{{ calDict["text_month"] }}</div>
-                            <div>
-                                <img id="loading" align="right" src="{{url_for('.static', filename='loading.svg')}}" alt="Loading..." height="50" width="50">
-                            </div>
-                        </div>
-                        {# The server will only create the calendar when it serves this page
-                           and the RA information will be given when the client requests it
-                           depending on the action they chose on their dashboard (ie run, edit)
-                            #}
-                        <div id="calendar" class="calendar">
-                            <div class="calendar__header">
-                                {% for d in ["sun","mon","tue","wed","thu","fri","sat"]: %}
-                                <div>{{ d }}</div>
-                                {% endfor %}
-                            </div>
-                            {% for week in cal: %}
-                            <div class="calendar__week">
-                                {% for day in week: %}
-                                {% if day[1] in [6,1,2,3,4]: %}
-                                {% set pts = 1 %}
-                                {% else %}
-                                {% set pts = 2 %}
-                                {% endif %}
+{% block headerRow %}
+<h1>Brandt Hall RA Duty Calendar</h1>
+<p>Below is the duty calendar for the month of {{ calDict["text_month"] }}</p>
+{% endblock headerRow %}
 
-                                {% if day[0] != 0: %}
-                                <div data-points="{{pts}}" class="calendar__day day" id="d{{ day[0] }}">
-                                    {{pts}}
-                                </div>
-                                {% else %}
-                                <div class="calendar__day day oth">
-                                    <div class="date"></div>
-                                </div>
-                                {% endif %}
+{% block contentRows %}
+<!-- Button trigger modal -->
+<!--<button type="button" class="btn btn-primary" data-toggle="modal" data-target="#exampleModalCenter">
+  Launch demo modal
+</button>-->
 
-                                {% endfor %}
-                            </div>
-                            {% endfor %}
-                        </div>
-                    </main>
-                </div>
+<!-- Edit Duty Modal -->
+<div class="modal fade" id="editModal" tabindex="-1" role="dialog" aria-labelledby="editModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Changing duty assignment for <span id="editModalLongTitle" style="font-weight:bold;"></span></h3>
+      </div>
+      <div class="modal-body">
+          <div class="row">
+
+              <div class="col-sm-5 modalLeft">
+                  <div class="row">
+                      <h4>Current Assigned RA</h4>
+                  </div>
+                  <div class="row">
+                      <span id="editModalPrevRA"></span>
+                  </div>
+              </div>
+
+              <div class="col-sm-1">
+                  <span style="font-weight: bold">&gt;</span>
+              </div>
+
+              <div class="col-sm-5 modalRight">
+                  <div class="row">
+                      <h4>New Assigned RA</h4>
+                  </div>
+                  <div class="row">
+                      <select id="editModalNextRA">
+                          {% for ra in raList: %}
+                          <option id="selector_{{ ra[0] }}" value="{{ ra[4] }}">{{ ra[1] }} {{ ra[2] }}</option>
+                          {% endfor %}
+                      </select>
+                  </div>
+              </div>
+
+          </div>
+      </div>
+      <div class="modalError">Update Assignment Failed: <span class="msg"></span></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-danger" onclick="deleteDuty()">Delete Duty</button>
+        <button type="button" class="btn btn-primary" onclick="saveModal()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Duty Modal -->
+<div class="modal fade" id="addDutyModal" tabindex="-1" role="dialog" aria-labelledby="addDutyModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Add a New Duty</h3>
+      </div>
+      <div class="modal-body">
+          <div class="row">
+              <label for="addDateDate">Duty Date:</label>
+              <input type="date" id="addDateDate">
+          </div>
+          <div class="row">
+              <label for="addDateRASelect">Assigned RA:</label>
+              <select id="addDateRASelect">
+                  {% for ra in raList: %}
+                  <option id="selector_{{ ra[0] }}" value="{{ ra[4] }}">{{ ra[1] }} {{ ra[2] }}</option>
+                  {% endfor %}
+              </select>
+          </div>
+          <div class="row">
+              <label for="addDatePts">Point Value:</label>
+              <input type="number" id="addDatePts" name="addDatePts">
+         </div>
+      </div>
+      <div class="modalError">Update Assignment Failed: <span class="msg"></span></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" onclick="addDuty()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Run Scheduler Modal -->
+<div class="modal fade" id="runModal" tabindex="-1" role="dialog" aria-labelledby="runModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Run Scheduler for <span id="runModalLongTitle" style="font-weight:bold;"></span></h3>
+      </div>
+      <div class="modal-body">
+          <div class="row">
+              <label for="runNoDutyDates">
+                  Enter the days where no duties should be assigned separated by commas.
+              </label>
+              <input id="runNoDutyDates" type="text" placeholder="Example: 14,15,30" />
+          </div>
+          <div class="row">
+              <label for="runRAList">
+                  Select the RAs that SHOULD be scheduled for duty for this month.
+              </label>
+              <div>
+                  <ul id="runRAList">
+                      {% for ra in raList: %}
+                      <li>
+                          <input id="{{ ra[0] }}" type="checkbox" checked >
+                          <label for="{{ ra[0] }}">{{ ra[1] }} {{ra[2] }}</label>
+                      </li>
+                      {% endfor %}
+                  </ul>
+              </div>
+          </div>
+          <!--<div class="row">
+              <label for="runLDA">
+                  Number of days between duties.
+              </label>
+              <input id="runNoDutyDates" type="text" placeholder="Example: 14,15,30" />
+          </div>-->
+      </div>
+      <div class="modalError">Update Assignment Failed: <span class="msg"></span></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        <button id="runButton" type="button" class="btn btn-primary" onclick="runScheduler()">Run Scheduler</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+    <main>
+        <div class="col-lg-9">
+            <div id="calendar">
+
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="options">
-                <div id="raList" class="raList">
+        <div class="col-lg-3">
+            <div id="raList" class="raList">
                 <ul>
-                    {% for ra in raList: %}
-                    <li id="list_{{ ra[0] }}" onclick="highlightRA({{ ra[0] }})">
-                        <div id="list_name_{{ ra[0] }}" class="tName">{{ ra[1] }} {{ ra[2] }}</div>
-                        <div id="list_points_{{ ra[0] }}" class="tPoints">{{ ra[3] }}</div>
+                    {% for idKey, idVal in ptDict: %}
+                    <li id="list_{{ idKey }}">
+                        <div id="list_name_{{ idKey }}" class="tName">{{ idVal["name"] }}</div>
+                        <div id="list_points_{{ idKey }}" class="tPoints">{{ idVal["pts"] }}</div>
                     </li>
                     {% endfor %}
                 </ul>
-                </div>
-                <button id="run" type="button" onclick="runScheduler()">Run Scheduler</button>
-                <button id="edit" type="button" onclick="getEditInfo()">Edit Calendar</button>
             </div>
         </div>
-    </div>
+    </main>
 </div>
 {% endblock %}
 
 {% block scripts %}
 {{ super() }}
-<script src="{{url_for('.static', filename='calendar.js')}}"></script>
+<script src="{{url_for('.static', filename='main.js')}}"></script>
+<script src="{{url_for('.static', filename='locales-all.js')}}"></script>
+<script src="{{url_for('.static', filename='fullCal.js')}}"></script>
 <script src="{{url_for('.static', filename='editSched.js')}}"></script>
+<script>
+    initEditSchedCal();
+</script>
 {% endblock %}
