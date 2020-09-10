@@ -32,6 +32,10 @@ gBlueprint = make_google_blueprint(
 app.register_blueprint(gBlueprint, url_prefix="/login")
 
 conn = psycopg2.connect(os.environ["DATABASE_URL"])
+baseOpts = {
+    "HOST_URL": os.environ["HOST_URL"]
+}
+
 
 db = SQLAlchemy(app)                                                            # SQLAlchemy is used for OAuth
 login_manager = LoginManager()                                                  # The login manager for the application
@@ -159,7 +163,7 @@ def index():
     if type(userDict) != dict:
         return userDict
     return render_template("index.html",calDict=cDict,auth_level=userDict["auth_level"], \
-                            cal=cc.monthdays2calendar(fDict["year"],fDict["num_month"]))
+                            cal=cc.monthdays2calendar(fDict["year"],fDict["num_month"]),opts=baseOpts)
 
 @app.route("/conflicts")
 def conflicts():
@@ -173,7 +177,7 @@ def conflicts():
         year = fDict["year"]
 
     return render_template("conflicts.html", calDict=fDict, auth_level=userDict["auth_level"], \
-                            cal=cc.monthdays2calendar(year,fDict["num_month"]))
+                            cal=cc.monthdays2calendar(year,fDict["num_month"]),opts=baseOpts)
 
 @app.route("/editSched")
 @login_required
@@ -205,7 +209,7 @@ def editSched():
 
     ptDict = getRAStats(userDict["hall_id"], start, end)
 
-    print(ptDict)
+    #print(ptDict)
 
     cur = conn.cursor()
     cur.execute("SELECT id, first_name, last_name, points, color FROM ra WHERE hall_id = {} ORDER BY points DESC;".format(userDict["hall_id"]))
@@ -215,7 +219,7 @@ def editSched():
 
     return render_template("editSched.html", calDict=cDict, raList=cur.fetchall(), auth_level=userDict["auth_level"], \
                             cal=cc.monthdays2calendar(fDict["year"],fDict["num_month"]), \
-                            ptDict=sorted(ptDict.items(), key=lambda x: x[1]["name"].split(" ")[1] ))
+                            ptDict=sorted(ptDict.items(), key=lambda x: x[1]["name"].split(" ")[1] ),opts=baseOpts)
 
 @app.route("/staff")
 @login_required
@@ -225,9 +229,9 @@ def manStaff():
     cur.execute("SELECT ra.id, first_name, last_name, email, date_started, res_hall.name, points, color, auth_level \
      FROM ra JOIN res_hall ON (ra.hall_id = res_hall.id) \
      WHERE hall_id = {} ORDER BY ra.id ASC;".format(userDict["hall_id"]))
-    return render_template("staff.html",raList=cur.fetchall(),auth_level=userDict["auth_level"])
+    return render_template("staff.html",raList=cur.fetchall(),auth_level=userDict["auth_level"],opts=baseOpts)
 
-#     -- Functional --
+#     -- API --
 
 @app.route("/api/enterConflicts/", methods=['POST'])
 @login_required
@@ -237,7 +241,7 @@ def processConflicts():
     ra_id = userDict["ra_id"]
     hallId = userDict["hall_id"]
 
-    print(request.json)
+    #print(request.json)
     data = request.json
 
     insert_cur = conn.cursor()
@@ -271,53 +275,6 @@ def processConflicts():
 
     insert_cur.close()
     return redirect(url_for(".index"))                                          # Send the user back to the main page (Not utilized by client currently)
-
-@app.route("/runIt/")
-@login_required
-def popDuties():
-    cur = conn.cursor()
-    cur.execute("SELECT year FROM month ORDER BY year DESC;")
-    d = cur.fetchone()[0]
-    year = d.year
-    month = 5
-
-    cur.execute("""SELECT first_name, last_name, id, hall_id,date_started, cons.array_agg, points FROM ra JOIN (SELECT ra_id, ARRAY_AGG(days.date) FROM conflicts JOIN (SELECT id, date FROM day WHERE month_id = 4) AS days ON (conflicts.day_id = days.id) GROUP BY ra_id) AS cons ON (ra.id = cons.ra_id) WHERE ra.hall_id = 1;""")
-
-    raList = [RA(res[0],res[1],res[2],res[3],res[4],res[5],res[6]) for res in cur.fetchall()]
-    noDutyList = [24,25,26,27,28,29,30,31]
-
-    sched = scheduling(raList,year,month,noDutyDates=noDutyList)
-
-    days = {}
-    cur.execute("SELECT id, date FROM day WHERE month_id = 4;")
-    for res in cur.fetchall():
-        print(str(res[1]))
-        days[str(res[1])] = res[0]
-
-    print(days)
-
-    for d in sched:
-        if d.numberOnDuty() > 0:
-            for r in d:
-                h = hash(str(d.getDate()))
-                cur.execute("""
-                    INSERT INTO duties (hall_id,ra_id,day_id,sched_id) VALUES (1,{},{},2);
-                    """.format(r.getId(),days[str(d.getDate())]))
-        else:
-            cur.execute("""
-                INSERT INTO duties (hall_id,day_id,sched_id) VALUES (1,{},2);
-                """.format(days[str(d.getDate())]))
-
-    cur.close()
-    conn.commit()
-
-#     -- api --
-
-@app.route("/api/testAPI", methods=["GET"])
-def testAPI():
-    #runScheduler3(1,12,2020)
-
-    return jsonify([1])
 
 @app.route("/api/getStats", methods=["GET"])
 @login_required
@@ -660,97 +617,6 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
     else:
         return jsonify(stdRet(1,"successful"))
 
-
-@app.route("/api/runScheduler_old", methods=["GET"])
-@login_required
-def runScheduler(hallId=None, monthNum=None, year=None):
-    # API Hook that will run the scheduler for a given month.
-    #  The month will be given via request.args as 'monthNum' and 'year'.
-    #  Additionally, the dates that should no have duties are also sent via
-    #  request.args and can either be a string of comma separated integers
-    #  ("1,2,3,4") or an empty string ("").
-    userDict = getAuth()                                                        # Get the user's info from our database
-    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
-        return jsonify("NOT AUTHORIZED")
-
-    fromServer = True
-    if monthNum == None and year == None and hallId == None:                    # Effectively: If API was called from the client and not from the server
-        monthNum = int(request.args.get("monthNum"))
-        year = int(request.args.get("year"))
-        userDict = getAuth()                                                    # Get the user's info from our database
-        hallId = userDict["hall_id"]
-        fromServer = False
-    res = {}
-
-    try:                                                                        # Try to get the proper information from the request
-        year = int(request.args["year"])
-        month = int(request.args["monthNum"])+1
-        noDutyList = request.args["noDuty"].split(",")
-    except:                                                                     # If error, send back an error message
-        return jsonify("ERROR")
-
-    hallId = userDict["hall_id"]
-    cur = conn.cursor()
-
-    cur.execute("SELECT id FROM month WHERE num = {} AND year = TO_DATE('{}','YYYY')".format(month,year))
-    monthId = cur.fetchone()[0]                                                 # Get the month_id from the database
-
-    if monthId == None:                                                         # If the database does not have the correct month
-        return jsonify("ERROR")                                                 # Send back an error message
-
-    cur.execute("""SELECT first_name, last_name, id, hall_id,
-                          date_started, cons.array_agg, points
-                   FROM ra JOIN (SELECT ra_id, ARRAY_AGG(days.date)
-                                 FROM conflicts JOIN (SELECT id, date FROM day
-                                                      WHERE month_id = {}) AS days
-                                 ON (conflicts.day_id = days.id)
-                                 GROUP BY ra_id) AS cons
-                            ON (ra.id = cons.ra_id)
-                    WHERE ra.hall_id = {};""".format(monthId,hallId))           # Query the database for the appropriate RAs and their respective information
-
-    ra_list = [RA(res[0],res[1],res[2],res[3],res[4],res[5],res[6]) for res in cur.fetchall()]
-    # The above line creates a list of RA objects reflecting the RAs for the appropriate hall
-
-    sched = scheduling(ra_list,year,month,noDutyDates=noDutyList)               # Run the scheduler
-    cur.execute("INSERT INTO schedule (hall_id,month_id,created) VALUES ({},{},NOW());".format(hallId,monthId))
-    conn.commit()                                                               # Add the schedule to the database
-    cur.execute("SELECT id FROM schedule WHERE hall_id = {} AND month_id = {} ORDER BY created DESC, id DESC;".format(hallId,monthId))
-    schedId = cur.fetchone()[0]                                                 # Get the id of the schedule that was just created
-
-    days = {}                                                                   # Dictionary mapping the day id to the date
-    cur.execute("SELECT id, date FROM day WHERE month_id = {};".format(monthId))
-    for res in cur.fetchall():
-        days[res[1]] = res[0]                                                   # Populate dictionary with results from the database
-
-    for d in sched:                                                             # Iterate through the schedule
-        if d.numberOnDuty() > 0:                                                # If there are RAs assigned to this day
-            for r in d:
-                try:
-                    cur.execute("""
-                        INSERT INTO duties (hall_id,ra_id,day_id,sched_id) VALUES ({},{},{},{});
-                        """.format(hallId,r.getId(),days[d.getDate()],schedId)) # Add the assigned duty to the database
-                    cur.execute("UPDATE ra SET points = points + {} WHERE id = {};".format(d.getPoints(),r.getId()))
-                    conn.commit()
-                except psycopg2.IntegrityError:
-                    conn.rollback()
-        else:
-            try:
-                cur.execute("""
-                    INSERT INTO duties (hall_id,day_id,sched_id) VALUES ({},{},{});
-                    """.format(hallId,days[d.getDate()],schedId))               # Add the unassigned duty to the database (These should be the dates in the noDutyList)
-                conn.commit()                                                   # Commit additions to the database
-            except psycopg2.IntegrityError:
-                conn.rollback()
-
-    conn.commit()
-
-    ret = {"schedule":getSchedule(month,year,hallId),"raStats":getRAStats(hallId)}
-    cur.close()
-    if fromServer:
-        return ret
-    else:
-        return jsonify(ret)
-
 @app.route("/api/getEditInfo", methods=["GET"])
 @login_required
 def getEditInfo(hallId=None, monthNum=None, year=None):
@@ -773,7 +639,7 @@ def getEditInfo(hallId=None, monthNum=None, year=None):
     res = []
     cur = conn.cursor()
 
-    print(monthNum,year)
+    #print(monthNum,year)
 
     cur.execute("SELECT id FROM month WHERE num = {} AND year = TO_DATE('{}','YYYY')".format(monthNum,year))
     monthId = cur.fetchone()[0]
@@ -944,28 +810,6 @@ def changeRAforDutyDay():
         conn.commit()
 
         cur.close()
-
-        # # Figure out what school year we are looking for
-        # month, day, year = data["dateStr"].split("/")
-        # #print(year,month,day)
-        #
-        # if int(month) >= 8:
-        #     # If the current month is August or later
-        #     #  then the current year is the startYear
-        #     startYear = int(year)
-        #     endYear = int(year) + 1
-        #
-        # else:
-        #     # If the current month is earlier than August
-        #     #  then the current year is the endYear
-        #     startYear = int(year) - 1
-        #     endYear = int(year)
-        #
-        # # TODO: Currently, a school year is considered from August to August.
-        # #        Perhaps this should be configurable by the AHD/HDs?
-        #
-        # start = str(startYear) + '-08-01'
-        # end = str(endYear) + '-08-01'
 
         ret = stdRet(1,"successful")
         # ret["pointDict"] = getRAStats(userDict["hall_id"], start, end)
