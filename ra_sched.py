@@ -42,6 +42,12 @@ class RA:
         else:
             return 1 == random.randint(0,1)
 
+    def __deepcopy__(self,memo):
+        # Return a new RA object with all of the same parameters
+        return RA(str(self.firstName),str(self.lastName),int(self.id),\
+                int(self.hallId),date.fromordinal(self.dateStarted.toordinal()),
+                list(self.conflicts),int(self.points))
+
     def getConflicts(self):
         return self.conflicts
 

@@ -8,11 +8,49 @@ function editStaff(id) {
                 node.className != "del" && node.className != "resHall") {
 
             let input = document.createElement("input");
-            input.type = "text";
 
-            let tmp = node.innerHTML;
-            input.value = tmp;
-            node.innerHTML = "";
+            switch (node.className) {
+                case "color":
+                    input.type = "color";
+
+                    let tm = node.value;
+                    input.value = tm;
+                    node.innerHTML = "";
+                    break;
+
+                case "email":
+                    input.type = "email";
+
+                    let tmp = node.innerHTML;
+                    input.value = tmp;
+                    node.innerHTML = "";
+                    break;
+
+                case "authLevel":
+                    input = document.createElement("select");
+
+                    for (let opt of document.getElementById("authLevelOpts").options) {
+                        let o = document.createElement("option");
+
+                        o.value = opt.value;
+                        o.innerHTML = opt.innerHTML;
+
+                        if (o.innerHTML == node.innerHTML) {
+                            o.selected = true;
+                        }
+
+                        input.add(o);
+                    }
+                    node.innerHTML = "";
+                    break;
+
+                default:
+                    input.type = "text";
+
+                    let t = node.innerHTML;
+                    input.value = t;
+                    node.innerHTML = "";
+            }
 
             node.appendChild(input);
         }

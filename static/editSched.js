@@ -2,95 +2,79 @@
 
 var editCal = {};
 
-function runScheduler() {
-    let noDutyDays = prompt("Enter the days where no duties should be assigned separated by commas.\n\nFor example: 14,15,30");
-    let monthNum = appConfig.calDate.getMonth();
-    let year = appConfig.calDate.getFullYear();
+function getPoints() {
 
-    console.log("Running Scheduler for month: "+monthNum);
-    console.log("  with no duties on: "+noDutyDays);
+    // In order to determine what school year the user is currently in
+    //  we need to get the current date and determine if its between
+    //  08-01 and 06-01
 
-    document.getElementById("loading").style.display = "block";
-    appConfig.base.callAPI("runScheduler",{"monthNum":monthNum,"year":year,"noDuty":noDutyDays},reviewSched);
-}
+    let curMonNum = appConfig.curDate.getMonth();
+    let startYear;
+    let endYear;
 
-function reviewSched(resObject) {
-    document.getElementById("loading").style.display = "none";
+    if (curMonNum >= 7) {
+        // If the current month is August or later
+        //  then the current year is the startYear
 
-    applySchedule(resObject["schedule"]);
-    updateRAs(resObject["raStats"]);
-}
+        startYear = appConfig.curDate.getFullYear();
+        endYear = appConfig.curDate.getFullYear() + 1;
 
-function editSched(raList) {
-    console.log(raList);
-    for (let i of raList) {
-        editCal[i.name] = i.id;
-    }
-    updateRAs(raList);
+    } else {
+        // If the current month is earlier than August
+        //  then the current year is the endYear
 
-    let names = document.getElementsByClassName("name");
-
-    for (let nameDiv of names) {
-        let s = document.createElement("select");
-        s.setAttribute("onChange","tallyPoints()");
-        let rID = nameDiv.id;
-        let rName = nameDiv.innerHTML;
-
-        let curSel = document.createElement("option");
-        curSel.text = rName;
-        s.add(curSel);
-        let spacer = document.createElement("option");
-        spacer.text = "----";
-        s.add(spacer);
-
-        for (let ra of raList) {
-
-            if (rID != ra.id) {
-                let o = document.createElement("option");
-                o.text = ra.name;
-                s.add(o);
-            }
-        }
-
-        nameDiv.innerHTML = "";
-        nameDiv.appendChild(s);
+        startYear = appConfig.curDate.getFullYear() - 1;
+        endYear = appConfig.curDate.getFullYear();
     }
 
-    let eb = document.getElementById("edit");
-    eb.innerHTML = "Submit Changes";
-    eb.setAttribute("onclick","updateSchedule()");
-    let rs = document.getElementById("run");
-    rs.disabled = true;
-    document.getElementById("loading").style.display = "none";
+    let params = {
+        start: startYear.toString() + '-08-01',
+        end: endYear.toString() + '-06-01'
+    }
+
+    appConfig.base.callAPI("getStats", params, updatePoints, "GET");
+
 }
 
-function getEditInfo() {
-    let monthNum = appConfig.calDate.getMonth();
-    let year = appConfig.calDate.getFullYear();
+function updatePoints(pointDict) {
+    // PointDict is expected to be as follows:
+    // { raId: {name: x, pts: x}, ... }
+    console.log(pointDict);
 
-    console.log("Editing Schedule for month: "+monthNum);
+    let raListDiv = document.getElementById("raList");
 
-    document.getElementById("loading").style.display = "block";
-    appConfig.base.callAPI("getEditInfo",{"monthNum":monthNum,"year":year},editSched);
-}
+    for (let idKey in pointDict) {
+        // Get the Div containing the points for the respective RA
+        let ptDiv = document.getElementById("list_points_" + idKey);
 
-function tallyPoints() {
-    let sels = document.getElementsByTagName("select");
-    let resDict = {};
-    for (let i of sels) {
-        let raName = i.value;
-        if (raName in resDict) {
-            resDict[raName] += parseInt(i.parentNode.parentNode.dataset.points);
+        if (ptDiv == null) {
+            // If the RA is not currently in the raList
+            //  then create a new entry for them.
+
+            let newLi = document.createElement("li");
+            newLi.id = "list_" + idKey;
+
+            let newNameDiv = document.createElement("div");
+            newNameDiv.id = "list_name_" + idKey;
+            newNameDiv.classList.add("tName");
+            newNameDiv.innerHTML = pointDict[idKey].name;
+
+            let newPtsDiv = document.createElement("div");
+            newNameDiv.id = "list_points_" + idKey;
+            newNameDiv.classList.add("tPoints");
+            newNameDiv.innerHTML = pointDict[idKey].pts;
+
+            newLi.appendChild(newNameDiv);
+            newLi.appendChild(newPtsDiv);
+            raListDiv.getElementsByTagName("ul")[0].appendChild(newLi);
+
         } else {
-            resDict[raName] = parseInt(i.parentNode.parentNode.dataset.points);
+            // Else update the point value
+            ptDiv.innerHTML = pointDict[idKey].pts;
         }
     }
-    for (let raKey in resDict) {
-        let i = editCal[raKey];
-        let ptsDiv = document.getElementById("list_points_"+i);
-        ptsDiv.innerHTML = resDict[raKey];
-    }
 }
+
 
 function highlightRA(i) {
     let raNames = document.getElementsByClassName("name");
@@ -101,41 +85,4 @@ function highlightRA(i) {
             entry.style.boxShadow = "none";
         }
     }
-}
-
-function updateRAs(raList) {
-    // Expecting a list containing objects with the following keys:
-    //   id: id of the ra
-    //   name: full name of the ra
-    //   mPts: points the RA has in the current month
-
-    let d = document.getElementById("raList");
-    let newL = document.createElement("ul");
-
-    for (let ra of raList) {
-        // List entry
-        let l = document.createElement("li");
-        l.id = "list_"+ra["id"];
-        l.onclick = function () { highlightRA(ra["id"]); };
-
-        // Div containing name
-        let n = document.createElement("div");
-        n.classList.add("tName");
-        n.innerHTML = ra["name"];
-        n.id = "list_name_"+ra["id"];
-
-        // Div containing points
-        let p = document.createElement("div");
-        p.classList.add("tPoints");
-        p.innerHTML = ra["points"];
-        p.id = "list_points_"+ra["id"];
-
-        l.appendChild(n);
-        l.appendChild(p);
-
-        newL.appendChild(l);
-    }
-
-    d.removeChild(d.children[0]);
-    d.appendChild(newL);
 }

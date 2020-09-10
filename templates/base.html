@@ -54,7 +54,7 @@
         <script src="{{url_for('.static', filename='master.js')}}"></script>
         <script>
             var appConfig = {};
-            appConfig.host = 'https://localhost:5000';
+            appConfig.host = '{{ opts["HOST_URL"] }}';
             appConfig.apiURL = appConfig.host+'/api/';
             appConfig.base = new AppBase();
             appConfig.curDate = new Date();

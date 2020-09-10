@@ -9,6 +9,7 @@
 # DATABASE_URL='postgres://{role_name}:{password}@{host}/{database_name}'
 
 export DATABASE_URL='postgres:///ra_sched'
+export HOST_URL='https://localhost:5000'
 
 # The next two are for developing purposes only
 # They allow oauth2 to be used over http instead of https
@@ -16,9 +17,9 @@ export OAUTHLIB_RELAX_TOKEN_SCOPE=1
 export OAUTHLIB_INSECURE_TRANSPORT=1
 
 # The following need to be set with the appropriate oAuth2 information.
-export SECRET_KEY=
-export CLIENT_ID=
-export CLIENT_SECRET=
+export SECRET_KEY=''
+export CLIENT_ID=''
+export CLIENT_SECRET=''
 
 # The USE_ADHOC boolean is for setting the ssl_context of the flask
 #  this is only to be used for development purposes.
