@@ -45,10 +45,8 @@
     cursor: pointer;
 }
 #runRAList {
-    max-height: 200px;
+    height: 200px;
     overflow-y: scroll;
-}
-#runRAList {
     list-style: none;
 }
 #runRAList li {
@@ -65,6 +63,9 @@
 .modalError {
     display: none;
     color: rgb(255,0,0);
+}
+.modal-body > .row {
+    margin-left: auto;
 }
 
 #calContainer {
