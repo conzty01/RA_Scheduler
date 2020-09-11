@@ -145,6 +145,31 @@ def stdRet(status, msg):
     #  going back to the client when no additional data is to be sent.
     return {"status":status,"msg":msg}
 
+def getCurSchoolYear():
+    # Figure out what school year we are looking for
+    month = datetime.date.today().month
+    year = datetime.date.today().year
+    #print(year,month,day)
+
+    if int(month) >= 8:
+        # If the current month is August or later
+        #  then the current year is the startYear
+        startYear = int(year)
+        endYear = int(year) + 1
+
+    else:
+        # If the current month is earlier than August
+        #  then the current year is the endYear
+        startYear = int(year) - 1
+        endYear = int(year)
+
+    # TODO: Currently, a school year is considered from August to August.
+    #        Perhaps this should be configurable by the AHD/HDs?
+
+    start = str(startYear) + '-08-01'
+    end = str(endYear) + '-08-01'
+
+    return start, end
 #     -- Views --
 
 @app.route("/logout")
@@ -178,29 +203,7 @@ def conflicts():
 def editSched():
     userDict = getAuth()                                                        # Get the user's info from our database
 
-    # Figure out what school year we are looking for
-    month = datetime.date.today().month
-    year = datetime.date.today().year
-    #print(year,month,day)
-
-    if int(month) >= 8:
-        # If the current month is August or later
-        #  then the current year is the startYear
-        startYear = int(year)
-        endYear = int(year) + 1
-
-    else:
-        # If the current month is earlier than August
-        #  then the current year is the endYear
-        startYear = int(year) - 1
-        endYear = int(year)
-
-    # TODO: Currently, a school year is considered from August to August.
-    #        Perhaps this should be configurable by the AHD/HDs?
-
-    start = str(startYear) + '-08-01'
-    end = str(endYear) + '-08-01'
-
+    start, end = getCurSchoolYear()
     ptDict = getRAStats(userDict["hall_id"], start, end)
 
     #print(ptDict)
@@ -219,12 +222,18 @@ def editSched():
 @login_required
 def manStaff():
     userDict = getAuth()                                                        # Get the user's info from our database
+
+    start, end = getCurSchoolYear()
+
     cur = conn.cursor()
     cur.execute("SELECT ra.id, first_name, last_name, email, date_started, res_hall.name, points, color, auth_level \
-     FROM ra JOIN res_hall ON (ra.hall_id = res_hall.id) \
-     WHERE hall_id = {} ORDER BY ra.id ASC;".format(userDict["hall_id"]))
+                 FROM ra JOIN res_hall ON (ra.hall_id = res_hall.id) \
+                 WHERE hall_id = {} ORDER BY ra.id ASC;".format(userDict["hall_id"]))
+
+    ptStats = getRAStats(userDict["hall_id"], start, end)
+
     return render_template("staff.html",raList=cur.fetchall(),auth_level=userDict["auth_level"], \
-                            opts=baseOpts,curView=3, hall_name=userDict["hall_name"])
+                            opts=baseOpts,curView=3, hall_name=userDict["hall_name"], pts=ptStats)
 
 #     -- API --
 
