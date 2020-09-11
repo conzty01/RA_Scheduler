@@ -283,7 +283,7 @@ function eventClicked(info) {
     modalTitle.innerHTML = info.event.start.toLocaleDateString();
 
     let prevRA = document.getElementById("editModalPrevRA");
-    prevRA.innerHTML = info.event.title;
+    prevRA.value = info.event.title;
 
     let selector = document.getElementById("editModalNextRA");
     selector.value = info.event.backgroundColor;
@@ -392,7 +392,7 @@ function passModalSave(modalId, msg, extraWork=() => {}) {
 function showRunModal() {
     let title = document.getElementById("runModalLongTitle");
 
-    title.textContent = appConfig.calDate.toLocaleString('default', { month: 'long' });
+    title.textContent = appConfig.calDate.toLocaleString('default', { month: 'long', year: 'numeric' });
 
     // Hide any errors from previous scheduler runs
     let modal = document.getElementById("runModal");
