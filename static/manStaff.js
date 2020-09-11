@@ -1,5 +1,62 @@
 "use strict"
 
+function showAddModal() {
+    // Set the Modal Title appropriately
+    document.getElementById("modalTitle").innerHTML = "Add a New Staff Member";
+
+    // Hide the delete and save changes buttons
+    document.getElementById("delBut").style.display = "none";
+    document.getElementById("savBut").style.display = "none";
+
+    // Show the add button
+    document.getElementById("addBut").style.display = "block";
+
+    // Reset Form
+    document.getElementById("addStafferForm").reset();
+
+    // Display the modal
+    $('#addStafferModal').modal('toggle');
+
+}
+
+function showEditModal(id) {
+    // Set the Modal Title appropriately
+    document.getElementById("modalTitle").innerHTML = "Edit Staff Member Info";
+
+    // Show the delete and save changes buttons
+    document.getElementById("delBut").style.display = "block";
+    document.getElementById("savBut").style.display = "block";
+
+    // Hide the add button
+    document.getElementById("addBut").style.display = "none";
+
+    // Set the values of the form.
+    let tr = document.getElementById(id);
+
+    document.getElementById("raID").value = tr.getElementsByClassName("raID")[0].innerHTML;
+    document.getElementById("fName").value = tr.getElementsByClassName("fName")[0].innerHTML;
+    document.getElementById("lName").value = tr.getElementsByClassName("lName")[0].innerHTML;
+    document.getElementById("email").value = tr.getElementsByClassName("email")[0].innerHTML;
+    document.getElementById("color").value = tr.getElementsByClassName("color")[0].childNodes[0].value;
+    document.getElementById("startDate").value = tr.getElementsByClassName("startDate")[0].innerHTML;
+    let authLevelTxt = tr.getElementsByClassName("authLevel")[0].innerHTML;
+    let authLevelVal;
+    switch (authLevelTxt) {
+        case 'AHD':
+            authLevelVal = 2;
+            break;
+        case 'HD':
+            authLevelVal = 3;
+            break;
+        case 'RA':
+            authLevelVal = 1;
+    }
+    document.getElementById("authLevelOpts").value = authLevelVal;
+
+    // Display the modal
+    $('#addStafferModal').modal('toggle');
+}
+
 function editStaff(id) {
     let row = document.getElementById(id);
 
@@ -57,7 +114,7 @@ function editStaff(id) {
     }
 
     let checkmark = document.createElement("span");
-    checkmark.className = "glyphicon glyphicon-ok";
+    checkmark.className = "fa fa-ok";
     checkmark.setAttribute("onclick","submitChanges("+id.toString()+")");
 
     let editTD = row.getElementsByClassName("edit")[0];
