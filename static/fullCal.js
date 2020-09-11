@@ -17,7 +17,7 @@ function initCal( propObject ) {
 
 function initConflictCal() {
     initCal({
-        height: "auto",
+        height: "75%",
         initialView: 'dayGridMonth',
         dayMaxEventRows: true,
         moreLinkClick: "popover",
@@ -44,7 +44,7 @@ function initConflictCal() {
 
 function initIndexCal() {
     initCal({
-        height: "auto",
+        height: "75%",
         initialView: 'dayGridMonth',
         dayMaxEventRows: true,
         moreLinkClick: "popover",
@@ -86,7 +86,7 @@ function initIndexCal() {
 
 function initEditSchedCal() {
     initCal({
-        height: "auto",
+        height: "75%",
         initialView: 'dayGridMonth',
         dayMaxEventRows: true,
         moreLinkClick: "popover",
