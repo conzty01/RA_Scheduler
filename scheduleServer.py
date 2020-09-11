@@ -126,8 +126,9 @@ def getAuth():
     uEmail = current_user.username                                              # The email returned from Google
     cur = conn.cursor()
     cur.execute("""
-            SELECT ra.id, username, first_name, last_name, hall_id, auth_level
+            SELECT ra.id, username, first_name, last_name, hall_id, auth_level, res_hall.name
             FROM "user" JOIN ra ON ("user".ra_id = ra.id)
+                        JOIN res_hall ON (ra.hall_id = res_hall.id)
             WHERE username = '{}';""".format(uEmail))
     res = cur.fetchone()                                                        # Get user info from the database
 
@@ -137,7 +138,7 @@ def getAuth():
 
     cur.close()
     return {"uEmail":uEmail,"ra_id":res[0],"name":res[2]+" "+res[3],
-            "hall_id":res[4],"auth_level":res[5]}
+            "hall_id":res[4],"auth_level":res[5],"hall_name":res[6]}
 
 def stdRet(status, msg):
     # Helper function to create a standard return object to help simplify code
@@ -162,22 +163,15 @@ def index():
     userDict = getAuth()                                                        # Get the user's info from our database
     if type(userDict) != dict:
         return userDict
-    return render_template("index.html",calDict=cDict,auth_level=userDict["auth_level"], \
-                            cal=cc.monthdays2calendar(fDict["year"],fDict["num_month"]),opts=baseOpts)
+    return render_template("index.html",auth_level=userDict["auth_level"], \
+                            curView=1, opts=baseOpts, hall_name=userDict["hall_name"])
 
 @app.route("/conflicts")
 def conflicts():
     userDict = getAuth()                                                        # Get the user's info from our database
 
-    # If current month is December, update the year
-    #  to display the proper month
-    if fDict["num_month"] == 12:
-        year = fDict["year"] + 1
-    else:
-        year = fDict["year"]
-
-    return render_template("conflicts.html", calDict=fDict, auth_level=userDict["auth_level"], \
-                            cal=cc.monthdays2calendar(year,fDict["num_month"]),opts=baseOpts)
+    return render_template("conflicts.html",  auth_level=userDict["auth_level"], \
+                            curView=2, opts=baseOpts, hall_name=userDict["hall_name"])
 
 @app.route("/editSched")
 @login_required
@@ -217,9 +211,9 @@ def editSched():
     # Sort alphabetically by last name of RA
     #ptDictSort = lambda kv: kv[1]["name"].split(" ")[1]
 
-    return render_template("editSched.html", calDict=cDict, raList=cur.fetchall(), auth_level=userDict["auth_level"], \
-                            cal=cc.monthdays2calendar(fDict["year"],fDict["num_month"]), \
-                            ptDict=sorted(ptDict.items(), key=lambda x: x[1]["name"].split(" ")[1] ),opts=baseOpts)
+    return render_template("editSched.html", raList=cur.fetchall(), auth_level=userDict["auth_level"], \
+                            ptDict=sorted(ptDict.items(), key=lambda x: x[1]["name"].split(" ")[1] ), \
+                            curView=3, opts=baseOpts, hall_name=userDict["hall_name"])
 
 @app.route("/staff")
 @login_required
@@ -229,7 +223,8 @@ def manStaff():
     cur.execute("SELECT ra.id, first_name, last_name, email, date_started, res_hall.name, points, color, auth_level \
      FROM ra JOIN res_hall ON (ra.hall_id = res_hall.id) \
      WHERE hall_id = {} ORDER BY ra.id ASC;".format(userDict["hall_id"]))
-    return render_template("staff.html",raList=cur.fetchall(),auth_level=userDict["auth_level"],opts=baseOpts)
+    return render_template("staff.html",raList=cur.fetchall(),auth_level=userDict["auth_level"], \
+                            opts=baseOpts,curView=3, hall_name=userDict["hall_name"])
 
 #     -- API --
 
