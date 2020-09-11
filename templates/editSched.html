@@ -1,84 +1,43 @@
 {% extends "base.html" %}
 {% block styles %}
 {{ super() }}
-<!-- <link rel="stylesheet" href="{{url_for('.static', filename='calendar.css')}}"> -->
-<link rel="stylesheet" href="{{url_for('.static', filename='editSched.css')}}">
 <link rel="stylesheet" href="{{url_for('.static', filename='main.css')}}">
 <link href='https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.13.1/css/all.css' rel='stylesheet'>
+<link rel="stylesheet" href="{{url_for('.static', filename='calendar.css')}}">
+<link rel="stylesheet" href="{{url_for('.static', filename='editSched.css')}}">
 
-<style>
-    .fc-day-other a.fc-event {
-        background-color: #D0D0D0 !important;
-        border-color: #C1C1C1 !important;
-    }
-    .fc-event-main {
-        cursor: pointer;
-    }
-    #runRAList {
-        max-height: 200px;
-        overflow-y: scroll;
-    }
-    #runRAList {
-        list-style: none;
-    }
-    #runRAList li {
-        display: block;
-        clear: left;
-        overflow: auto;
-    }
-    #runRAList li:hover {
-        background-color: #E1E1E1;
-    }
-    #runRAList li label {
-        cursor: pointer;
-    }
-    .modalError {
-        display: none;
-        color: rgb(255,0,0);
-    }
-</style>
 {% endblock %}
 
-{% block headerRow %}
-<h1>Brandt Hall RA Duty Calendar</h1>
-<p>Below is the duty calendar for the month of {{ calDict["text_month"] }}</p>
-{% endblock headerRow %}
-
 {% block contentRows %}
-<!-- Button trigger modal -->
-<!--<button type="button" class="btn btn-primary" data-toggle="modal" data-target="#exampleModalCenter">
-  Launch demo modal
-</button>-->
 
 <!-- Edit Duty Modal -->
 <div class="modal fade" id="editModal" tabindex="-1" role="dialog" aria-labelledby="editModalTitle" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered" role="document">
+  <div class="modal-dialog modal-dialog" role="document">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 class="modal-title">Changing duty assignment for <span id="editModalLongTitle" style="font-weight:bold;"></span></h3>
+        <h3 class="modal-title">Change Duty: <span id="editModalLongTitle" style="font-weight:bold;"></span></h3>
       </div>
       <div class="modal-body">
           <div class="row">
-
-              <div class="col-sm-5 modalLeft">
-                  <div class="row">
-                      <h4>Current Assigned RA</h4>
-                  </div>
-                  <div class="row">
-                      <span id="editModalPrevRA"></span>
+              <div class="col-sm-5">
+                  <div class="form-group">
+                      <label for"editModalPrevRA">Current Assigned RA</label>
+                      <select id="editModalPrevRA" class="form-control" disabled>
+                          {% for ra in raList: %}
+                          <option value="{{ ra[1] }} {{ ra[2] }}">{{ ra[1] }} {{ ra[2] }}</option>
+                          {% endfor %}
+                      </select>
                   </div>
               </div>
 
-              <div class="col-sm-1">
-                  <span style="font-weight: bold">&gt;</span>
+              <div class="col-sm-1 align-middle">
+                  <span class="fa fa-arrow-right"></span>
               </div>
 
               <div class="col-sm-5 modalRight">
-                  <div class="row">
-                      <h4>New Assigned RA</h4>
-                  </div>
-                  <div class="row">
-                      <select id="editModalNextRA">
+                  <div class="form-group">
+                      <label for="editModalNextRA">New Assigned RA</label>
+                      <select id="editModalNextRA" class="form-control">
                           {% for ra in raList: %}
                           <option id="selector_{{ ra[0] }}" value="{{ ra[4] }}">{{ ra[1] }} {{ ra[2] }}</option>
                           {% endfor %}
@@ -100,27 +59,27 @@
 
 <!-- Add Duty Modal -->
 <div class="modal fade" id="addDutyModal" tabindex="-1" role="dialog" aria-labelledby="addDutyModalTitle" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered" role="document">
+  <div class="modal-dialog modal-dialog" role="document">
     <div class="modal-content">
       <div class="modal-header">
         <h3 class="modal-title">Add a New Duty</h3>
       </div>
       <div class="modal-body">
-          <div class="row">
+          <div class="form-group">
               <label for="addDateDate">Duty Date:</label>
-              <input type="date" id="addDateDate">
+              <input class="form-control" type="date" id="addDateDate">
           </div>
-          <div class="row">
+          <div class="form-group">
               <label for="addDateRASelect">Assigned RA:</label>
-              <select id="addDateRASelect">
+              <select class="form-control" id="addDateRASelect">
                   {% for ra in raList: %}
                   <option id="selector_{{ ra[0] }}" value="{{ ra[4] }}">{{ ra[1] }} {{ ra[2] }}</option>
                   {% endfor %}
               </select>
           </div>
-          <div class="row">
+          <div class="form-group">
               <label for="addDatePts">Point Value:</label>
-              <input type="number" id="addDatePts" name="addDatePts">
+              <input class="form-control" type="number" id="addDatePts" name="addDatePts" value="1">
          </div>
       </div>
       <div class="modalError">Update Assignment Failed: <span class="msg"></span></div>
@@ -134,19 +93,19 @@
 
 <!-- Run Scheduler Modal -->
 <div class="modal fade" id="runModal" tabindex="-1" role="dialog" aria-labelledby="runModalTitle" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered" role="document">
+  <div class="modal-dialog modal-dialog" role="document">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 class="modal-title">Run Scheduler for <span id="runModalLongTitle" style="font-weight:bold;"></span></h3>
+        <h3 class="modal-title">Run Scheduler: <span id="runModalLongTitle" style="font-weight:bold;"></span></h3>
       </div>
       <div class="modal-body">
-          <div class="row">
+          <div class="form-group">
               <label for="runNoDutyDates">
                   Enter the days where no duties should be assigned separated by commas.
               </label>
-              <input id="runNoDutyDates" type="text" placeholder="Example: 14,15,30" />
+              <input class="form-control" id="runNoDutyDates" type="text" placeholder="Example: 14,15,30" />
           </div>
-          <div class="row">
+          <div class="form-group">
               <label for="runRAList">
                   Select the RAs that SHOULD be scheduled for duty for this month.
               </label>
@@ -177,26 +136,22 @@
   </div>
 </div>
 
-<div class="row">
-    <main>
-        <div class="col-lg-9">
-            <div id="calendar">
+<div id="calContainer" class="col-lg-9">
+    <div id="calendar">
 
-            </div>
-        </div>
-        <div class="col-lg-3">
-            <div id="raList" class="raList">
-                <ul>
-                    {% for idKey, idVal in ptDict: %}
-                    <li id="list_{{ idKey }}">
-                        <div id="list_name_{{ idKey }}" class="tName">{{ idVal["name"] }}</div>
-                        <div id="list_points_{{ idKey }}" class="tPoints">{{ idVal["pts"] }}</div>
-                    </li>
-                    {% endfor %}
-                </ul>
-            </div>
-        </div>
-    </main>
+    </div>
+</div>
+<div id="raListContainer" class="col-lg-3">
+    <div id="raList" class="raList">
+        <ul>
+            {% for idKey, idVal in ptDict: %}
+            <li id="list_{{ idKey }}">
+                <div id="list_name_{{ idKey }}" class="tName">{{ idVal["name"] }}</div>
+                <div id="list_points_{{ idKey }}" class="tPoints">{{ idVal["pts"] }}</div>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
 </div>
 {% endblock %}
 
