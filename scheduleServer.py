@@ -4,6 +4,7 @@ from flask_dance.consumer.backend.sqla import OAuthConsumerMixin, SQLAlchemyBack
 from flask_dance.contrib.google import make_google_blueprint, google
 from flask_dance.consumer import oauth_authorized
 from sqlalchemy.orm.exc import NoResultFound
+from werkzeug.utils import secure_filename
 from flask_sqlalchemy import SQLAlchemy
 from flask_bootstrap import Bootstrap
 from flask.wrappers import Response
@@ -36,6 +37,9 @@ baseOpts = {
     "HOST_URL": os.environ["HOST_URL"]
 }
 
+ALLOWED_EXTENSIONS = {'txt','csv'}
+UPLOAD_FOLDER = "./static"
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 db = SQLAlchemy(app)                                                            # SQLAlchemy is used for OAuth
 login_manager = LoginManager()                                                  # The login manager for the application
@@ -143,6 +147,53 @@ def stdRet(status, msg):
     # Helper function to create a standard return object to help simplify code
     #  going back to the client when no additional data is to be sent.
     return {"status":status,"msg":msg}
+
+def fileAllowed(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def validateUpload(partList):
+
+    pl = []
+    for i in partList:
+        i.replace("%","")
+        i.replace(";","")
+        i.replace("\\","")
+
+        pl.append(i)
+
+    valid = True
+    reasons = []
+
+    if len(partList) != 6:
+        valid = False
+        reasons.append("Expected 5 Parameters, Received: {}".format(len(partList)))
+        print(partList)
+
+    else:
+        fName, lName, email, start, color, role = pl
+
+        # Check Email Address
+        if "@" not in email and "." not in email:
+            valid = False
+            reasons.append(fName+" "+lName+" - Invalid Email Address: "+email)
+            print(email)
+
+        # Check Start Date
+        splitDate = start.split("/")
+        if len(splitDate) != 3 or "-" in start or int(splitDate[0]) > 12 or \
+            int(splitDate[1]) > 31 or int(splitDate[2]) < 1:
+            valid = False
+            reasons.append(fName+" "+lName+" - Invalid Start Date: "+start)
+            print(start)
+
+        # Check Color
+        if len(color) != 7:
+            valid = False
+            reasons.append(fName+" "+lName+" - Invalid Color Format: {} Must be in 6-digit, hex format preceeded by a '#'".format(color))
+            print(color)
+
+    return pl, valid, reasons
 
 #     -- Views --
 
@@ -914,6 +965,80 @@ def daleteDuty():
 
         return jsonify({"status":0,"error":"Unable to find parameters in DB"})
 
+@app.route("/api/importStaff", methods=["POST"])
+@login_required
+def importStaff():
+    userDict = getAuth()
+
+    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
+        return jsonify("NOT AUTHORIZED")
+
+    print(request.files)
+    if 'file' not in request.files:
+            return jsonify(stdRet(0,"No File Part"))
+
+    file = request.files['file']
+    # if user does not select file, browser also
+    # submit an empty part without filename
+
+    if file.filename == '':
+        return jsonify(stdRet(0,"No File Selected"))
+
+    if file and fileAllowed(file.filename):
+        dataStr = file.read().decode("utf-8")
+
+        # Iterate through the rows of the dataStr
+        #  The expected format for the csv contains
+        #  a header row and is as follows:
+        #  First Name, Last Name, Email, Date Started (MM/DD/YYYY), Color, Role
+
+        #  Example:
+        #  FName, LName-Hyphen, example@email.com, 05/28/2020, #OD1E76, RA
+        print(dataStr)
+        cur = conn.cursor()
+        for row in dataStr.split("\n")[1:]:
+            if row != "":
+                pl = [ part.strip() for part in row.split(",") ]
+                print(pl)
+
+                # Do some validation checking
+
+                pl, valid, reasons = validateUpload(pl)
+
+                if not valid:
+                    ret = stdRet("0","Invalid Formatting")
+                    ret["except"] = reasons
+                    return jsonify(ret)
+
+                if pl[-1] == "HD" and userDict["auth_level"] >= 3:
+                    auth = 3
+                elif pl[-1] == "AHD":
+                    auth = 2
+                else:
+                    auth = 1
+
+                print(auth)
+
+                try:
+                    cur.execute("""
+                        INSERT INTO ra (first_name,last_name,hall_id,date_started,color,email,auth_level)
+                        VALUES ('{}','{}',{},TO_DATE('{}','MM/DD/YYYY'),'{}','{}',{});
+                        """.format(pl[0],pl[1],userDict["hall_id"],pl[3],pl[4],pl[2],auth))
+
+                    conn.commit()
+
+                except psycopg2.IntegrityError:                                         # If the conflict entry already exists
+                    print("Duplicate RA: ", pl)
+                    conn.rollback()                                                     # Rollback last commit so that Internal Error doesn't occur
+                    cur.close()
+                    cur = conn.cursor()
+
+        cur.close()
+
+        return jsonify(stdRet(1,"successful"))
+
+    else:
+        return jsonify(stdRet(0,"File Type Not Supported"))
 
 #     -- Error Handling --
 
