@@ -280,6 +280,27 @@ def processConflicts():
     insert_cur.close()
     return redirect(url_for(".index"))                                          # Send the user back to the main page (Not utilized by client currently)
 
+@app.route("/api/getStaffInfo", methods=["GET"])
+@login_required
+def getStaffStats():
+    userDict = getAuth()
+
+    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
+        return jsonify("NOT AUTHORIZED")
+
+    cur = conn.cursor()
+
+    cur.execute("""SELECT ra.id, first_name, last_name, email, date_started, res_hall.name, color, auth_level
+                 FROM ra JOIN res_hall ON (ra.hall_id = res_hall.id)
+                 WHERE hall_id = {} ORDER BY ra.id DESC;""".format(userDict["hall_id"]))
+
+    start, end = getCurSchoolYear()
+    pts = getRAStats(userDict["hall_id"], start, end)
+
+    ret = {"raList":cur.fetchall(), "pts":pts}
+
+    return jsonify(ret)
+
 @app.route("/api/getStats", methods=["GET"])
 @login_required
 def getRAStats(hallId=None,startDateStr=None,endDateStr=None):
@@ -679,23 +700,24 @@ def changeStaffInfo():
     hallId = userDict["hall_id"]
 
     if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
-        return jsonify("NOT AUTHORIZED")
+        return jsonify(stdRet(0,"NOT AUTHORIZED"))
 
     data = request.json
 
     cur = conn.cursor()
     cur.execute("""UPDATE ra
-                   SET first_name = '{}', last_name = '{}', hall_id = {},
+                   SET first_name = '{}', last_name = '{}',
                        date_started = TO_DATE('{}', 'YYYY-MM-DD'),
-                       points = {}, color = '{}', email = '{}', auth_level = {}
+                       color = '{}', email = '{}', auth_level = {}
                    WHERE id = {};
-                """.format(data["fName"],data["lName"],hallId, \
-                        data["startDate"],data["points"],data["color"], \
-                        data["email"],data["authLevel"], data["raID"]))
+                """.format(data["fName"],data["lName"], \
+                        data["startDate"],data["color"], \
+                        data["email"],data["authLevel"], \
+                        data["raID"]))
 
     conn.commit()
     cur.close()
-    return data["raID"]
+    return jsonify(stdRet(1,"successful"))
 
 @app.route("/api/removeStaffer", methods=["POST"])
 @login_required
