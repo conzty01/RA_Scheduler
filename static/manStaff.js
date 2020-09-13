@@ -1,113 +1,113 @@
 "use strict"
 
-function editStaff(id) {
-    let row = document.getElementById(id);
+function showAddModal() {
+    // Set the Modal Title appropriately
+    document.getElementById("modalTitle").innerHTML = "Add a New Staff Member";
 
-    for (let node of row.children) {
-        if (node.className != "raID" && node.className != "edit" &&
-                node.className != "del" && node.className != "resHall") {
+    // Hide the delete and save changes buttons
+    document.getElementById("delBut").style.display = "none";
+    document.getElementById("savBut").style.display = "none";
 
-            let input = document.createElement("input");
+    // Show the add button
+    document.getElementById("addBut").style.display = "block";
 
-            switch (node.className) {
-                case "color":
-                    input.type = "color";
+    // Reset Form
+    document.getElementById("addStafferForm").reset();
 
-                    let tm = node.value;
-                    input.value = tm;
-                    node.innerHTML = "";
-                    break;
+    // Display the modal
+    $('#addStafferModal').modal('toggle');
 
-                case "email":
-                    input.type = "email";
+}
 
-                    let tmp = node.innerHTML;
-                    input.value = tmp;
-                    node.innerHTML = "";
-                    break;
+function showEditModal(id) {
+    // Set the Modal Title appropriately
+    document.getElementById("modalTitle").innerHTML = "Edit Staff Member Info";
 
-                case "authLevel":
-                    input = document.createElement("select");
+    // Show the delete and save changes buttons
+    document.getElementById("delBut").style.display = "block";
+    document.getElementById("delBut").onclick = () => { delStaff(id) };
+    document.getElementById("savBut").style.display = "block";
 
-                    for (let opt of document.getElementById("authLevelOpts").options) {
-                        let o = document.createElement("option");
+    // Hide the add button
+    document.getElementById("addBut").style.display = "none";
 
-                        o.value = opt.value;
-                        o.innerHTML = opt.innerHTML;
+    // Set the values of the form.
+    let tr = document.getElementById(id);
 
-                        if (o.innerHTML == node.innerHTML) {
-                            o.selected = true;
-                        }
-
-                        input.add(o);
-                    }
-                    node.innerHTML = "";
-                    break;
-
-                default:
-                    input.type = "text";
-
-                    let t = node.innerHTML;
-                    input.value = t;
-                    node.innerHTML = "";
-            }
-
-            node.appendChild(input);
-        }
+    document.getElementById("raID").value = tr.getElementsByClassName("raID")[0].innerHTML;
+    document.getElementById("fName").value = tr.getElementsByClassName("fName")[0].innerHTML;
+    document.getElementById("lName").value = tr.getElementsByClassName("lName")[0].innerHTML;
+    document.getElementById("email").value = tr.getElementsByClassName("email")[0].innerHTML;
+    document.getElementById("color").value = tr.getElementsByClassName("color")[0].childNodes[0].value;
+    document.getElementById("startDate").value = tr.getElementsByClassName("startDate")[0].innerHTML;
+    let authLevelTxt = tr.getElementsByClassName("authLevel")[0].innerHTML;
+    let authLevelVal;
+    switch (authLevelTxt) {
+        case 'AHD':
+            authLevelVal = 2;
+            break;
+        case 'HD':
+            authLevelVal = 3;
+            break;
+        case 'RA':
+            authLevelVal = 1;
     }
+    document.getElementById("authLevelOpts").value = authLevelVal;
 
-    let checkmark = document.createElement("span");
-    checkmark.className = "glyphicon glyphicon-ok";
-    checkmark.setAttribute("onclick","submitChanges("+id.toString()+")");
-
-    let editTD = row.getElementsByClassName("edit")[0];
-    editTD.removeChild(editTD.childNodes[0]);
-    editTD.appendChild(checkmark);
+    // Display the modal
+    $('#addStafferModal').modal('toggle');
 }
 
 function submitChanges(id) {
-    let row = document.getElementById(id);
-    let data = {};
 
-    for (let col of row.children) {
-        //console.log(col);
-        // columns with inputs
-        if (col.className != "edit" && col.className != "del") {
-            data[col.className] = col.childNodes[0].value;
-        }
+    let data = {
+        raID : document.getElementById("raID").value,
+        fName : document.getElementById("fName").value,
+        lName : document.getElementById("lName").value,
+        email : document.getElementById("email").value,
+        color : document.getElementById("color").value,
+        startDate : document.getElementById("startDate").value,
+        authLevel : document.getElementById("authLevelOpts").value
     }
 
-    data["raID"] = row.children[0].innerHTML;
-
-    appConfig.base.callAPI("changeStaffInfo",data,resetRow,"POST");
+    appConfig.base.callAPI("changeStaffInfo",data,getStaffInfo,"POST");
 }
 
-function resetRow(id) {
-    let row = document.getElementById(id);
+function getStaffInfo() {
+    console.log("Refreshing Staff List");
 
-    for (let col of row.children) {
-        if (col.className == "edit") {
-            let pencil = document.createElement("span");
-            pencil.className = "glyphicon glyphicon-pencil";
-            pencil.setAttribute("onclick","editStaff("+id.toString()+")");
+    appConfig.base.callAPI("getStaffInfo",{},
+                             (data) => {
+                                reDrawTable(data);
+                                $('#addStafferModal').modal('toggle');
+                             },"GET");
+}
 
-            let editTD = row.getElementsByClassName("edit")[0];
-            editTD.removeChild(editTD.childNodes[0]);
-            editTD.appendChild(pencil);
+function reDrawTable(data) {
+    // data = {
+    //    raList: [(id,fName,lName,email,dateStarted,resHallName,color,auth_level), ...],
+    //    pts: { raID : { name: xxx, pts: xx }, ... }
+    // }
 
-        } else if (col.children.length != 0 && col.className != "del") {
-            let tmp = col.children[0].value;
+    console.log("Redrawing Staff Table");
 
-            col.removeChild(col.children[0]);
-            col.innerHTML = tmp;
-        }
+    let table = document.getElementById("staffTable");
+    let oldTBody = table.getElementsByTagName("tbody")[0];
+
+    let newTBody = document.createElement("tbody");
+
+    for (let staffer of data.raList) {
+
+        // Add the points into the list in the expected location
+        staffer.splice(6, 0, data.pts[staffer[0]].pts)
+        addRow(staffer, newTBody);
     }
+
+    table.replaceChild(newTBody, oldTBody);
 }
 
-function addRow(data) {
-    console.log(data);
-    let tab = document.getElementsByTagName("table")[0];
-    let newRow = tab.insertRow(1);
+function addRow(data, table) {
+    let newRow = table.insertRow(0);
     newRow.id = data[0];
     newRow.setAttribute("scope","row");
 
@@ -120,8 +120,35 @@ function addRow(data) {
         if (d == "startDate") {
             let tmp = new Date(data[i]);
             col.innerHTML = tmp.getFullYear().toString()+"-"+(tmp.getMonth()+1).toString()+"-"+tmp.getDate().toString();
+
+        } else if (d == "color") {
+            let tmp = document.createElement("input");
+            tmp.type = "color";
+            tmp.value = data[i];
+            tmp.disabled = true;
+            col.appendChild(tmp);
+
+        } else if (d == "authLevel") {
+            switch (data[i]) {
+                case 1:
+                    col.innerHTML = "RA";
+                    break;
+
+                case 2:
+                    col.innerHTML = "AHD";
+                    break;
+                case 3:
+                    col.innerHTML = "HD";
+                    break;
+
+                default:
+                    col.innerHTML = "HD";
+                    break;
+            }
+
         } else {
             col.innerHTML = data[i];
+
         }
         i++;
     }
@@ -129,20 +156,17 @@ function addRow(data) {
     let edit = newRow.insertCell(i);
     let editSpan = document.createElement("span");
 
-    editSpan.className = "glyphicon glyphicon-pencil";
-    editSpan.setAttribute("onclick","editStaff("+data[0].toString()+")");
+    editSpan.className = "fa fa-pencil";
+    editSpan.setAttribute("onclick","showEditModal("+data[0].toString()+")");
     edit.appendChild(editSpan);
-
-    let del = newRow.insertCell(i+1);
-    let delSpan = document.createElement("span");
-
-    delSpan.className = "glyphicon glyphicon-remove";
-    delSpan.setAttribute("onclick","delStaff("+data[0].toString()+")");
-    del.appendChild(delSpan);
 
 }
 
 function delStaff(id) {
+
+    // Hide the modal
+    $('#addStafferModal').modal('toggle');
+
     appConfig.base.callAPI("removeStaffer",id,function(i) {
         let row = document.getElementById(i);
         row.parentNode.removeChild(row);
@@ -150,14 +174,16 @@ function delStaff(id) {
 }
 
 function addStaff() {
-    let row = document.getElementById("addRow");
+
     let data = {
-        "fName": row.children[0].children[0].value,
-        "lName": row.children[1].children[0].value,
-        "email": row.children[2].children[0].value,
-        "color": row.children[3].children[0].value,
-        "authLevel": row.children[4].children[0].value
+        raID : document.getElementById("raID").value,
+        fName : document.getElementById("fName").value,
+        lName : document.getElementById("lName").value,
+        email : document.getElementById("email").value,
+        color : document.getElementById("color").value,
+        startDate : document.getElementById("startDate").value,
+        authLevel : document.getElementById("authLevelOpts").value
     }
 
-    appConfig.base.callAPI("addStaffer",data,addRow,"POST");
+    appConfig.base.callAPI("addStaffer",data,getStaffInfo,"POST");
 }

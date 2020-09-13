@@ -1,17 +1,17 @@
-.glyphicon-pencil {
+.fa-pencil {
     color: yellow;
     text-shadow: -1px 0 black, 0 1px black, 1px 0 black, 0 -1px black;
 }
 
-.glyphicon-remove {
+.fa-remove {
     color: red;
 }
 
-.glyphicon-ok {
+.fa-ok {
     color: green;
 }
 
-.glyphicon:hover {
+.fa:hover {
     cursor: pointer;
 }
 
@@ -25,11 +25,6 @@ table {
     overflow: scroll;
 }
 
-input {
-    max-width: 100px;
-    overflow: scroll;
-}
-
 #addRow > div {
     padding: 5px;
 }
@@ -37,4 +32,15 @@ input {
 #addRow > div > input {
     width: 100%;
     max-width: none;
+}
+
+#buttonRow {
+    margin-top: 3%;
+    align-items: flex-end;
+}
+
+
+.modalError {
+    display: none;
+    color: rgb(255,0,0);
 }

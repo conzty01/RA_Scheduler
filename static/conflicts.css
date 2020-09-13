@@ -1,33 +1,20 @@
-.calendar input[type=checkbox] {
-    transform: scale(1.5);
+.fc .fc-daygrid-day.fc-day-today {
+    background-color: #90EE90;
 }
-.checkLabel {
-    display: block;
-    height: 55%;
-    width: 100%;
-    background-color:rgba(0,255,0,0.3);
+.fc-daygrid-day:not(.fc-day-other) {
+    background-color: #90EE90;
 }
-.checkLabel > input[type=checkbox]:checked {
-    background-color: red;
+.selected {
+    background-color: #FF7F7F !important;
 }
-.calendar__day {
-    padding-right: 0px;
+.selected a.fc-daygrid-day-number {
+    color: #FFF !important;
 }
-.check {
-
-    text-align: center;
+.fc-conflictResetButton-button:hover {
+    background-color: #CC0000 !important;
+    border-color: #AA0000 !important;
 }
-.date {
-    margin-right: 5px;
-}
-input[type=submit], button {
-    padding: 5px;
-    background: #003F87;
-    color: #FFF;
-    height: 50%;
-    width: auto;
-    font-size: 1.2em;
-    cursor: pointer;
-    border-radius: 5px;
-    text-align: center;
+.fc-conflictSubmitButton-button:hover {
+    background-color: #00BB00 !important;
+    border-color: #009900 !important;
 }

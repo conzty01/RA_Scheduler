@@ -1,6 +1,6 @@
 .raList {
     width: 100%;
-    max-height: 50%;
+    max-height: 75%;
     margin: 5%;
     margin-left: 0;
     margin-top: 30%;
@@ -9,6 +9,7 @@
     border: 1px solid #e1e1e1;
     padding: 5px;
     display: block;
+    float: right;
 }
 .raList ul {
     list-style: none;
@@ -22,7 +23,6 @@
 }
 .raList li:hover {
     background-color: #e1e1e1;
-    cursor: pointer;
 }
 .tName {
     float: left;
@@ -36,6 +36,40 @@
     background-color: none;
 }
 
-.name > select {
-    color: #000;
+.fc-day-other a.fc-event {
+    background-color: #D0D0D0 !important;
+    border-color: #C1C1C1 !important;
+}
+.fc-event-main {
+    cursor: pointer;
+}
+#runRAList {
+    height: 200px;
+    overflow-y: scroll;
+    list-style: none;
+}
+#runRAList li {
+    display: block;
+    clear: left;
+    overflow: auto;
+}
+#runRAList li:hover {
+    background-color: #E1E1E1;
+}
+#runRAList li label {
+    cursor: pointer;
+}
+.modalError {
+    display: none;
+    color: rgb(255,0,0);
+}
+.modal-body > .row {
+    margin-left: auto;
+}
+
+#calContainer {
+    float: left;
+}
+#raListContainer {
+    float: right;
 }
