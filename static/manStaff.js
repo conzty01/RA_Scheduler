@@ -25,6 +25,7 @@ function showEditModal(id) {
 
     // Show the delete and save changes buttons
     document.getElementById("delBut").style.display = "block";
+    document.getElementById("delBut").onclick = () => { delStaff(id) };
     document.getElementById("savBut").style.display = "block";
 
     // Hide the add button
@@ -123,20 +124,51 @@ function editStaff(id) {
 }
 
 function submitChanges(id) {
-    let row = document.getElementById(id);
-    let data = {};
 
-    for (let col of row.children) {
-        //console.log(col);
-        // columns with inputs
-        if (col.className != "edit" && col.className != "del") {
-            data[col.className] = col.childNodes[0].value;
-        }
+    let data = {
+        raID : document.getElementById("raID").value,
+        fName : document.getElementById("fName").value,
+        lName : document.getElementById("lName").value,
+        email : document.getElementById("email").value,
+        color : document.getElementById("color").value,
+        startDate : document.getElementById("startDate").value,
+        authLevel : document.getElementById("authLevelOpts").value
     }
 
-    data["raID"] = row.children[0].innerHTML;
+    appConfig.base.callAPI("changeStaffInfo",data,getStaffInfo,"POST");
+}
 
-    appConfig.base.callAPI("changeStaffInfo",data,resetRow,"POST");
+function getStaffInfo() {
+    console.log("Refreshing Staff List");
+
+    appConfig.base.callAPI("getStaffInfo",{},
+                             (data) => {
+                                reDrawTable(data);
+                                $('#addStafferModal').modal('toggle');
+                             },"GET");
+}
+
+function reDrawTable(data) {
+    // data = {
+    //    raList: [(id,fName,lName,email,dateStarted,resHallName,color,auth_level), ...],
+    //    pts: { raID : { name: xxx, pts: xx }, ... }
+    // }
+
+    console.log("Redrawing Staff Table");
+
+    let table = document.getElementById("staffTable");
+    let oldTBody = table.getElementsByTagName("tbody")[0];
+
+    let newTBody = document.createElement("tbody");
+
+    for (let staffer of data.raList) {
+
+        // Add the points into the list in the expected location
+        staffer.splice(6, 0, data.pts[staffer[0]].pts)
+        addRow(staffer, newTBody);
+    }
+
+    table.replaceChild(newTBody, oldTBody);
 }
 
 function resetRow(id) {
@@ -161,10 +193,8 @@ function resetRow(id) {
     }
 }
 
-function addRow(data) {
-    console.log(data);
-    let tab = document.getElementsByTagName("table")[0];
-    let newRow = tab.insertRow(1);
+function addRow(data, table) {
+    let newRow = table.insertRow(0);
     newRow.id = data[0];
     newRow.setAttribute("scope","row");
 
@@ -177,8 +207,35 @@ function addRow(data) {
         if (d == "startDate") {
             let tmp = new Date(data[i]);
             col.innerHTML = tmp.getFullYear().toString()+"-"+(tmp.getMonth()+1).toString()+"-"+tmp.getDate().toString();
+
+        } else if (d == "color") {
+            let tmp = document.createElement("input");
+            tmp.type = "color";
+            tmp.value = data[i];
+            tmp.disabled = true;
+            col.appendChild(tmp);
+
+        } else if (d == "authLevel") {
+            switch (data[i]) {
+                case 1:
+                    col.innerHTML = "RA";
+                    break;
+
+                case 2:
+                    col.innerHTML = "AHD";
+                    break;
+                case 3:
+                    col.innerHTML = "HD";
+                    break;
+
+                default:
+                    col.innerHTML = "HD";
+                    break;
+            }
+
         } else {
             col.innerHTML = data[i];
+
         }
         i++;
     }
@@ -186,20 +243,17 @@ function addRow(data) {
     let edit = newRow.insertCell(i);
     let editSpan = document.createElement("span");
 
-    editSpan.className = "glyphicon glyphicon-pencil";
-    editSpan.setAttribute("onclick","editStaff("+data[0].toString()+")");
+    editSpan.className = "fa fa-pencil";
+    editSpan.setAttribute("onclick","showEditModal("+data[0].toString()+")");
     edit.appendChild(editSpan);
-
-    let del = newRow.insertCell(i+1);
-    let delSpan = document.createElement("span");
-
-    delSpan.className = "glyphicon glyphicon-remove";
-    delSpan.setAttribute("onclick","delStaff("+data[0].toString()+")");
-    del.appendChild(delSpan);
 
 }
 
 function delStaff(id) {
+
+    // Hide the modal
+    $('#addStafferModal').modal('toggle');
+
     appConfig.base.callAPI("removeStaffer",id,function(i) {
         let row = document.getElementById(i);
         row.parentNode.removeChild(row);
@@ -207,14 +261,16 @@ function delStaff(id) {
 }
 
 function addStaff() {
-    let row = document.getElementById("addRow");
+
     let data = {
-        "fName": row.children[0].children[0].value,
-        "lName": row.children[1].children[0].value,
-        "email": row.children[2].children[0].value,
-        "color": row.children[3].children[0].value,
-        "authLevel": row.children[4].children[0].value
+        raID : document.getElementById("raID").value,
+        fName : document.getElementById("fName").value,
+        lName : document.getElementById("lName").value,
+        email : document.getElementById("email").value,
+        color : document.getElementById("color").value,
+        startDate : document.getElementById("startDate").value,
+        authLevel : document.getElementById("authLevelOpts").value
     }
 
-    appConfig.base.callAPI("addStaffer",data,addRow,"POST");
+    appConfig.base.callAPI("addStaffer",data,getStaffInfo,"POST");
 }
