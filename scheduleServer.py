@@ -196,6 +196,33 @@ def validateUpload(partList):
 
     return pl, valid, reasons
 
+def getCurSchoolYear():
+    # Figure out what school year we are looking for
+    month = datetime.date.today().month
+    year = datetime.date.today().year
+    #print(year,month,day)
+
+    if int(month) >= 8:
+        # If the current month is August or later
+        #  then the current year is the startYear
+        startYear = int(year)
+        endYear = int(year) + 1
+
+    else:
+        # If the current month is earlier than August
+        #  then the current year is the endYear
+        startYear = int(year) - 1
+        endYear = int(year)
+
+    # TODO: Currently, a school year is considered from August to August.
+    #        Perhaps this should be configurable by the AHD/HDs?
+
+    start = str(startYear) + '-08-01'
+    end = str(endYear) + '-08-01'
+
+    return start, end
+
+
 #     -- Views --
 
 @app.route("/logout")
