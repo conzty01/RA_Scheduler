@@ -29,7 +29,7 @@ AppBase.prototype.callAPI = function (apiStr, params, fun, m="GET", errorFun=nul
         }).done(function(data) {
             fun(data)
             dfd.resolve();
-        }).error(errorFun);
+        });
     } else if (m === "POST") {
         $.ajax({
     		url: appConfig.apiURL + apiStr,
@@ -39,7 +39,7 @@ AppBase.prototype.callAPI = function (apiStr, params, fun, m="GET", errorFun=nul
         }).done(function(data) {
             fun(data)
             dfd.resolve();
-        }).error(errorFun);
+        });
     }
     return dfd;
 

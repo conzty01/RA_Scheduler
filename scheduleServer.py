@@ -126,8 +126,9 @@ def getAuth():
     uEmail = current_user.username                                              # The email returned from Google
     cur = conn.cursor()
     cur.execute("""
-            SELECT ra.id, username, first_name, last_name, hall_id, auth_level
+            SELECT ra.id, username, first_name, last_name, hall_id, auth_level, res_hall.name
             FROM "user" JOIN ra ON ("user".ra_id = ra.id)
+                        JOIN res_hall ON (ra.hall_id = res_hall.id)
             WHERE username = '{}';""".format(uEmail))
     res = cur.fetchone()                                                        # Get user info from the database
 
@@ -137,53 +138,14 @@ def getAuth():
 
     cur.close()
     return {"uEmail":uEmail,"ra_id":res[0],"name":res[2]+" "+res[3],
-            "hall_id":res[4],"auth_level":res[5]}
+            "hall_id":res[4],"auth_level":res[5],"hall_name":res[6]}
 
 def stdRet(status, msg):
     # Helper function to create a standard return object to help simplify code
     #  going back to the client when no additional data is to be sent.
     return {"status":status,"msg":msg}
 
-#     -- Views --
-
-@app.route("/logout")
-@login_required
-def logout():
-    logout_user()
-    return redirect(url_for('.login'))
-
-@app.route("/")
-def login():
-    return redirect(url_for("google.login"))
-
-@app.route("/home")
-@login_required
-def index():
-    userDict = getAuth()                                                        # Get the user's info from our database
-    if type(userDict) != dict:
-        return userDict
-    return render_template("index.html",calDict=cDict,auth_level=userDict["auth_level"], \
-                            cal=cc.monthdays2calendar(fDict["year"],fDict["num_month"]),opts=baseOpts)
-
-@app.route("/conflicts")
-def conflicts():
-    userDict = getAuth()                                                        # Get the user's info from our database
-
-    # If current month is December, update the year
-    #  to display the proper month
-    if fDict["num_month"] == 12:
-        year = fDict["year"] + 1
-    else:
-        year = fDict["year"]
-
-    return render_template("conflicts.html", calDict=fDict, auth_level=userDict["auth_level"], \
-                            cal=cc.monthdays2calendar(year,fDict["num_month"]),opts=baseOpts)
-
-@app.route("/editSched")
-@login_required
-def editSched():
-    userDict = getAuth()                                                        # Get the user's info from our database
-
+def getCurSchoolYear():
     # Figure out what school year we are looking for
     month = datetime.date.today().month
     year = datetime.date.today().year
@@ -207,6 +169,41 @@ def editSched():
     start = str(startYear) + '-08-01'
     end = str(endYear) + '-08-01'
 
+    return start, end
+#     -- Views --
+
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('.login'))
+
+@app.route("/")
+def login():
+    return redirect(url_for("google.login"))
+
+@app.route("/home")
+@login_required
+def index():
+    userDict = getAuth()                                                        # Get the user's info from our database
+    if type(userDict) != dict:
+        return userDict
+    return render_template("index.html",auth_level=userDict["auth_level"], \
+                            curView=1, opts=baseOpts, hall_name=userDict["hall_name"])
+
+@app.route("/conflicts")
+def conflicts():
+    userDict = getAuth()                                                        # Get the user's info from our database
+
+    return render_template("conflicts.html",  auth_level=userDict["auth_level"], \
+                            curView=2, opts=baseOpts, hall_name=userDict["hall_name"])
+
+@app.route("/editSched")
+@login_required
+def editSched():
+    userDict = getAuth()                                                        # Get the user's info from our database
+
+    start, end = getCurSchoolYear()
     ptDict = getRAStats(userDict["hall_id"], start, end)
 
     #print(ptDict)
@@ -217,19 +214,26 @@ def editSched():
     # Sort alphabetically by last name of RA
     #ptDictSort = lambda kv: kv[1]["name"].split(" ")[1]
 
-    return render_template("editSched.html", calDict=cDict, raList=cur.fetchall(), auth_level=userDict["auth_level"], \
-                            cal=cc.monthdays2calendar(fDict["year"],fDict["num_month"]), \
-                            ptDict=sorted(ptDict.items(), key=lambda x: x[1]["name"].split(" ")[1] ),opts=baseOpts)
+    return render_template("editSched.html", raList=cur.fetchall(), auth_level=userDict["auth_level"], \
+                            ptDict=sorted(ptDict.items(), key=lambda x: x[1]["name"].split(" ")[1] ), \
+                            curView=3, opts=baseOpts, hall_name=userDict["hall_name"])
 
 @app.route("/staff")
 @login_required
 def manStaff():
     userDict = getAuth()                                                        # Get the user's info from our database
+
+    start, end = getCurSchoolYear()
+
     cur = conn.cursor()
     cur.execute("SELECT ra.id, first_name, last_name, email, date_started, res_hall.name, points, color, auth_level \
-     FROM ra JOIN res_hall ON (ra.hall_id = res_hall.id) \
-     WHERE hall_id = {} ORDER BY ra.id ASC;".format(userDict["hall_id"]))
-    return render_template("staff.html",raList=cur.fetchall(),auth_level=userDict["auth_level"],opts=baseOpts)
+                 FROM ra JOIN res_hall ON (ra.hall_id = res_hall.id) \
+                 WHERE hall_id = {} ORDER BY ra.id ASC;".format(userDict["hall_id"]))
+
+    ptStats = getRAStats(userDict["hall_id"], start, end)
+
+    return render_template("staff.html",raList=cur.fetchall(),auth_level=userDict["auth_level"], \
+                            opts=baseOpts,curView=3, hall_name=userDict["hall_name"], pts=ptStats)
 
 #     -- API --
 
@@ -275,6 +279,27 @@ def processConflicts():
 
     insert_cur.close()
     return redirect(url_for(".index"))                                          # Send the user back to the main page (Not utilized by client currently)
+
+@app.route("/api/getStaffInfo", methods=["GET"])
+@login_required
+def getStaffStats():
+    userDict = getAuth()
+
+    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
+        return jsonify("NOT AUTHORIZED")
+
+    cur = conn.cursor()
+
+    cur.execute("""SELECT ra.id, first_name, last_name, email, date_started, res_hall.name, color, auth_level
+                 FROM ra JOIN res_hall ON (ra.hall_id = res_hall.id)
+                 WHERE hall_id = {} ORDER BY ra.id DESC;""".format(userDict["hall_id"]))
+
+    start, end = getCurSchoolYear()
+    pts = getRAStats(userDict["hall_id"], start, end)
+
+    ret = {"raList":cur.fetchall(), "pts":pts}
+
+    return jsonify(ret)
 
 @app.route("/api/getStats", methods=["GET"])
 @login_required
@@ -675,23 +700,24 @@ def changeStaffInfo():
     hallId = userDict["hall_id"]
 
     if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
-        return jsonify("NOT AUTHORIZED")
+        return jsonify(stdRet(0,"NOT AUTHORIZED"))
 
     data = request.json
 
     cur = conn.cursor()
     cur.execute("""UPDATE ra
-                   SET first_name = '{}', last_name = '{}', hall_id = {},
+                   SET first_name = '{}', last_name = '{}',
                        date_started = TO_DATE('{}', 'YYYY-MM-DD'),
-                       points = {}, color = '{}', email = '{}', auth_level = {}
+                       color = '{}', email = '{}', auth_level = {}
                    WHERE id = {};
-                """.format(data["fName"],data["lName"],hallId, \
-                        data["startDate"],data["points"],data["color"], \
-                        data["email"],data["authLevel"], data["raID"]))
+                """.format(data["fName"],data["lName"], \
+                        data["startDate"],data["color"], \
+                        data["email"],data["authLevel"], \
+                        data["raID"]))
 
     conn.commit()
     cur.close()
-    return data["raID"]
+    return jsonify(stdRet(1,"successful"))
 
 @app.route("/api/removeStaffer", methods=["POST"])
 @login_required

@@ -1,33 +1,18 @@
 {% extends "base.html" %}
 {% block styles %}
 {{ super() }}
-<!-- <link rel="stylesheet" href="{{url_for('.static', filename='calendar.css')}}"> -->
 <link rel="stylesheet" href="{{url_for('.static', filename='main.css')}}">
 <link href='https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.13.1/css/all.css' rel='stylesheet'>
+<link rel="stylesheet" href="{{url_for('.static', filename='calendar.css')}}">
+<link rel="stylesheet" href="{{url_for('.static', filename='index.css')}}">
 
-<style>
-    .fc-day-other a.fc-event {
-        background-color: #D0D0D0 !important;
-        border-color: #C1C1C1 !important;
-    }
-</style>
 {% endblock %}
 
-{% block headerRow %}
-<h1>Brandt Hall RA Duty Calendar</h1>
-<p>Below is the duty calendar for the month of {{ calDict["text_month"] }}</p>
-{% endblock headerRow %}
+{% block rows %}
+<div id="calendar">
 
-{% block contentRows %}
-<div class="row">
-    <div class="wrapper">
-        <main>
-            <div id="calendar">
-
-            </div>
-        </main>
-    </div>
 </div>
+
 {% endblock %}
 
 {% block scripts %}
