@@ -58,71 +58,6 @@ function showEditModal(id) {
     $('#addStafferModal').modal('toggle');
 }
 
-function editStaff(id) {
-    let row = document.getElementById(id);
-
-    for (let node of row.children) {
-        if (node.className != "raID" && node.className != "edit" &&
-                node.className != "del" && node.className != "resHall") {
-
-            let input = document.createElement("input");
-
-            switch (node.className) {
-                case "color":
-                    input.type = "color";
-
-                    let tm = node.value;
-                    input.value = tm;
-                    node.innerHTML = "";
-                    break;
-
-                case "email":
-                    input.type = "email";
-
-                    let tmp = node.innerHTML;
-                    input.value = tmp;
-                    node.innerHTML = "";
-                    break;
-
-                case "authLevel":
-                    input = document.createElement("select");
-
-                    for (let opt of document.getElementById("authLevelOpts").options) {
-                        let o = document.createElement("option");
-
-                        o.value = opt.value;
-                        o.innerHTML = opt.innerHTML;
-
-                        if (o.innerHTML == node.innerHTML) {
-                            o.selected = true;
-                        }
-
-                        input.add(o);
-                    }
-                    node.innerHTML = "";
-                    break;
-
-                default:
-                    input.type = "text";
-
-                    let t = node.innerHTML;
-                    input.value = t;
-                    node.innerHTML = "";
-            }
-
-            node.appendChild(input);
-        }
-    }
-
-    let checkmark = document.createElement("span");
-    checkmark.className = "fa fa-ok";
-    checkmark.setAttribute("onclick","submitChanges("+id.toString()+")");
-
-    let editTD = row.getElementsByClassName("edit")[0];
-    editTD.removeChild(editTD.childNodes[0]);
-    editTD.appendChild(checkmark);
-}
-
 function submitChanges(id) {
 
     let data = {
@@ -169,28 +104,6 @@ function reDrawTable(data) {
     }
 
     table.replaceChild(newTBody, oldTBody);
-}
-
-function resetRow(id) {
-    let row = document.getElementById(id);
-
-    for (let col of row.children) {
-        if (col.className == "edit") {
-            let pencil = document.createElement("span");
-            pencil.className = "glyphicon glyphicon-pencil";
-            pencil.setAttribute("onclick","editStaff("+id.toString()+")");
-
-            let editTD = row.getElementsByClassName("edit")[0];
-            editTD.removeChild(editTD.childNodes[0]);
-            editTD.appendChild(pencil);
-
-        } else if (col.children.length != 0 && col.className != "del") {
-            let tmp = col.children[0].value;
-
-            col.removeChild(col.children[0]);
-            col.innerHTML = tmp;
-        }
-    }
 }
 
 function addRow(data, table) {
