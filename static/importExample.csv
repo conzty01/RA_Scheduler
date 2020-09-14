@@ -1,0 +1,58 @@
+The Staff Importer tool requires a specific format in order to properly identify
+and import the staff information. The first line is a header row that works to
+inform the user of the expected format and must be present. Each following line
+of the file corresponds to the information for a single staff member to be
+imported. The format is as follows:
+
+First Name , Last Name , Email , Start Date , Color , Role
+
+Each value must be separated by a comma (,) and must be in the order outlined
+above. It may be easier to think of this format as an Excel sheet where each
+block is separated by a comma.
+
+Failure to adhere to this format could result in information regarding staff
+members being mixed up or no information being imported altogether. NOTE: All of
+these values can be changed after the import by going to the 'Edit Staff' page.
+
+Below is a breakdown of what each of the above values represent and how they can
+be formatted.
+
+First Name : The first name of the staff member. Can be up to 20 characters long
+
+Last Name : The last name of the staff member. Can be up to 50 characters long
+
+Email : The email of the staff member. This is the email the staff member will use
+         to sign in to the Duty Scheduling Application.
+
+Start Date : The date that the staff member started their role. This must be in
+              the following format: MM/DD/YYYY . For example 01/01/2020
+
+Color : The color associated with this staff member's duty events. This will
+         help the staff member locate their duties on the calendar. This must be
+         represented in a hexadecimal format that is preceded by a '#'.
+
+         For example: #000000 , #FFFFFF , or #123456
+
+         For assistance in finding these values, there are hex color pickers
+         online that will allow you to select the desired color and it will
+         provide the associated hexadecimal value.
+
+Role : The role of the staff member. This must be one of three possible values:
+        RA  - Resident Assistant
+        AHD - Assistant Hall Director
+        HD  - Hall Director / Area Coordinator
+
+        These roles determine what authorization level the staff member has and
+        what the staff member has access to within the application. The RA role
+        is only authorized for the basic functionality whereas the HD role has
+        the most access across the application.
+
+The remainder of this file can be used as a template for creating the .csv file.
+Using the header line below, enter the information for each staff member in the
+following lines. When you are ready to import, simply delete all of these
+instructions so that the header line is the first line of the file and save.
+Then follow the instructions in the 'Edit Staff' page to import the staff!
+
+
+First Name , Last Name , Email , Start Date , Color , Role
+Example , Name , name@example.com, 01/01/2020 , #000000 , RA
