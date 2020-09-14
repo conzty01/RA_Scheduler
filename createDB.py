@@ -35,7 +35,6 @@ def createRaDB(conn):
 			last_name		varchar(50),
 			hall_id			int,
 			date_started	date,
-			points			int,
 			color			varchar(7),
 			email			varchar(256) UNIQUE,
 			auth_level		int DEFAULT 1,
@@ -67,7 +66,7 @@ def createDutyDB(conn):
 			ra_id		int,
 			day_id		int,
 			sched_id	int,
-			point_val	int,
+			point_val	int DEFAULT 0 CONSTRAINT pos_duty_point_value CHECK (point_val >= 0),
 
 			PRIMARY KEY (id),
 			FOREIGN KEY (hall_id) REFERENCES res_hall(id),
@@ -109,7 +108,7 @@ def createUserDB(conn):
 		CREATE TABLE "user"(
 			id			serial UNIQUE,
 			ra_id		int UNIQUE,
-			username	varchar(20) UNIQUE,
+			username	varchar(50) UNIQUE,
 
 			PRIMARY KEY (id),
 			FOREIGN KEY (ra_id) REFERENCES ra(id)
