@@ -196,11 +196,8 @@ def validateUpload(partList):
 
     return pl, valid, reasons
 
-def getCurSchoolYear():
+def getSchoolYear(month, year):
     # Figure out what school year we are looking for
-    month = datetime.date.today().month
-    year = datetime.date.today().year
-    #print(year,month,day)
 
     if int(month) >= 8:
         # If the current month is August or later
@@ -218,10 +215,16 @@ def getCurSchoolYear():
     #        Perhaps this should be configurable by the AHD/HDs?
 
     start = str(startYear) + '-08-01'
-    end = str(endYear) + '-08-01'
+    end = str(endYear) + '-07-31'
 
     return start, end
 
+def getCurSchoolYear():
+    # Figure out what school year we are looking for
+    month = datetime.date.today().month
+    year = datetime.date.today().year
+
+    return getSchoolYear(month, year)
 
 #     -- Views --
 
@@ -262,7 +265,7 @@ def editSched():
     #print(ptDict)
 
     cur = conn.cursor()
-    cur.execute("SELECT id, first_name, last_name, points, color FROM ra WHERE hall_id = {} ORDER BY points DESC;".format(userDict["hall_id"]))
+    cur.execute("SELECT id, first_name, last_name, color FROM ra WHERE hall_id = {} ORDER BY first_name ASC;".format(userDict["hall_id"]))
 
     # Sort alphabetically by last name of RA
     #ptDictSort = lambda kv: kv[1]["name"].split(" ")[1]
@@ -279,7 +282,7 @@ def manStaff():
     start, end = getCurSchoolYear()
 
     cur = conn.cursor()
-    cur.execute("SELECT ra.id, first_name, last_name, email, date_started, res_hall.name, points, color, auth_level \
+    cur.execute("SELECT ra.id, first_name, last_name, email, date_started, res_hall.name, color, auth_level \
                  FROM ra JOIN res_hall ON (ra.hall_id = res_hall.id) \
                  WHERE hall_id = {} ORDER BY ra.id ASC;".format(userDict["hall_id"]))
 
@@ -563,8 +566,8 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
     hallId = userDict["hall_id"]
     cur = conn.cursor()
 
-    cur.execute("SELECT id FROM month WHERE num = {} AND EXTRACT(YEAR FROM year) = {}".format(month,year))
-    monthId = cur.fetchone()[0]                                                 # Get the month_id from the database
+    cur.execute("SELECT id, year FROM month WHERE num = {} AND EXTRACT(YEAR FROM year) = {}".format(month,year))
+    monthId, date = cur.fetchone()                                              # Get the month_id from the database
     #print(monthId)
 
     if monthId == None:                                                         # If the database does not have the correct month
@@ -574,7 +577,7 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
     #  as well as all of their respective conflicts for a given month
     queryStr = """
         SELECT first_name, last_name, id, hall_id, date_started,
-               COALESCE(cons.array_agg, ARRAY[]::date[]), points
+               COALESCE(cons.array_agg, ARRAY[]::date[])
         FROM ra LEFT OUTER JOIN (
             SELECT ra_id, ARRAY_AGG(days.date)
             FROM conflicts JOIN (
@@ -593,8 +596,13 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
     #print(queryStr)
 
     cur.execute(queryStr)       # Query the database for the appropriate RAs and their respective information
+    partialRAList = cur.fetchall()
 
-    ra_list = [RA(res[0],res[1],res[2],res[3],res[4],res[5],res[6]) for res in cur.fetchall()]
+    start, end = getSchoolYear(date.month, date.year)
+
+    ptsDict = getRAStats(userDict["hall_id"], start, end)
+
+    ra_list = [RA(res[0],res[1],res[2],res[3],res[4],res[5],ptsDict[res[2]]["pts"]) for res in partialRAList]
 
     # Set the Last Duty Assigned Tolerance based on floor dividing the number of
     #  RAs by 2 then adding 1. For example, with a staff of 15, the LDA Tolerance
@@ -695,55 +703,55 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
     else:
         return jsonify(stdRet(1,"successful"))
 
-@app.route("/api/getEditInfo", methods=["GET"])
-@login_required
-def getEditInfo(hallId=None, monthNum=None, year=None):
-    # API Hook that will get a the list of RAs along with their conflicts for a.
-    #  given month. The month will be given via request.args as 'monthNum' and
-    #  'year'. The server will then query the database for the conflicts and
-    #  and return them along with a list of the RAs
-
-    userDict = getAuth()                                                        # Get the user's info from our database
-    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
-        return jsonify("NOT AUTHORIZED")
-
-    fromServer = True
-    if monthNum == None and year == None and hallId == None:                    # Effectively: If API was called from the client and not from the server
-        monthNum = int(request.args.get("monthNum")) + 1
-        year = int(request.args.get("year"))
-        userDict = getAuth()                                                    # Get the user's info from our database
-        hallId = userDict["hall_id"]
-        fromServer = False
-    res = []
-    cur = conn.cursor()
-
-    #print(monthNum,year)
-
-    cur.execute("SELECT id FROM month WHERE num = {} AND year = TO_DATE('{}','YYYY')".format(monthNum,year))
-    monthId = cur.fetchone()[0]
-
-    cur.execute("SELECT id, first_name, last_name, points FROM ra WHERE hall_id = {};".format(hallId))
-    ra_list = cur.fetchall()
-
-    for raRes in ra_list:
-        raDict = {"id":raRes[0],"name":raRes[1]+" "+raRes[2][0]+".","points":raRes[3]}
-        cur.execute("""SELECT day.date
-                       FROM conflicts JOIN day ON (conflicts.day_id = day.id)
-                                      JOIN month ON (day.month_id = month.id)
-                       WHERE day.month_id = {} AND conflicts.ra_id = {};""".format(monthId,raRes[0]))
-
-        conList = cur.fetchall()
-        c = []
-        for con in conList:
-            c.append(con[0])
-
-        raDict["conflicts"] = c                                                 # Add conflicts to the RA Dict
-        res.append(raDict)                                                      # Append RA Dict to results list
-
-    if fromServer:
-        return res
-    else:
-        return jsonify(res)
+# @app.route("/api/getEditInfo", methods=["GET"])
+# @login_required
+# def getEditInfo(hallId=None, monthNum=None, year=None):
+#     # API Hook that will get a the list of RAs along with their conflicts for a.
+#     #  given month. The month will be given via request.args as 'monthNum' and
+#     #  'year'. The server will then query the database for the conflicts and
+#     #  and return them along with a list of the RAs
+#
+#     userDict = getAuth()                                                        # Get the user's info from our database
+#     if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
+#         return jsonify("NOT AUTHORIZED")
+#
+#     fromServer = True
+#     if monthNum == None and year == None and hallId == None:                    # Effectively: If API was called from the client and not from the server
+#         monthNum = int(request.args.get("monthNum")) + 1
+#         year = int(request.args.get("year"))
+#         userDict = getAuth()                                                    # Get the user's info from our database
+#         hallId = userDict["hall_id"]
+#         fromServer = False
+#     res = []
+#     cur = conn.cursor()
+#
+#     #print(monthNum,year)
+#
+#     cur.execute("SELECT id FROM month WHERE num = {} AND year = TO_DATE('{}','YYYY')".format(monthNum,year))
+#     monthId = cur.fetchone()[0]
+#
+#     cur.execute("SELECT id, first_name, last_name, points FROM ra WHERE hall_id = {};".format(hallId))
+#     ra_list = cur.fetchall()
+#
+#     for raRes in ra_list:
+#         raDict = {"id":raRes[0],"name":raRes[1]+" "+raRes[2][0]+".","points":raRes[3]}
+#         cur.execute("""SELECT day.date
+#                        FROM conflicts JOIN day ON (conflicts.day_id = day.id)
+#                                       JOIN month ON (day.month_id = month.id)
+#                        WHERE day.month_id = {} AND conflicts.ra_id = {};""".format(monthId,raRes[0]))
+#
+#         conList = cur.fetchall()
+#         c = []
+#         for con in conList:
+#             c.append(con[0])
+#
+#         raDict["conflicts"] = c                                                 # Add conflicts to the RA Dict
+#         res.append(raDict)                                                      # Append RA Dict to results list
+#
+#     if fromServer:
+#         return res
+#     else:
+#         return jsonify(res)
 
 @app.route("/api/changeStaffInfo", methods=["POST"])
 @login_required
@@ -825,8 +833,8 @@ def addStaffer():
     cur = conn.cursor()
 
     cur.execute("""
-    INSERT INTO ra (first_name,last_name,hall_id,date_started,points,color,email,auth_level)
-    VALUES ('{}','{}',{},NOW(),0,'{}','{}','{}')
+    INSERT INTO ra (first_name,last_name,hall_id,date_started,color,email,auth_level)
+    VALUES ('{}','{}',{},NOW(),'{}','{}','{}')
     RETURNING id;
     """.format(data["fName"],data["lName"],userDict["hall_id"],data["color"], \
                 data["email"],data["authLevel"]))
@@ -834,7 +842,7 @@ def addStaffer():
     conn.commit()
     newId = cur.fetchone()[0]
 
-    cur.execute("""SELECT ra.id, first_name, last_name, email, date_started, res_hall.name, points, color, auth_level
+    cur.execute("""SELECT ra.id, first_name, last_name, email, date_started, res_hall.name, color, auth_level
      FROM ra JOIN res_hall ON (ra.hall_id = res_hall.id)
      WHERE ra.id = {};""".format(newId))
     raData = cur.fetchone()
@@ -875,7 +883,6 @@ def changeRAforDutyDay():
     cur.execute("SELECT id FROM schedule WHERE hall_id = {} AND month_id = {} ORDER BY created DESC, id DESC;".format(userDict["hall_id"],monthId))
     schedId = cur.fetchone()
 
-    # TODO: Update points for RAs
 
     if raParams is not None and dayID is not None and schedId is not None and oldRA is not None:
         cur.execute("""UPDATE duties

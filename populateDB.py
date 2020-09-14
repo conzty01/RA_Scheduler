@@ -1,6 +1,7 @@
 from ra_sched import RA, Day, Schedule
-from scheduler import scheduling
 from datetime import date
+import scheduler3_0
+import copy as cp
 import psycopg2
 import calendar
 import random
@@ -32,7 +33,7 @@ def popRAs(cur):
 		for n in ["Alfonzo Doerr" , "Lahoma Berns", "Lue Girardin", "Donald Demartini", "Aubrey Mandell", "Stormy Dunigan","Arron Kernan",
 				  "Betty Chmiel", "Gerardo Spells", "Epifania Soucy", "Tristan Hedgepeth","Neil Frix","Marvin Cheatam","Carmen Broadnax","Milford Schroyer"]:
 			c = randomColor()
-			cur.execute("INSERT INTO ra (first_name, last_name, hall_id, date_started, points, color) VALUES ('{}','{}',{},NOW(),0,'{}')".format(n.split()[0],n.split()[1],iD,c))
+			cur.execute("INSERT INTO ra (first_name, last_name, hall_id, date_started, color) VALUES ('{}','{}',{},NOW(),'{}')".format(n.split()[0],n.split()[1],iD,c))
 
 	def popLarsenRA(cur):
 		cur.execute("SELECT id FROM res_hall WHERE name = 'Larsen';")
@@ -40,7 +41,7 @@ def popRAs(cur):
 
 		for n in ["Contessa Clardy", "Lolita Marcelino", "Wan Waddington", "Venus Maus", "Rosamond Chesson" "Mitzie Sickels"]:
 			c = randomColor()
-			cur.execute("INSERT INTO ra (first_name, last_name, hall_id, date_started, points, color) VALUES ('{}','{}',{},NOW(),0,'{}')".format(n.split()[0],n.split()[1],iD,c))
+			cur.execute("INSERT INTO ra (first_name, last_name, hall_id, date_started, color) VALUES ('{}','{}',{},NOW(),'{}')".format(n.split()[0],n.split()[1],iD,c))
 
 	def popOlsonRA(cur):
 		cur.execute("SELECT id FROM res_hall WHERE name = 'Olson';")
@@ -48,7 +49,7 @@ def popRAs(cur):
 
 		for n in ["Nick Vankirk", "Eldon Sweetman", "Zita Gans", "Claudia Hole", "Dane Agarwal", "Verna Korb", "Ray Housman", "Zulema Robitaille"]:
 			c = randomColor()
-			cur.execute("INSERT INTO ra (first_name, last_name, hall_id, date_started, points, color) VALUES ('{}','{}',{},NOW(),0,'{}')".format(n.split()[0],n.split()[1],iD,c))
+			cur.execute("INSERT INTO ra (first_name, last_name, hall_id, date_started, color) VALUES ('{}','{}',{},NOW(),'{}')".format(n.split()[0],n.split()[1],iD,c))
 
 	popBrandtRA(cur)
 	popLarsenRA(cur)
@@ -94,40 +95,121 @@ def popConflicts(cur):
 			dID = daysCopy.pop(random.randint(0,len(daysCopy)-1))
 			cur.execute("INSERT INTO conflicts (ra_id, day_id) VALUES ({},{})".format(raID[0],dID[0]))
 
-def popDuties(cur):
-	cur.execute("SELECT year FROM month ORDER BY year ASC;")
-	d = cur.fetchone()[0]
-	year = d.year
-	month = d.month
+def popDuties(cur,conn):
+	cur.execute("SELECT id, year FROM month ORDER BY year ASC;")
+	monthId, date = cur.fetchone()
+	hallId = 1
+	year = 2018
+	month = 8
 
-	cur.execute("""SELECT first_name, last_name, id, hall_id,
-						  date_started, cons.array_agg, points
-				   FROM ra JOIN (SELECT ra_id, ARRAY_AGG(days.date)
-								 FROM conflicts JOIN (SELECT id, date FROM day
-													  WHERE month_id = 1) AS days
-				   				 ON (conflicts.day_id = days.id)
-				  			     GROUP BY ra_id) AS cons
-						   ON (ra.id = cons.ra_id)
-				   WHERE ra.hall_id = 1;""")
+	cur.execute("SELECT id FROM ra WHERE hall_id = {}".format(hallId))
+	eligibleRAs = [int(i[0]) for i in cur.fetchall()]
+	eligibleRAStr = "AND ra.id IN ({});".format(str(eligibleRAs)[1:-1])
 
-	raList = [RA(res[0],res[1],res[2],res[3],res[4],res[5],res[6]) for res in cur.fetchall()]
-	noDutyList = [date(year,month,1),date(year,month,2),date(year,month,3),date(year,month,4),date(year,month,5),date(year,month,6),date(year,month,31)]
 
-	sched = scheduling(raList,year,month,noDutyList)
+	queryStr = """
+        SELECT first_name, last_name, id, hall_id, date_started,
+               COALESCE(cons.array_agg, ARRAY[]::date[])
+        FROM ra LEFT OUTER JOIN (
+            SELECT ra_id, ARRAY_AGG(days.date)
+            FROM conflicts JOIN (
+                SELECT id, date
+                FROM day
+                WHERE month_id = {}
+                ) AS days
+            ON (conflicts.day_id = days.id)
+            GROUP BY ra_id
+            ) AS cons
+        ON (ra.id = cons.ra_id)
+        WHERE ra.hall_id = {}
+        AND ra.auth_level < 3 {}
+    """.format(monthId, hallId, eligibleRAStr)
+
+	cur.execute(queryStr) # Query the database for the appropriate RAs and their respective information
+	partialRAList = cur.fetchall()
+
+	start = "2018-08-01"
+	end = "2019-07-31"
+
+	ra_list = [RA(res[0],res[1],res[2],res[3],res[4],res[5],0) for res in partialRAList]
+
+	noDutyList = [1,2,15,16,28]
+
+	ldat = (len(ra_list) // 2) + 1
+
+	copy_raList = cp.deepcopy(ra_list)
+	copy_noDutyList = cp.copy(noDutyList)
+
+	completed = False
+	successful = True
+	while not completed:
+    	# Create the Schedule
+		sched = scheduler3_0.schedule(copy_raList,year,month,noDutyDates=copy_noDutyList,ldaTolerance=ldat)
+
+		if len(sched) == 0:
+			# If we were unable to schedule with the previous parameters,
+
+			if ldat > 1:
+				# And the LDATolerance is greater than 1
+				#  then decrement the LDATolerance by 1 and try again
+
+				#print("DECREASE LDAT: ", ldat)
+				ldat -= 1
+				copy_raList = cp.deepcopy(ra_list)
+				copy_noDutyList = cp.copy(noDutyList)
+
+			else:
+				# The LDATolerance is not greater than 1 and we were unable to schedule
+				completed = True
+				successful = False
+
+		else:
+			# We were able to create a schedule
+			completed = True
+
+
+	cur.execute("INSERT INTO schedule (hall_id, month_id, created) VALUES ({},{},NOW()) RETURNING id;".format(hallId, monthId))
+	schedId = cur.fetchone()[0]
+	conn.commit()
 
 	days = {}
-	cur.execute("SELECT id, date FROM day WHERE month_id = 1;")
+	cur.execute("SELECT EXTRACT(DAY FROM date), id FROM day WHERE month_id = {};".format(monthId))
 	for res in cur.fetchall():
-		days[res[1]] = res[0]
+		days[res[0]] = res[1]
 
+	# Iterate through the schedule
+	dutyDayStr = ""
+	noDutyDayStr = ""
 	for d in sched:
-		for r in d:
-			cur.execute("""
-			INSERT INTO duties (hall_id,ra_id,day_id,sched_id) VALUES (1,{},{},1);
-			""".format(r.getId(),days[d.getDate()],1))
+		# If there are RAs assigned to this day
+		if d.numberOnDuty() > 0:
+			for r in d:
+				dutyDayStr += "({},{},{},{},{}),".format(hallId, r.getId(), days[d.getDate()], schedId, d.getPoints())
 
-def popSchedule(cur):
-	cur.execute("INSERT INTO schedule (hall_id,month_id,created) VALUES (1,1,NOW());")
+		else:
+			noDutyDayStr += "({},{},{},{}),".format(hallId, days[d.getDate()], schedId, d.getPoints())
+
+	# Attempt to save the schedule to the DB
+	try:
+		# Add all of the duties that were scheduled for the month
+		if dutyDayStr != "":
+			cur.execute("""
+                    INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val) VALUES {};
+                    """.format(dutyDayStr[:-1]))
+
+		# Add all of the blank duty values for days that were not scheduled
+		if noDutyDayStr != "":
+			cur.execute("""
+                    INSERT INTO duties (hall_id, day_id, sched_id, point_val) VALUES {};
+                    """.format(noDutyDayStr[:-1]))
+
+	except psycopg2.IntegrityError:
+		#print("ROLLBACK")
+		conn.rollback()
+
+	conn.commit()
+
+	cur.close()
 
 def main():
 	# This program assumes that the database is completely clean
@@ -143,9 +225,7 @@ def main():
 	conn.commit()
 	popConflicts(cur)
 	conn.commit()
-	popSchedule(cur)
-	conn.commit()
-	popDuties(cur)
+	popDuties(cur,conn)
 	conn.commit()
 
 main()
