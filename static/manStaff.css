@@ -49,3 +49,7 @@ table {
     display: none;
     color: rgb(255,0,0);
 }
+
+.container {
+    max-width: 90%;
+}
