@@ -305,7 +305,7 @@ function saveModal() {
 
     let dateStr = document.getElementById("editModalLongTitle").textContent;
 
-    let oldName = document.getElementById("editModalPrevRA").textContent;
+    let oldName = document.getElementById("editModalPrevRA").selectedOptions[0].value;
 
     let newColor = selRAOption.value;
     let newName = selRAOption.text;
@@ -502,7 +502,7 @@ function deleteDuty() {
     // Get the RA that is assigned to the duty and the date and send to API
 
     let dateStr = document.getElementById("editModalLongTitle").textContent;
-    let oldName = document.getElementById("editModalPrevRA").textContent;
+    let oldName = document.getElementById("editModalPrevRA").selectedOptions[0].value;
 
     let changeParams = {
         dateStr: dateStr,
