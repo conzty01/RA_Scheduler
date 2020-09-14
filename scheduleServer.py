@@ -1075,6 +1075,46 @@ def importStaff():
     else:
         return redirect(url_for(".err",msg="Unable to Import Staff"))
 
+@app.route("/api/getConflicts", methods=["GET"])
+@login_required
+def getConflicts(monthNum=None,raID=None,year=None,hallId=None):
+    # API Hook that will get the requested conflicts for a given user and month.
+    #  The month will be given via request.args as 'monthNum' and 'year'.
+
+    fromServer = True
+    if monthNum is None and year is None and hallId is None and raID is None:                    # Effectively: If API was called from the client and not from the server
+        monthNum = int(request.args.get("monthNum"))
+        year = int(request.args.get("year"))
+
+        userDict = getAuth()                                                    # Get the user's info from our database
+        hallID = userDict["hall_id"]
+        raID = userDict["ra_id"]
+        fromServer = False
+
+
+    print(monthNum, year, hallID, raID)
+
+    cur = conn.cursor()
+
+    cur.execute("SELECT id FROM month WHERE num = {} AND EXTRACT(YEAR FROM year) = {}".format(monthNum, year))
+    monthID = cur.fetchone()
+
+    if monthID is None:
+        return jsonify(stdRet(-1,"No month found with Num = {}".format(monthNum)))
+
+    else:
+        monthID = monthID[0]
+
+    cur.execute("""SELECT TO_CHAR(day.date, 'YYYY-MM-DD')
+                   FROM conflicts JOIN day ON (conflicts.day_id = day.id)
+                   WHERE conflicts.ra_id = {}
+                   AND day.month_id = {}""".format(raID, monthID, hallID))
+
+    ret = [ d[0] for d in cur.fetchall() ]
+
+    return jsonify({"conflicts":ret})
+
+
 #     -- Error Handling --
 
 @app.route("/error/<string:msg>")
