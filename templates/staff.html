@@ -127,8 +127,8 @@
                 <td class="startDate">{{ ra[4] }}</td>
                 <td class="resHall">{{ ra[5] }}</td>
                 <td class="points">{{ pts[ra[0]]["pts"] }}</td>
-                <td class="color"><input type="color" value="{{ ra[7] }}" disabled /></td>
-                <td class="authLevel">{% if ra[8] == 1: %}RA{% elif ra[8] == 2: %}AHD{% else %}HD{% endif %}</td>
+                <td class="color"><input type="color" value="{{ ra[6] }}" disabled /></td>
+                <td class="authLevel">{% if ra[7] == 1: %}RA{% elif ra[7] == 2: %}AHD{% else %}HD{% endif %}</td>
                 <td class="edit"><span class="fa fa-pencil" onclick="showEditModal({{ ra[0] }})"></span></td>
             </tr>
     {% endfor %}
