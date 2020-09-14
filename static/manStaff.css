@@ -39,6 +39,11 @@ table {
     align-items: flex-end;
 }
 
+#buttonRow > button {
+    margin-left: 0.25rem;
+    margin-right: 0.25rem;
+}
+
 
 .modalError {
     display: none;
