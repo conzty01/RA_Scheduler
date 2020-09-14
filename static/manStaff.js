@@ -187,3 +187,18 @@ function addStaff() {
 
     appConfig.base.callAPI("addStaffer",data,getStaffInfo,"POST");
 }
+
+function showImportModal() {
+    // Display the modal
+    $('#importStaffModal').modal('toggle');
+}
+
+function importStaff() {
+    console.log("Importing Staff From .csv");
+
+    // Disable the import button
+    document.getElementById("importBut").disabled = true;
+
+    // Submit the form
+    document.getElementById("importStaffForm").submit();
+}
