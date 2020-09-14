@@ -998,7 +998,7 @@ def daleteDuty():
 def importStaff():
     userDict = getAuth()
 
-    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
+    if userDict["auth_level"] < 3:                                              # If the user is not at least an AHD
         return jsonify("NOT AUTHORIZED")
 
     print(request.files)
@@ -1063,10 +1063,10 @@ def importStaff():
 
         cur.close()
 
-        return jsonify(stdRet(1,"successful"))
+        return redirect(url_for(".manStaff"))
 
     else:
-        return jsonify(stdRet(0,"File Type Not Supported"))
+        return redirect(url_for(".err",msg="Unable to Import Staff"))
 
 #     -- Error Handling --
 
