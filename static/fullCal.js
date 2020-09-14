@@ -15,32 +15,6 @@ function initCal( propObject ) {
     });
 }
 
-function initConflictCal() {
-    initCal({
-        height: "75%",
-        initialView: 'dayGridMonth',
-        dayMaxEventRows: true,
-        moreLinkClick: "popover",
-        dateClick: conflict_DateClick,
-        customButtons: {
-            conflictSubmitButton: {
-              text: 'Submit',
-              click: conflict_Submit
-            },
-            conflictResetButton: {
-              text: 'Reset',
-              click: conflict_Reset
-            },
-        },
-        headerToolbar: {
-            left: 'prev,next today',
-            center: 'title',
-            right: 'conflictResetButton conflictSubmitButton'
-        },
-        //showNonCurrentDates: false
-        fixedWeekCount: false
-    });
-}
 
 function initIndexCal() {
     initCal({
@@ -197,34 +171,7 @@ function addSingleEvent( id, title, startStr, colorStr, allDay = true ) {
 
 
 
-/////////////////////////////////////////////
-/*  Functions for the conflicts.html page  */
-/////////////////////////////////////////////
 
-function conflict_DateClick(info) {
-    console.log(info);
-    //alert('Clicked on: ' + info.dateStr);
-    //alert('Coordinates: ' + info.jsEvent.pageX + ',' + info.jsEvent.pageY);
-    //alert('Current view: ' + info.view.type);
-
-    // If the selected day is not part of the month
-    if (!(info.dayEl.classList.contains("fc-day-other"))) {
-
-        // change the day's background color
-        if (info.dayEl.classList.contains("selected")) {
-            // Remove the selected date from the conSet
-            conSet.delete(info.dateStr);
-            // Remove the 'selected' class from the date
-            info.dayEl.classList.remove("selected");
-
-        } else {
-            // Add the selected date to the conSet
-            conSet.add(info.dateStr);
-            // Add the 'selected' class to the date
-            info.dayEl.classList.add("selected");
-        };
-    };
-}
 
 function conflict_Submit() {
     // Submit the conflicts to the server
