@@ -63,9 +63,43 @@
   </div>
 </div>
 
+<!-- Import Staff Modal -->
+<div class="modal fade" id="importStaffModal" tabindex="-1" role="dialog" aria-labelledby="importStaffModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title"><span id="modalTitle">Import Staff Members<span></h3>
+      </div>
+      <form id="importStaffForm" class="modal-body" action="/api/importStaff" method="POST" enctype="multipart/form-data">
+          <div class="form-group form-row">
+              <div class="col">
+                  Use this tool to import multiple staff members at once by uploading a
+                  <em>.csv</em> (Comma Separated Values) file with the specified format.
+
+                  For an example of the expected format, you can download and modify an example
+                  <a id="downloadExample" href="{{url_for('.static', filename='importExample.csv')}}">here.</a>
+              </div>
+          </div>
+          <div class="form-group form-row">
+              <div class="col">
+                  <label for="file">File for Import</label>
+                  <input class="form-control-file" name="file" type="file" id="file">
+              </div>
+          </div>
+     </form>
+      <div class="modalError">Add Staffer Failed: <span class="msg"></span></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        <button id="importBut" type="button" class="btn btn-primary" onclick="importStaff()">Import Staff</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
 <div id="buttonRow" class="row d-flex flex-row-reverse">
     <button id="newStafferButton" type="button" class="btn btn-primary" onclick="showAddModal()">Add Staff Member</button>
-    <button id="importStaffButton" type="button" class="btn btn-primary" onclick="showImportModal()" style="display:none;">Import Staff</button>
+    <button id="importStaffButton" type="button" class="btn btn-primary" onclick="showImportModal()">Import Staff</button>
 </div>
 <div class="row">
     <table id="staffTable" class="table table-striped table-hover">
