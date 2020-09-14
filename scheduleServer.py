@@ -930,28 +930,38 @@ def addNewDuty():
     cur.execute("SELECT id FROM ra WHERE id = {} AND hall_id = {};".format(data["id"],userDict["hall_id"]))
     raId = cur.fetchone()
 
+    if raId is None
+        ret = stdRet(-1,"Unable to find RA {} in database".format(data["id"]))
+
+
     cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE('{}', 'YYYY-MM-DD');".format(data["dateStr"]))
     dayID, monthId = cur.fetchone()
+
+    if dayID is None:
+        cur.close()
+        return stdRet(-1,"Unable to find day {} in database".format(data["dateStr"]))
+
+    if monthId is None:
+        cur.close()
+        return stdRet(-1,"Unable to find month for {} in database".format(data["dateStr"]))
+
 
     cur.execute("SELECT id FROM schedule WHERE hall_id = {} AND month_id = {} ORDER BY created DESC, id DESC;".format(userDict["hall_id"],monthId))
     schedId = cur.fetchone()
 
-    if raId is not None and dayID is not None and schedId is not None:
-        cur.execute("""INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val)
-                        VALUES ({}, {}, {}, {}, {});""".format(userDict["hall_id"], raId[0], dayID, schedId[0], data["pts"]))
-
-        conn.commit()
-
+    if monthId is None:
         cur.close()
+        return stdRet(-1,"Unable to find month for {} in database".format(data["dateStr"]))
 
-        return jsonify(stdRet(1,"successful"))
 
-    else:
-        # Something is not in the DB
+    cur.execute("""INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val)
+                    VALUES ({}, {}, {}, {}, {});""".format(userDict["hall_id"], raId[0], dayID, schedId[0], data["pts"]))
 
-        cur.close()
+    conn.commit()
 
-        return jsonify(stdRet(-1,"Unable to find parameters in DB"))
+    cur.close()
+
+    return jsonify(stdRet(1,"successful"))
 
 @app.route("/api/deleteDuty", methods=["POST"])
 @login_required
