@@ -170,48 +170,6 @@ function addSingleEvent( id, title, startStr, colorStr, allDay = true ) {
 }
 
 
-
-
-
-function conflict_Submit() {
-    // Submit the conflicts to the server
-    appConfig.base.callAPI("enterConflicts/", Array.from(conSet), conflict_Reset, "POST");
-    // ^ Running into CORS error
-    // let f = document.getElementById("conflictForm");
-    // let i;
-    // for (let d of conSet) {
-    //     i = document.createElement("input");
-    //
-    //     i.setAttribute("value", d);
-    //     i.setAttribute("style", "display:none;");
-    //
-    //     f.appendChild(i);
-    // }
-    // f.submit();
-}
-
-function conflict_Reset() {
-    // Reset the calendar and clear the conSet
-
-    let days = document.getElementsByClassName("selected");
-    let dayLen = days.length;
-    //console.log(days);
-
-    // Since getElementsByClassName returns an array-like object
-    //  when a for-of loop iterates over and the class is removed,
-    //  the object is actually removed from the array which
-    //  skrews up the iterator. This is a simple workaround.
-    for (let i = 0; i < dayLen; i++) {
-        days[0].classList.remove("selected");
-    }
-
-    conSet = new Set();
-}
-
-var conSet = new Set();
-
-
-
 ///////////////////////////////////////////
 /* Functions for the editSched.html page */
 ///////////////////////////////////////////
