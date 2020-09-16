@@ -302,39 +302,63 @@ def processConflicts():
     hallId = userDict["hall_id"]
 
     #print(request.json)
-    data = request.json
+    monthNum = request.json["monthNum"]
+    year = request.json["year"]
+    conflicts = request.json["conflicts"]
 
-    insert_cur = conn.cursor()
+    cur = conn.cursor()
 
-    dateList = ()
-    for d in data:                                                              # Append all dates to dateList (or in this case dateTUPLE)
-        s = "TO_DATE('"+d+"','YYYY-MM-DD')"                                     # Create TO_DATE string from all date information
-        dateList += (s,)                                                        # Add string to dateList
+    cur.execute("""SELECT TO_CHAR(day.date, 'YYYY-MM-DD')
+                   FROM conflicts JOIN day ON (conflicts.day_id = day.id)
+                                  JOIN ra ON (ra.id = conflicts.ra_id)
+                                  JOIN month ON (month.id = day.month_id)
+                   WHERE num = {}
+                   AND EXTRACT(YEAR from year) = {}
+                   AND hall_id = {}
+                   AND ra.id = {};""".format(monthNum,year, \
+                                             userDict["hall_id"],userDict["ra_id"]))
 
-    bigDateStr = "("                                                            # Begin assembling the psql array string
-    for i in dateList:
-        bigDateStr+= i+", "
-    bigDateStr = bigDateStr[:-2]+")"                                            # Get rid of the extra ", " at the end and cap it with a ")"
+    prevConflicts = cur.fetchall()
+    prevSet = set([ i[0] for i in prevConflicts ])
 
-    exStr = """SELECT day.id FROM day
-               WHERE day.date IN {};
-                """.format(bigDateStr)                                          # Format the query string
+    newSet = set(conflicts)
 
-    insert_cur.execute(exStr)                                                   # Execute the query
-    dIds = insert_cur.fetchall()                                                # Get results
+    # Get a set of dates that were previously entered but are not in the latest
+    #  These items should be removed from the DB
+    deleteSet = prevSet.difference(newSet)
 
-    for d in dIds:                                                              # For each date
-        try:                                                                    # Try to insert it into the database
-            insert_cur.execute("INSERT INTO conflicts (ra_id, day_id) VALUES ({},{});"\
-                                .format(ra_id,d[0]))                            # Each entry is a tuple that must be indexed into to get the value. ie d[0]
-            conn.commit()                                                       # Commit the change in case the try runs into an error
-        except psycopg2.IntegrityError:                                         # If the conflict entry already exists
-            print("error")
-            conn.rollback()                                                     # Rollback last commit so that Internal Error doesn't occur
-            insert_cur = conn.cursor()                                          # Create a new cursor
+    # Get a set of dates that have been submitted that were not previously
+    #  These items shoudl be inserted into the DB
+    addSet = newSet.difference(prevSet)
 
-    insert_cur.close()
-    return redirect(url_for(".index"))                                          # Send the user back to the main page (Not utilized by client currently)
+    cur = conn.cursor()
+    # print("dataConflicts", conflicts)
+    # print("PrevSet", prevSet)
+    # print("newSet", newSet)
+    # print("deleteSet", deleteSet, str(deleteSet)[1:-1])
+    # print("addSet", addSet, str(addSet)[1:-1])
+
+    if len(deleteSet) > 0:
+
+        cur.execute("""DELETE FROM conflicts
+                       WHERE conflicts.day_id IN (
+                            SELECT conflicts.day_id
+                            FROM conflicts
+                                JOIN day ON (conflicts.day_id = day.id)
+                            WHERE TO_CHAR(day.date, 'YYYY-MM-DD') IN ({})
+                            AND conflicts.ra_id = {}
+                        );""".format(str(deleteSet)[1:-1],userDict["ra_id"]))
+
+    if len(addSet) > 0:
+
+        cur.execute("""INSERT INTO conflicts (ra_id, day_id)
+                        SELECT {}, day.id FROM day
+                        WHERE TO_CHAR(day.date, 'YYYY-MM-DD') IN ({})
+                        """.format(userDict["ra_id"], str(addSet)[1:-1]))
+
+    conn.commit()
+    cur.close()
+    return jsonify(stdRet(1,"successful"))                                          # Send the user back to the main page (Not utilized by client currently)
 
 @app.route("/api/getStaffInfo", methods=["GET"])
 @login_required
@@ -930,7 +954,7 @@ def addNewDuty():
     cur.execute("SELECT id FROM ra WHERE id = {} AND hall_id = {};".format(data["id"],userDict["hall_id"]))
     raId = cur.fetchone()
 
-    if raId is None
+    if raId is None:
         ret = stdRet(-1,"Unable to find RA {} in database".format(data["id"]))
 
 

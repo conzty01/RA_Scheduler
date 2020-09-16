@@ -27,7 +27,7 @@ function initConflictCal() {
               click: conflict_Submit
             },
             conflictResetButton: {
-              text: 'Reset',
+              text: 'Clear',
               click: conflict_Reset
             },
         },
@@ -103,7 +103,7 @@ function getPrevConflicts() {
 
     let data = {
         // Convert from js zero-based numbering
-        monthNum: appConfig.calDate.getMonth(),
+        monthNum: appConfig.calDate.getMonth() + 1,
         year: appConfig.calDate.getFullYear()
     }
 
@@ -118,6 +118,7 @@ function showPrevConflicts(conRes) {
 
     let dayList = document.querySelectorAll("[data-date]");
 
+    conSet = new Set();
     for (let dayEl of dayList) {
 
         // If the dayElement's date is in the conList
@@ -131,3 +132,48 @@ function showPrevConflicts(conRes) {
     }
 
 }
+
+function conflict_Submit() {
+    // Submit the conflicts to the server
+
+    // disable the button until receive an ack from the server
+    let butt = document.getElementsByClassName("fc-conflictSubmitButton-button")[0];
+    butt.disabled = true;
+
+    data = {
+        conflicts: Array.from(conSet),
+        monthNum: appConfig.calDate.getMonth() + 1,
+        year: appConfig.calDate.getFullYear()
+    };
+
+    appConfig.base.callAPI("enterConflicts/", data, (res) => {
+        let butt = document.getElementsByClassName("fc-conflictSubmitButton-button")[0]
+        butt.disabled = false
+
+        if (res.status != 1) {
+            console.log(res.msg);
+        } else {
+            getPrevConflicts();
+        }
+    }, "POST");
+}
+
+function conflict_Reset() {
+    // Reset the calendar and clear the conSet
+
+    let days = document.getElementsByClassName("selected");
+    let dayLen = days.length;
+    //console.log(days);
+
+    // Since getElementsByClassName returns an array-like object
+    //  when a for-of loop iterates over and the class is removed,
+    //  the object is actually removed from the array which
+    //  skrews up the iterator. This is a simple workaround.
+    for (let i = 0; i < dayLen; i++) {
+        days[0].classList.remove("selected");
+    }
+
+    conSet = new Set();
+}
+
+var conSet = new Set();
