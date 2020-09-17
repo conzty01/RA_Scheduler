@@ -8,7 +8,7 @@ from pythonds import Stack
 
 def schedule(raList,year,month,noDutyDates=[],doubleDays=(4,5),doublePts=2, \
     doubleNum=2,doubleDates=set(),doubleDateNum=2,doubleDatePts=1,
-    ldaTolerance=8,nddTolerance=.1):
+    ldaTolerance=8,nddTolerance=.1,prevDuties=[]):
     # This algorithm will schedule RAs for duties based on ...
     #
     # The algorithm returns a Schedule object that contains Day objects which, in
@@ -39,6 +39,17 @@ def schedule(raList,year,month,noDutyDates=[],doubleDays=(4,5),doublePts=2, \
     #                      set and the doubleDays set, it acts like a double day.
     #     doubleDateNum = number of RAs to be assigned on a double date
     #     doubleDatePts = number of points that are earned on a double date
+    #     ldaTolerance  = number of days before an RA is to be considered for duty
+    #     nddTolerance  = tolerance for whether an RA should be considered for
+    #                      duty on a double day. This tolerance helps prevent RAs
+    #                      from being scheduled for two consective double days in
+    #                      a row since they could be many days apart
+    #     prevDuties    = list containing tuples of an RA object and date object
+    #                      that cooresponds with the last few days of duty of the
+    #                      previous month. This helps prevent RAs from being
+    #                      assigned for duties in close succession at the
+    #                      change of the month.
+
 
     def createDateDict(year,month,noDutyDates,doubleDays,doublePts,doubleNum, \
             doubleDates,doubleDateNum,doubleDatePts):
@@ -244,13 +255,25 @@ def schedule(raList,year,month,noDutyDates=[],doubleDays=(4,5),doublePts=2, \
 
         return retList
 
-    lastDateAssigned = {}   # <- Dictionary of RA keys to lists of dates
-    numDoubleDays = {}      # <- Dictionary of RA keys to int of the number of double duty days
+    def createPreviousDuties(raList,prevDuties):
 
-    # Initialize lastDateAssigned and numDoubleDays for each RA
-    for r in raList:
-        numDoubleDays[r] = 0
-        lastDateAssigned[r] = 0
+        lastDateAssigned = {}   # <- Dictionary of RA keys to lists of dates
+        numDoubleDays = {}      # <- Dictionary of RA keys to int of the number of double duty days
+
+        # Initialize lastDateAssigned and numDoubleDays for each RA
+        for r in raList:
+            numDoubleDays[r] = 0
+            lastDateAssigned[r] = 0
+
+        # Prime the lastDateAssigned from the prevDuties
+        for ra, dDate in prevDuties:
+            lastDateAssigned[ra] = dDate
+        return numDoubleDays, lastDateAssigned
+
+
+    # Create and prime the numDoubleDays and lastDateAssigned dicts with the
+    #  data from the previous month's schedule.
+    numDoubleDays, lastDateAssigned = createPreviousDuties(raList,prevDuties)
 
     # Create calendar
     cal = createDateDict(year,month,noDutyDates,doubleDays,doublePts,doubleNum, \
