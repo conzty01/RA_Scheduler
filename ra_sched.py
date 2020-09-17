@@ -17,7 +17,7 @@ class RA:
         return "{} has {} points".format(self.fullName,self.points)
 
     def __repr__(self):
-        return "RA(Id: {}, Name: {})".format(self.hallId,self.firstName)
+        return "RA(Id: {}, Name: {})".format(self.id,self.firstName)
 
     def __iter__(self):
         for c in self.conflicts:
@@ -27,12 +27,10 @@ class RA:
         return self.fullName == other.fullName and \
                self.id == other.id and \
                self.hallId == other.hallId and \
-               self.conflicts == other.conflicts and \
-               self.dateStarted == other.dateStarted and \
-               self.points == other.points
+               self.dateStarted == other.dateStarted
 
     def __hash__(self):
-        return hash((self.fullName,self.id,self.hallId,self.dateStarted))
+        return hash((self.fullName,self.id,self.hallId,str(self.dateStarted)))
 
     def __lt__(self,other):
         # Sort by comparing the number of points RAs have. If RAs have the same
