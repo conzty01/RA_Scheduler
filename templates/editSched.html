@@ -144,6 +144,10 @@
 <div id="raListContainer" class="col-lg-3">
     <div id="raList" class="raList">
         <ul>
+            <li id="list_header">
+                <div id="list_name_header" class="tName">Name</div>
+                <div id="list_points_header" class="tPoints"># Points</div>
+            </li>
             {% for idKey, idVal in ptDict: %}
             <li id="list_{{ idKey }}">
                 <div id="list_name_{{ idKey }}" class="tName">{{ idVal["name"] }}</div>
