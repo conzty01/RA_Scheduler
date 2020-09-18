@@ -628,15 +628,15 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
 
     ra_list = [RA(res[0],res[1],res[2],res[3],res[4],res[5],ptsDict[res[2]]["pts"]) for res in partialRAList]
 
-    print("RA_LIST_______________________")
-    for ra in ra_list:
-        print("Name: ",ra.getName())
-        print("ID: ",ra.getId())
-        print("Hall: ",ra.getHallId())
-        print("Started: ",ra.getStartDate())
-        print(hash(ra))
-
-    input()
+    # print("RA_LIST_______________________")
+    # for ra in ra_list:
+    #     print("Name: ",ra.getName())
+    #     print("ID: ",ra.getId())
+    #     print("Hall: ",ra.getHallId())
+    #     print("Started: ",ra.getStartDate())
+    #     print(hash(ra))
+    #
+    # input()
     # Set the Last Duty Assigned Tolerance based on floor dividing the number of
     #  RAs by 2 then adding 1. For example, with a staff of 15, the LDA Tolerance
     #  would be 8 days.
@@ -1071,12 +1071,12 @@ def importStaff():
 
         #  Example:
         #  FName, LName-Hyphen, example@email.com, 05/28/2020, #OD1E76, RA
-        print(dataStr)
+        #print(dataStr)
         cur = conn.cursor()
         for row in dataStr.split("\n")[1:]:
             if row != "":
                 pl = [ part.strip() for part in row.split(",") ]
-                print(pl)
+                #print(pl)
 
                 # Do some validation checking
 
@@ -1094,7 +1094,7 @@ def importStaff():
                 else:
                     auth = 1
 
-                print(auth)
+                #print(auth)
 
                 try:
                     cur.execute("""
@@ -1105,7 +1105,7 @@ def importStaff():
                     conn.commit()
 
                 except psycopg2.IntegrityError:                                         # If the conflict entry already exists
-                    print("Duplicate RA: ", pl)
+                    #print("Duplicate RA: ", pl)
                     conn.rollback()                                                     # Rollback last commit so that Internal Error doesn't occur
                     cur.close()
                     cur = conn.cursor()
@@ -1134,7 +1134,7 @@ def getConflicts(monthNum=None,raID=None,year=None,hallId=None):
         fromServer = False
 
 
-    print(monthNum, year, hallID, raID)
+    #print(monthNum, year, hallID, raID)
 
     cur = conn.cursor()
 
