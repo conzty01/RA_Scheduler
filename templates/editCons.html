@@ -7,6 +7,29 @@
 <link rel="stylesheet" href="{{url_for('.static', filename='editCons.css')}}">
 {% endblock %}
 
+{% block contentRows %}
+<div id="calContainer" class="col-lg-9">
+    <div id="calendar">
+
+    </div>
+</div>
+<div id="raListContainer" class="col-lg-3">
+    <div id="raList" class="raList">
+        <ul>
+            <li id="list_header">
+                <div id="list_name_header" class="tName">Name</div>
+                <div id="list_points_header" class="tPoints"># Conflicts</div>
+            </li>
+            {% for ra in raList: %}
+            <li id="list_{{ ra[0] }}">
+                <div id="list_name_{{ ra[0] }}" class="tName">{{ ra[1] + " " + ra[2] }}</div>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endblock %}
+
 {% block scripts %}
 {{ super() }}
 <script src="{{url_for('.static', filename='main.js')}}"></script>
@@ -14,6 +37,6 @@
 <script src="{{url_for('.static', filename='fullCal.js')}}"></script>
 <script src="{{url_for('.static', filename='editCons.js')}}"></script>
 <script>
-    initEditSchedCal();
+    initEditConsCal();
 </script>
 {% endblock %}

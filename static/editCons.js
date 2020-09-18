@@ -24,21 +24,19 @@ function initEditConsCal() {
                 click: moveToday
             }
         },
-        dateClick: showAddDutyModal,
+        dateClick: '',
         headerToolbar: {
             left: 'customPrevButton,customNextButton customTodayButton',
             center: 'title',
             right: ''
         },
         events: {
-            url: '/api/getSchedule',
+            url: '/api/getStaffConflicts',
             failure: function () {
                 alert('there was an error while fetching events!');
             },
             extraParams: function () {
                 return {
-                    monthNum: appConfig.calDate.getMonth() + 1,
-                    year: appConfig.calDate.getFullYear(),
                     allColors: true
                 };
             }
@@ -46,6 +44,7 @@ function initEditConsCal() {
         lazyFetching: true,
         showNonCurrentDates: false,
         fixedWeekCount: false,
-        eventClick: eventClicked
+        eventClick: '',
+        dayMaxEventRows: 2
     });
 }

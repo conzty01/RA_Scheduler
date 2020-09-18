@@ -1170,6 +1170,49 @@ def getConflicts(monthNum=None,raID=None,year=None,hallId=None):
 
     return jsonify({"conflicts":ret})
 
+@app.route("/api/getStaffConflicts", methods=["GET"])
+@login_required
+def getRACons(hallId=None,startDateStr=None,endDateStr=None):
+    # API Hook that will get the conflicts for a given month and hall.
+    #  The month will be given via request.args as 'start' and 'end'.
+    #  The server will then query the database for the appropriate conflicts.
+
+    fromServer = True
+    if hallId is None and startDateStr is None and endDateStr is None:
+        userDict = getAuth()                                                    # Get the user's info from our database
+        hallId = userDict["hall_id"]
+        startDateStr = request.args.get("start").split("T")[0]                  # No need for the timezone in our current application
+        endDateStr = request.args.get("end").split("T")[0]                      # No need for the timezone in our current application
+
+        fromServer = False
+
+    res = []
+
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT ra.id, ra.first_name, ra.last_name, ra.color, TO_CHAR(day.date, 'YYYY-MM-DD')
+        FROM conflicts JOIN day ON (conflicts.day_id = day.id)
+                       JOIN ra ON (conflicts.ra_id = ra.id)
+        WHERE day.date >= TO_DATE('{}', 'YYYY-MM-DD')
+        AND day.date <= TO_DATE('{}', 'YYYY-MM-DD')
+        AND ra.hall_ID = {};
+    """.format(startDateStr, endDateStr, hallId))
+
+    rawRes = cur.fetchall()
+
+    for row in rawRes:
+        res.append({
+            "id": row[0],
+            "title": row[1] + " " + row[2],
+            "start": row[4],
+            "color": row[3]
+        })
+
+    if fromServer:
+        return rawRes
+    else:
+        return jsonify(res)
 
 #     -- Error Handling --
 
