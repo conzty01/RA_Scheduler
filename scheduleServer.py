@@ -274,6 +274,20 @@ def editSched():
                             ptDict=sorted(ptDict.items(), key=lambda x: x[1]["name"].split(" ")[1] ), \
                             curView=3, opts=baseOpts, hall_name=userDict["hall_name"])
 
+@app.route("/editCons")
+@login_required
+def editCons():
+    userDict = getAuth()
+
+    if userDict["auth_level"] < 2:
+        return jsonify("NOT AUTHORIZED")
+
+    cur = conn.cursor()
+    cur.execute("SELECT id, first_name, last_name, color FROM ra WHERE hall_id = {} ORDER BY first_name ASC;".format(userDict["hall_id"]))
+
+    return render_template("editCons.html", raList=cur.fetchall(), auth_level=userDict["auth_level"], \
+                            curView=3, opts=baseOpts, hall_name=userDict["hall_name"])
+
 @app.route("/staff")
 @login_required
 def manStaff():
