@@ -1186,7 +1186,7 @@ def getRAConflicts():
     monthNum = request.args.get("monthNum")
     year = request.args.get("year")
 
-    print(hallId, raId, monthNum, year)
+    #print(hallId, raId, monthNum, year)
 
     if int(raId) != -1:
         addStr = "AND conflicts.ra_id = {};".format(raId)
