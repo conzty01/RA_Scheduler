@@ -27,6 +27,7 @@
     display: block;
     clear: left;
     overflow: auto;
+    cursor: pointer;
 }
 .raList li:hover {
     background-color: #e1e1e1;
