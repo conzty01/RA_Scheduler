@@ -1168,7 +1168,62 @@ def getConflicts(monthNum=None,raID=None,year=None,hallId=None):
 
     ret = [ d[0] for d in cur.fetchall() ]
 
-    return jsonify({"conflicts":ret})
+    if fromServer:
+        return ret
+    else:
+        return jsonify({"conflicts":ret})
+
+@app.route("/api/getRAConflicts", methods=["GET"])
+@login_required
+def getRAConflicts():
+    userDict = getAuth()
+
+    if userDict["auth_level"] < 2:
+        return stdRet(0,"NOT AUTHORIZED")
+
+    hallId = userDict["hall_id"]
+    raId = request.args.get("raID")
+    monthNum = request.args.get("monthNum")
+    year = request.args.get("year")
+
+    print(hallId, raId, monthNum, year)
+
+    if int(raId) != -1:
+        addStr = "AND conflicts.ra_id = {};".format(raId)
+    else:
+        addStr = ""
+
+    cur = conn.cursor()
+
+    cur.execute("SELECT id FROM month WHERE num = {} AND EXTRACT(YEAR FROM year) = {}".format(monthNum, year))
+    monthID = cur.fetchone()
+
+    if monthID is None:
+        return jsonify(stdRet(-1,"No month found with Num = {}".format(monthNum)))
+
+    else:
+        monthID = monthID[0]
+
+    cur.execute("""SELECT conflicts.id, ra.first_name, ra.last_name, TO_CHAR(day.date, 'YYYY-MM-DD'), ra.color
+                   FROM conflicts JOIN day ON (conflicts.day_id = day.id)
+                                  JOIN ra ON (ra.id = conflicts.ra_id)
+                   WHERE day.month_id = {}
+                   AND ra.hall_id = {}
+                   {};""".format(monthID, hallId, addStr))
+
+    conDates = cur.fetchall()
+
+    res = []
+
+    for d in conDates:
+        res.append({
+            "id": d[0],
+            "title": d[1] + " " + d[2],
+            "start": d[3],
+            "color": d[4]
+        })
+
+    return jsonify(res)
 
 @app.route("/api/getStaffConflicts", methods=["GET"])
 @login_required
