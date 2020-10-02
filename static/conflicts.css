@@ -1,5 +1,8 @@
-.fc .fc-daygrid-day.fc-day-today {
-    background-color: #90EE90;
+.fc-day-today:not(.fc-day-other) {
+    background-color: #90EE90 !important;
+}
+.fc-day-today.fc-day-other {
+    background-color: inherit !important;
 }
 .fc-daygrid-day:not(.fc-day-other) {
     background-color: #90EE90;
