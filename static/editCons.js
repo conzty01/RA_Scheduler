@@ -47,7 +47,7 @@ function initEditConsCal() {
         lazyFetching: true,
         showNonCurrentDates: false,
         fixedWeekCount: false,
-        eventClick: '',
+        //eventClick: clickedConflict,
         dayMaxEventRows: 2
     });
 }
@@ -103,6 +103,10 @@ function getSelectedRAID() {
 
     return parseInt(i)
 }
+
+// function clickedConflict(obj) {
+//     console.log(obj);
+// }
 
 function filterConflicts(id) {
     let tmp = document.getElementById("list_"+id);
