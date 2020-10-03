@@ -1187,11 +1187,16 @@ def getRAConflicts():
     year = request.args.get("year")
 
     #print(hallId, raId, monthNum, year)
+    #print(int(raId))
+    #print(type(int(raId)))
+    #print(int(raId) != -1)
 
     if int(raId) != -1:
         addStr = "AND conflicts.ra_id = {};".format(raId)
     else:
         addStr = ""
+
+    #print(addStr)
 
     cur = conn.cursor()
 
@@ -1212,6 +1217,7 @@ def getRAConflicts():
                    {};""".format(monthID, hallId, addStr))
 
     conDates = cur.fetchall()
+    #print(conDates)
 
     res = []
 
@@ -1266,6 +1272,46 @@ def getRACons(hallId=None,startDateStr=None,endDateStr=None):
 
     if fromServer:
         return rawRes
+    else:
+        return jsonify(res)
+
+@app.route("/api/getConflictNums", methods=["GET"])
+@login_required
+def getNumberConflicts(hallId=None,monthNum=None,year=None):
+
+    fromServer = True
+    if hallId is None and monthNum is None and year is None:
+        userDict = getAuth()                                                    # Get the user's info from our database
+        hallId = userDict["hall_id"]
+        monthNum = request.args.get("monthNum")
+        year = request.args.get("year")
+
+        fromServer = False
+
+    if userDict["auth_level"] < 2:
+        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT ra.id, COUNT(cons.id)
+        FROM ra LEFT JOIN (
+            SELECT conflicts.id, ra_id
+            FROM conflicts JOIN day ON (conflicts.day_id = day.id)
+                           JOIN month ON (month.id = day.month_id)
+            WHERE month.num = {}
+            AND EXTRACT(YEAR FROM month.year) = {}
+        ) AS cons ON (cons.ra_id = ra.id)
+        WHERE ra.hall_id = {}
+        GROUP BY ra.id;
+    """.format(monthNum, year, hallId))
+
+    res = {}
+    for row in cur.fetchall():
+        res[row[0]] = row[1]
+
+    if fromServer:
+        return res
     else:
         return jsonify(res)
 
