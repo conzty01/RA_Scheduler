@@ -13,15 +13,15 @@ function initEditConsCal() {
         customButtons: {
             customPrevButton: {
                 text: '<',
-                click: movePrev
+                click: movePrevCons
             },
             customNextButton: {
                 text: '>',
-                click: moveNext
+                click: moveNextCons
             },
             customTodayButton: {
                 text: 'Today',
-                click: moveToday
+                click: moveTodayCons
             }
         },
         dateClick: '',
@@ -52,6 +52,43 @@ function initEditConsCal() {
     });
 }
 
+function moveNextCons() {
+    console.log("Change Month: Next");
+
+    appConfig.calDate.setMonth(appConfig.calDate.getMonth() + 1);
+    console.log(appConfig.calDate);
+
+    // Get the number of conflicts
+    getNumberConflicts();
+    // Get the conflicts
+    calendar.currentData.calendarApi.next();
+}
+
+function movePrevCons() {
+    console.log("Change Month: Prev");
+
+    appConfig.calDate.setMonth(appConfig.calDate.getMonth() - 1);
+    console.log(appConfig.calDate);
+
+    // Get the number of conflicts
+    getNumberConflicts();
+    // Get the conflicts
+    calendar.currentData.calendarApi.prev();
+}
+
+function moveTodayCons() {
+    console.log("Change Month: Today");
+
+    appConfig.calDate.setMonth(appConfig.curDate.getMonth());
+    appConfig.calDate.setFullYear(appConfig.curDate.getFullYear());
+
+    // Get the number of conflicts
+    getNumberConflicts();
+    // Get the conflicts
+    calendar.currentData.calendarApi.today();
+}
+
+
 function getSelectedRAID() {
 
     let i;
@@ -81,6 +118,30 @@ function filterConflicts(id) {
 
     // refetch events
     calendar.currentData.calendarApi.refetchEvents();
+}
+
+function getNumberConflicts() {
+
+    // Fetch the conflict count for each RA for the currently viewed month.
+    let params = {
+        monthNum: appConfig.calDate.getMonth() + 1,
+        year: appConfig.calDate.getFullYear(),
+    }
+    appConfig.base.callAPI("getConflictNums", params, setConflictNumbers, "GET");
+
+}
+
+function setConflictNumbers(results) {
+    console.log("Redrawing Conflict Numbers");
+    //console.log(results);
+
+    let curRow;
+    for (let key of Object.keys(results)) {
+        //console.log("list_points_"+key);
+        curRow = document.getElementById("list_points_"+key);
+        curRow.innerHTML = results[key];
+    }
+
 }
 
 var selectedRAli;
