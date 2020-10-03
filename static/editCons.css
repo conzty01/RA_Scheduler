@@ -43,3 +43,6 @@
     margin-left: 20%;
     background-color: none;
 }
+.fc-event-main {
+    cursor: pointer;
+}
