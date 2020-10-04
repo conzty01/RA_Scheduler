@@ -35,5 +35,6 @@ function moveToday() {
     console.log("Change Month: Today");
 
     appConfig.calDate.setMonth(appConfig.curDate.getMonth());
+    appConfig.calDate.setFullYear(appConfig.curDate.getFullYear());
     calendar.currentData.calendarApi.today();
 }

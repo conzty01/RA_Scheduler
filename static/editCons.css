@@ -1,0 +1,45 @@
+#calContainer {
+    float: left;
+}
+#raListContainer {
+    float: right;
+}
+
+.raList {
+    width: 100%;
+    max-height: 75%;
+    margin: 5%;
+    margin-left: 0;
+    margin-top: 30%;
+    overflow-y: scroll;
+    font-size: 1.2em;
+    border: 1px solid #e1e1e1;
+    padding: 5px;
+    display: block;
+    float: right;
+}
+.raList ul {
+    list-style: none;
+    margin-left: 0;
+    padding: 0;
+}
+.raList ul li {
+    display: block;
+    clear: left;
+    overflow: auto;
+    cursor: pointer;
+}
+.raList li:hover {
+    background-color: #e1e1e1;
+}
+.tName {
+    float: left;
+    margin-left: 10px;
+    background-color: none;
+}
+.tPoints {
+    float: right;
+    margin-right: 20px;
+    margin-left: 20%;
+    background-color: none;
+}

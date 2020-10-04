@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block styles %}
+{{ super() }}
+<link rel="stylesheet" href="{{url_for('.static', filename='main.css')}}">
+<link href='https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.13.1/css/all.css' rel='stylesheet'>
+<link rel="stylesheet" href="{{url_for('.static', filename='calendar.css')}}">
+<link rel="stylesheet" href="{{url_for('.static', filename='editCons.css')}}">
+{% endblock %}
+
+{% block contentRows %}
+<!-- View Conflict Modal -->
+<div class="modal fade" id="viewConflict" tabindex="-1" role="dialog" aria-labelledby="viewConflictModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">View Conflict: <span id="viewConflictLongTitle" style="font-weight:bold;"></span></h3>
+      </div>
+      <div class="modal-body">
+          <div class="form-group">
+              <label for="viewConflictDate">Duty Date:</label>
+              <input class="form-control" type="date" id="viewConflictDate" disabled>
+          </div>
+          <div class="form-group">
+              <label for="addDateRASelect">Assigned RA:</label>
+              <select class="form-control" id="addDateRASelect">
+                  {% for ra in raList: %}
+                  <option id="selector_{{ ra[0] }}" value="{{ ra[4] }}">{{ ra[1] }} {{ ra[2] }}</option>
+                  {% endfor %}
+              </select>
+          </div>
+          <div class="form-group">
+              <label for="addDatePts">Point Value:</label>
+              <input class="form-control" type="number" id="addDatePts" name="addDatePts" value="1">
+         </div>
+      </div>
+      <div class="modalError">Update Assignment Failed: <span class="msg"></span></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" onclick="addDuty()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+<div id="calContainer" class="col-lg-9">
+    <div id="calendar">
+
+    </div>
+</div>
+<div id="raListContainer" class="col-lg-3">
+    <div id="raList" class="raList">
+        <ul>
+            <li id="list_header">
+                <div id="list_name_header" class="tName">Name</div>
+                <div id="list_points_header" class="tPoints"># Conflicts</div>
+            </li>
+            {% for ra in raList: %}
+            <li id="list_{{ ra[0] }}" onclick="filterConflicts({{ ra[0] }})">
+                <div id="list_name_{{ ra[0] }}" class="tName">{{ ra[1] + " " + ra[2] }}</div>
+                <div id="list_points_{{ ra[0] }}" class="tPoints">0</div>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="{{url_for('.static', filename='main.js')}}"></script>
+<script src="{{url_for('.static', filename='locales-all.js')}}"></script>
+<script src="{{url_for('.static', filename='fullCal.js')}}"></script>
+<script src="{{url_for('.static', filename='editCons.js')}}"></script>
+<script>
+    initEditConsCal();
+    getNumberConflicts();
+</script>
+{% endblock %}

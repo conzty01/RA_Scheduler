@@ -15,8 +15,24 @@ import copy as cp
 import datetime
 import psycopg2
 import calendar
+import logging
 import json
 import os
+
+logLevel = os.environ["LOG_LEVEL"].upper()
+
+if logLevel == "DEBUG":
+    logLevel = logging.DEBUG
+elif logLevel == "INFO":
+    logLevel = logging.INFO
+elif logLevel == "WARNING":
+    logLevel = logging.WARNING
+elif logLevel == "ERROR":
+    logLevel = logging.ERROR
+elif logLevel == "CRITICAL":
+    logLevel = logging.CRITICAL
+else:
+    logLevel = logging.WARNING
 
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
@@ -83,13 +99,13 @@ def before_request():
 
 @oauth_authorized.connect_via(gBlueprint)
 def googleLoggedIn(blueprint,token):
-    print('googleLoggedIn')
+    logging.info('googleLoggedIn')
     if not token:                                                               # If we don't have a token
         return False
 
     resp = blueprint.session.get("/oauth2/v2/userinfo")
     if not resp.ok:                                                             # If the response is bad
-        print("NOT OK")
+        logging.info("NOT OK")
         return False
     google_info = resp.json()
 
@@ -101,16 +117,16 @@ def googleLoggedIn(blueprint,token):
     try:
         oauth = query.one()                                                     # Execute the query
     except NoResultFound:                                                       # If there are no results
-        print("NO OAUTH")
+        logging.info("NO OAUTH")
         oauth = OAuth(provider=blueprint.name,                                  # Create a new entry in our database
                       provider_user_id=gID,
                       token=token)
 
     if oauth.user:                                                              # If we have a user
-        print("LOGGING OAUTH")
+        logging.info("LOGGING OAUTH")
         login_user(oauth.user)                                                  # Log them in
     else:
-        print("CREATE NEW USER")
+        logging.info("CREATE NEW USER")
         cur = conn.cursor()
         cur.execute("SELECT id FROM ra WHERE email = '{}'".format(username))    # Get the ra with the matching email so that we can link RAs to their emails
         raId = cur.fetchone()
@@ -127,6 +143,7 @@ def googleLoggedIn(blueprint,token):
 #     -- Helper Functions --
 
 def getAuth():
+    logging.debug("Start getAuth")
     uEmail = current_user.username                                              # The email returned from Google
     cur = conn.cursor()
     cur.execute("""
@@ -137,6 +154,8 @@ def getAuth():
     res = cur.fetchone()                                                        # Get user info from the database
 
     if res == None:                                                             # If user does not exist, go to error url
+        logging.warning("No user found with email: {}".format(uEmail))
+
         cur.close()
         return redirect(url_for(".err",msg="No user found with email: {}".format(uEmail)))
 
@@ -147,14 +166,16 @@ def getAuth():
 def stdRet(status, msg):
     # Helper function to create a standard return object to help simplify code
     #  going back to the client when no additional data is to be sent.
+    logging.debug("Generate Standard Return")
     return {"status":status,"msg":msg}
 
 def fileAllowed(filename):
+    logging.debug("Checking if file is allowed")
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def validateUpload(partList):
-
+    logging.debug("Validating Upload")
     pl = []
     for i in partList:
         i.replace("%","")
@@ -169,7 +190,7 @@ def validateUpload(partList):
     if len(partList) != 6:
         valid = False
         reasons.append("Expected 5 Parameters, Received: {}".format(len(partList)))
-        print(partList)
+        logging.debug("PartList: "+str(partList))
 
     else:
         fName, lName, email, start, color, role = pl
@@ -178,7 +199,7 @@ def validateUpload(partList):
         if "@" not in email and "." not in email:
             valid = False
             reasons.append(fName+" "+lName+" - Invalid Email Address: "+email)
-            print(email)
+            logging.debug("RA Email: "+email)
 
         # Check Start Date
         splitDate = start.split("/")
@@ -186,18 +207,19 @@ def validateUpload(partList):
             int(splitDate[1]) > 31 or int(splitDate[2]) < 1:
             valid = False
             reasons.append(fName+" "+lName+" - Invalid Start Date: "+start)
-            print(start)
+            logging.debug("RA Start Date: "+start)
 
         # Check Color
         if len(color) != 7:
             valid = False
             reasons.append(fName+" "+lName+" - Invalid Color Format: {} Must be in 6-digit, hex format preceeded by a '#'".format(color))
-            print(color)
+            logging.debug("RA Color: "+color)
 
     return pl, valid, reasons
 
 def getSchoolYear(month, year):
     # Figure out what school year we are looking for
+    logging.debug("Calculate School Year: {} {}".format(month, year))
 
     if int(month) >= 8:
         # If the current month is August or later
@@ -217,10 +239,14 @@ def getSchoolYear(month, year):
     start = str(startYear) + '-08-01'
     end = str(endYear) + '-07-31'
 
+    logging.debug("Start: "+ start)
+    logging.debug("End: "+ end)
+
     return start, end
 
 def getCurSchoolYear():
     # Figure out what school year we are looking for
+    logging.debug("Calculate Current School Year")
     month = datetime.date.today().month
     year = datetime.date.today().year
 
@@ -231,11 +257,13 @@ def getCurSchoolYear():
 @app.route("/logout")
 @login_required
 def logout():
+    logging.info("Logout User")
     logout_user()
     return redirect(url_for('.login'))
 
 @app.route("/")
 def login():
+    logging.info("Redirect to Google Login")
     return redirect(url_for("google.login"))
 
 @app.route("/home")
@@ -259,10 +287,14 @@ def conflicts():
 def editSched():
     userDict = getAuth()                                                        # Get the user's info from our database
 
+    if userDict["auth_level"] < 2:
+        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
+        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
+
     start, end = getCurSchoolYear()
     ptDict = getRAStats(userDict["hall_id"], start, end)
 
-    #print(ptDict)
+    logger.debug("Point Dict: {}".format(ptDict))
 
     cur = conn.cursor()
     cur.execute("SELECT id, first_name, last_name, color FROM ra WHERE hall_id = {} ORDER BY first_name ASC;".format(userDict["hall_id"]))
@@ -274,10 +306,29 @@ def editSched():
                             ptDict=sorted(ptDict.items(), key=lambda x: x[1]["name"].split(" ")[1] ), \
                             curView=3, opts=baseOpts, hall_name=userDict["hall_name"])
 
+@app.route("/editCons")
+@login_required
+def editCons():
+    userDict = getAuth()
+
+    if userDict["auth_level"] < 2:
+        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
+        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
+
+    cur = conn.cursor()
+    cur.execute("SELECT id, first_name, last_name, color FROM ra WHERE hall_id = {} ORDER BY first_name ASC;".format(userDict["hall_id"]))
+
+    return render_template("editCons.html", raList=cur.fetchall(), auth_level=userDict["auth_level"], \
+                            curView=3, opts=baseOpts, hall_name=userDict["hall_name"])
+
 @app.route("/staff")
 @login_required
 def manStaff():
     userDict = getAuth()                                                        # Get the user's info from our database
+
+    if userDict["auth_level"] < 2:
+        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
+        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
 
     start, end = getCurSchoolYear()
 
@@ -296,12 +347,13 @@ def manStaff():
 @app.route("/api/enterConflicts/", methods=['POST'])
 @login_required
 def processConflicts():
+    logging.debug("Process Conflicts")
     userDict = getAuth()                                                        # Get the user's info from our database
 
     ra_id = userDict["ra_id"]
     hallId = userDict["hall_id"]
 
-    #print(request.json)
+    logging.debug(request.json)
     monthNum = request.json["monthNum"]
     year = request.json["year"]
     conflicts = request.json["conflicts"]
@@ -332,11 +384,11 @@ def processConflicts():
     addSet = newSet.difference(prevSet)
 
     cur = conn.cursor()
-    # print("dataConflicts", conflicts)
-    # print("PrevSet", prevSet)
-    # print("newSet", newSet)
-    # print("deleteSet", deleteSet, str(deleteSet)[1:-1])
-    # print("addSet", addSet, str(addSet)[1:-1])
+    logging.debug("DataConflicts: {}".format(conflicts))
+    logging.debug("PrevSet: {}".format(prevSet))
+    logging.debug("NewSet: {}".format(newSet))
+    logging.debug("DeleteSet: {}, {}".format(deleteSet, str(deleteSet)[1:-1]))
+    logging.debug("AddSet: {}, {}".format(addSet, str(addSet)[1:-1]))
 
     if len(deleteSet) > 0:
 
@@ -366,7 +418,8 @@ def getStaffStats():
     userDict = getAuth()
 
     if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
-        return jsonify("NOT AUTHORIZED")
+        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
+        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
 
     cur = conn.cursor()
 
@@ -396,6 +449,8 @@ def getRAStats(hallId=None,startDateStr=None,endDateStr=None):
         fromServer = False
         startDateStr = request.args.get("start")
         endDateStr = request.args.get("end")
+
+    logging.debug("Get RA Stats - FromServer: {}".format(fromServer))
 
     res = {}
 
@@ -459,6 +514,8 @@ def getSchedule2(monthNum=None,year=None,hallId=None,allColors=None):
         userDict = getAuth()                                                    # Get the user's info from our database
         hallId = userDict["hall_id"]
         fromServer = False
+
+    logging.debug("Get Schedule - From Server: {}".format(fromServer))
     res = []
 
     cur = conn.cursor()
@@ -488,12 +545,12 @@ def getSchedule2(monthNum=None,year=None,hallId=None,allColors=None):
     """.format(hallId, hallId, start[:-3], end[:-3], start, end))
 
     rawRes = cur.fetchall()
-    #print(rawRes)
+    logging.debug("RawRes: {}".format(rawRes))
 
     for row in rawRes:
         # If the ra is the same as the user, then display their color
         #  Otherwise, display a generic color.
-        #print(userDict["ra_id"] == row[3])
+        logging.debug("Ra is same as user? {}".format(userDict["ra_id"] == row[3]))
         if not(showAllColors):
             # If the desired behavior is to not show all of the unique RA colors
             #  then check to see if the current user is the ra on the duty being
@@ -531,6 +588,8 @@ def getMonth(monthNum=None,year=None):
         monthNum = int(request.args.get("monthNum"))
         year = int(request.args.get("year"))
 
+    logging.debug("Get Month - MonthNum: {}, Year: {}".format(monthNum, year))
+
     res = {}
     dateList = []
     for week in cc.monthdayscalendar(year,monthNum):
@@ -554,12 +613,13 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
     #  Additionally, the dates that should no have duties are also sent via
     #  request.args and can either be a string of comma separated integers
     #  ("1,2,3,4") or an empty string ("").
-    #print("SCHEDULER")
+
     userDict = getAuth()                                                        # Get the user's info from our database
     if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
-        return jsonify(std(-1,"NOT AUTHORIZED"))
+        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
+        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
 
-    #print(request.json)
+    logging.debug("Request.json: {}".format(request.json))
 
     fromServer = True
     if monthNum == None and year == None and hallId == None:                    # Effectively: If API was called from the client and not from the server
@@ -568,6 +628,8 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
         userDict = getAuth()                                                    # Get the user's info from our database
         hallId = userDict["hall_id"]
         fromServer = False
+
+    logging.debug("Run Scheduler - From Server: {}".format(fromServer))
     res = {}
 
     try:
@@ -592,9 +654,10 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
 
     cur.execute("SELECT id, year FROM month WHERE num = {} AND EXTRACT(YEAR FROM year) = {}".format(monthNum,year))
     monthId, date = cur.fetchone()                                              # Get the month_id from the database
-    #print(monthId)
+    logger.debug("MonthId: {}".format(monthId))
 
     if monthId == None:                                                         # If the database does not have the correct month
+        logger.warning("Unable to find month {}/{} in DB".format(monthNum,year))
         return jsonify(stdRet(-1,"Unable to find month {}/{} in DB".format(monthNum,year)))
 
     # Select all RAs in a particular hall whose auth_level is below 3 (HD)
@@ -617,7 +680,7 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
         AND ra.auth_level < 3 {}
     """.format(monthId, hallId, eligibleRAStr)
 
-    #print(queryStr)
+    logging.debug(queryStr)
 
     cur.execute(queryStr)       # Query the database for the appropriate RAs and their respective information
     partialRAList = cur.fetchall()
@@ -628,15 +691,15 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
 
     ra_list = [RA(res[0],res[1],res[2],res[3],res[4],res[5],ptsDict[res[2]]["pts"]) for res in partialRAList]
 
-    print("RA_LIST_______________________")
-    for ra in ra_list:
-        print("Name: ",ra.getName())
-        print("ID: ",ra.getId())
-        print("Hall: ",ra.getHallId())
-        print("Started: ",ra.getStartDate())
-        print(hash(ra))
-
-    input()
+    # logger.debug("RA_LIST_______________________")
+    # for ra in ra_list:
+    #     logger.debug("Name: {}".format(ra.getName()))
+    #     logger.debug("ID: {}".format(ra.getId()))
+    #     logger.debug("Hall: {}".format(ra.getHallId()))
+    #     logger.debug("Started: {}".format(ra.getStartDate()))
+    #     logger.debug("Hash: {}".format(hash(ra)))
+    #
+    # input()
     # Set the Last Duty Assigned Tolerance based on floor dividing the number of
     #  RAs by 2 then adding 1. For example, with a staff of 15, the LDA Tolerance
     #  would be 8 days.
@@ -654,12 +717,12 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
 
     endMonthStr = '{}-{}'.format(year, "{0:02d}".format(monthNum))
 
-    # print(startMonthStr)
-    # print(endMonthStr)
-    # print(userDict["hall_id"])
-    # print(year)
-    # print('{0:02d}'.format(monthNum))
-    # print(ldat)
+    logging.debug("StartMonthStr: "+startMonthStr)
+    logging.debug("EndMonthStr: "+endMonthStr)
+    logging.debug("Hall Id: "+userDict["hall_id"])
+    logging.debug("Year: "+year)
+    logging.debug('MonthNum: {0:02d}'.format(monthNum))
+    logging.debug("LDAT: "+ldat)
 
     cur.execute("""SELECT ra.first_name, ra.last_name, ra.id, ra.hall_id,
                           ra.date_started, day.date - TO_DATE('{}-{}-01','YYYY-MM-DD')
@@ -689,7 +752,7 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
     # Create shell RA objects that will hash to the appropriate value
     prevRADuties = [ ( RA(d[0],d[1],d[2],d[3],d[4]), d[5] ) for d in prevDuties ]
 
-    #print("PREVIOUS DUTIES:",prevRADuties)
+    logging.debug("PREVIOUS DUTIES:",prevRADuties)
 
     # Attempt to run the scheduler using deep copies of the raList and noDutyList.
     #  This is so that if the scheduler does not resolve on the first run, we
@@ -711,7 +774,7 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
                 # And the LDATolerance is greater than 1
                 #  then decrement the LDATolerance by 1 and try again
 
-                print("DECREASE LDAT: ", ldat)
+                logging.info("DECREASE LDAT: ", ldat)
                 ldat -= 1
                 copy_raList = cp.deepcopy(ra_list)
                 copy_noDutyList = cp.copy(noDutyList)
@@ -725,16 +788,17 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
             # We were able to create a schedule
             completed = True
 
-    #print(sched)
+    logger.debug("Schedule: {}".format(sched))
 
     if not successful:
-        return jsonify({"status":0,"msg":"UNABLE TO GENERATE SCHEDULE"})
+        logging.info("Unable to Generate Schedule for Hall: {} MonthNum: {} Year: {}".format(userDict["hall_id"], monthNum, year))
+        return jsonify(stdRet(0,"UNABLE TO GENERATE SCHEDULE"))
 
     # Add the schedule to the database and get its ID
     cur.execute("INSERT INTO schedule (hall_id, month_id, created) VALUES ({},{},NOW()) RETURNING id;".format(hallId, monthId))
     schedId = cur.fetchone()[0]
     conn.commit()
-    #print(schedId)
+    logger.debug("Schedule ID: {}".format(schedId))
 
     # Get the id of the schedule that was just created
     #cur.execute("SELECT id FROM schedule WHERE hall_id = {} AND month_id = {} ORDER BY created DESC, id DESC;".format(hallId, monthId))
@@ -773,12 +837,14 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
                     """.format(noDutyDayStr[:-1]))
 
     except psycopg2.IntegrityError:
-        #print("ROLLBACK")
+        logging.debug("ROLLBACK")
         conn.rollback()
 
     conn.commit()
 
     cur.close()
+
+    logging.info("Successfully Generated Schedule: {}".format(schedId))
 
     if fromServer:
         return stdRet(1,"successful")
@@ -793,7 +859,8 @@ def changeStaffInfo():
     hallId = userDict["hall_id"]
 
     if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
-        return jsonify(stdRet(0,"NOT AUTHORIZED"))
+        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
+        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
 
     data = request.json
 
@@ -818,7 +885,8 @@ def removeStaffer():
     userDict = getAuth()
 
     if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
-        return jsonify("NOT AUTHORIZED")
+        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
+        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
 
     raID = request.json
 
@@ -844,7 +912,8 @@ def addStaffer():
     userDict = getAuth()
 
     if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
-        return jsonify("NOT AUTHORIZED")
+        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
+        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
 
     data = request.json
 
@@ -888,14 +957,15 @@ def changeRAforDutyDay():
     userDict = getAuth()
 
     if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
-        return jsonify({"status":-1,"msg":"NOT AUTHORIZED"})
+        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
+        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
 
     data = request.json
-    #print("New RA id:", data["newId"])
-    #print("Old RA Name:", data["oldName"])
-    #print("HallID: ", userDict["hall_id"])
+    logging.debug("New RA id: {}".format(data["newId"]))
+    logging.debug("Old RA Name: {}".format(data["oldName"]))
+    logging.debug("HallID: {}".format(userDict["hall_id"]))
     # Expected as x/x/xxxx
-    #print("DateStr: ", data["dateStr"])
+    logging.debug("DateStr: {}".format(data["dateStr"]))
 
     fName, lName = data["oldName"].split()
 
@@ -948,14 +1018,15 @@ def addNewDuty():
     userDict = getAuth()
 
     if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
-        return jsonify("NOT AUTHORIZED")
+        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
+        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
 
     data = request.json
 
-    #print("New RA id:", data["id"])
-    #print("HallID: ", userDict["hall_id"])
+    logging.debug("New RA id: {}".format(data["id"]))
+    logging.debug("HallID: {}".format(userDict["hall_id"]))
     # Expected as x-x-xxxx
-    #print("DateStr: ", data["dateStr"])
+    logging.debug("DateStr: {}".format(data["dateStr"]))
 
     cur = conn.cursor()
 
@@ -971,20 +1042,17 @@ def addNewDuty():
 
     if dayID is None:
         cur.close()
+        logging.warning("Unable to find day {} in database".format(data["dateStr"]))
         return stdRet(-1,"Unable to find day {} in database".format(data["dateStr"]))
 
     if monthId is None:
         cur.close()
+        logging.warning("Unable to find month for {} in database".format(data["dateStr"]))
         return stdRet(-1,"Unable to find month for {} in database".format(data["dateStr"]))
 
 
     cur.execute("SELECT id FROM schedule WHERE hall_id = {} AND month_id = {} ORDER BY created DESC, id DESC;".format(userDict["hall_id"],monthId))
     schedId = cur.fetchone()
-
-    if monthId is None:
-        cur.close()
-        return stdRet(-1,"Unable to find month for {} in database".format(data["dateStr"]))
-
 
     cur.execute("""INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val)
                     VALUES ({}, {}, {}, {}, {});""".format(userDict["hall_id"], raId[0], dayID, schedId[0], data["pts"]))
@@ -993,6 +1061,7 @@ def addNewDuty():
 
     cur.close()
 
+    logging.debug("Successfully added new duty")
     return jsonify(stdRet(1,"successful"))
 
 @app.route("/api/deleteDuty", methods=["POST"])
@@ -1001,14 +1070,15 @@ def daleteDuty():
     userDict = getAuth()
 
     if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
-        return jsonify("NOT AUTHORIZED")
+        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
+        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
 
     data = request.json
 
-    #print("Deleted Duty RA Name:", data["raName"])
-    #print("HallID: ", userDict["hall_id"])
+    logging.debug("Deleted Duty RA Name: {}".format(data["raName"]))
+    logging.debug("HallID: {}".format(userDict["hall_id"]))
     # Expected as x-x-xxxx
-    #print("DateStr: ", data["dateStr"])
+    logging.debug("DateStr: {}".format(data["dateStr"]))
 
     fName, lName = data["raName"].split()
 
@@ -1034,12 +1104,14 @@ def daleteDuty():
 
         cur.close()
 
-        return jsonify({"status":1})
+        logging.info("Successfully deleted duty")
+        return jsonify(stdRet(1,"successful"))
 
     else:
 
         cur.close()
 
+        logging.info("Unable to locate duty to delete")
         return jsonify({"status":0,"error":"Unable to find parameters in DB"})
 
 @app.route("/api/importStaff", methods=["POST"])
@@ -1047,18 +1119,21 @@ def daleteDuty():
 def importStaff():
     userDict = getAuth()
 
-    if userDict["auth_level"] < 3:                                              # If the user is not at least an AHD
-        return jsonify("NOT AUTHORIZED")
+    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
+        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
+        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
 
-    print(request.files)
+    logging.info("Import File: {}".format(request.files))
     if 'file' not in request.files:
-            return jsonify(stdRet(0,"No File Part"))
+        logging.info("No file part found")
+        return jsonify(stdRet(0,"No File Part"))
 
     file = request.files['file']
     # if user does not select file, browser also
     # submit an empty part without filename
 
     if file.filename == '':
+        logging.info("No File Selected")
         return jsonify(stdRet(0,"No File Selected"))
 
     if file and fileAllowed(file.filename):
@@ -1071,12 +1146,12 @@ def importStaff():
 
         #  Example:
         #  FName, LName-Hyphen, example@email.com, 05/28/2020, #OD1E76, RA
-        print(dataStr)
+        logger.debug(dataStr)
         cur = conn.cursor()
         for row in dataStr.split("\n")[1:]:
             if row != "":
                 pl = [ part.strip() for part in row.split(",") ]
-                print(pl)
+                logger.debug("PL: {}".format(pl))
 
                 # Do some validation checking
 
@@ -1085,6 +1160,7 @@ def importStaff():
                 if not valid:
                     ret = stdRet("0","Invalid Formatting")
                     ret["except"] = reasons
+                    logging.info("Invalid Formatting")
                     return jsonify(ret)
 
                 if pl[-1] == "HD" and userDict["auth_level"] >= 3:
@@ -1094,7 +1170,7 @@ def importStaff():
                 else:
                     auth = 1
 
-                print(auth)
+                logging.debug(auth)
 
                 try:
                     cur.execute("""
@@ -1105,7 +1181,7 @@ def importStaff():
                     conn.commit()
 
                 except psycopg2.IntegrityError:                                         # If the conflict entry already exists
-                    print("Duplicate RA: ", pl)
+                    logging.debug("Duplicate RA: {}, rolling back DB changes".format(pl))
                     conn.rollback()                                                     # Rollback last commit so that Internal Error doesn't occur
                     cur.close()
                     cur = conn.cursor()
@@ -1115,6 +1191,7 @@ def importStaff():
         return redirect(url_for(".manStaff"))
 
     else:
+        logging.info("Unable to Import Staff")
         return redirect(url_for(".err",msg="Unable to Import Staff"))
 
 @app.route("/api/getConflicts", methods=["GET"])
@@ -1133,8 +1210,9 @@ def getConflicts(monthNum=None,raID=None,year=None,hallId=None):
         raID = userDict["ra_id"]
         fromServer = False
 
+    logging.debug("Get Conflicts - From Server: {}".format(fromServer))
 
-    print(monthNum, year, hallID, raID)
+    logging.debug("MonthNum: {}, Year: {}, HallID: {}, raID: {}".format(monthNum, year, hallID, raID))
 
     cur = conn.cursor()
 
@@ -1142,6 +1220,7 @@ def getConflicts(monthNum=None,raID=None,year=None,hallId=None):
     monthID = cur.fetchone()
 
     if monthID is None:
+        logging.warning("No month found with Num = {}".format(monthNum))
         return jsonify(stdRet(-1,"No month found with Num = {}".format(monthNum)))
 
     else:
@@ -1154,16 +1233,169 @@ def getConflicts(monthNum=None,raID=None,year=None,hallId=None):
 
     ret = [ d[0] for d in cur.fetchall() ]
 
-    return jsonify({"conflicts":ret})
+    if fromServer:
+        return ret
+    else:
+        return jsonify({"conflicts":ret})
 
+@app.route("/api/getRAConflicts", methods=["GET"])
+@login_required
+def getRAConflicts():
+    userDict = getAuth()
+
+    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
+        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
+        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
+
+    hallId = userDict["hall_id"]
+    raId = request.args.get("raID")
+    monthNum = request.args.get("monthNum")
+    year = request.args.get("year")
+
+    logging.debug("HallId: {}".format(hallId))
+    logging.debug("RaId: {}".format(raId))
+    logging.debug("MonthNum: {}".format(monthNum))
+    logging.debug("Year: {}".format(year))
+    logging.debug("RaId == -1? {}".format(int(raId) != -1))
+
+    if int(raId) != -1:
+        addStr = "AND conflicts.ra_id = {};".format(raId)
+    else:
+        addStr = ""
+
+    logging.debug(addStr)
+
+    cur = conn.cursor()
+
+    cur.execute("SELECT id FROM month WHERE num = {} AND EXTRACT(YEAR FROM year) = {}".format(monthNum, year))
+    monthID = cur.fetchone()
+
+    if monthID is None:
+        logging.info("No month found with Num = {}".format(monthNum))
+        return jsonify(stdRet(-1,"No month found with Num = {}".format(monthNum)))
+
+    else:
+        monthID = monthID[0]
+
+    cur.execute("""SELECT conflicts.id, ra.first_name, ra.last_name, TO_CHAR(day.date, 'YYYY-MM-DD'), ra.color
+                   FROM conflicts JOIN day ON (conflicts.day_id = day.id)
+                                  JOIN ra ON (ra.id = conflicts.ra_id)
+                   WHERE day.month_id = {}
+                   AND ra.hall_id = {}
+                   {};""".format(monthID, hallId, addStr))
+
+    conDates = cur.fetchall()
+    logging.debug("ConDates: {}".format(conDates))
+
+    res = []
+
+    for d in conDates:
+        res.append({
+            "id": d[0],
+            "title": d[1] + " " + d[2],
+            "start": d[3],
+            "color": d[4]
+        })
+
+    return jsonify(res)
+
+@app.route("/api/getStaffConflicts", methods=["GET"])
+@login_required
+def getRACons(hallId=None,startDateStr=None,endDateStr=None):
+    # API Hook that will get the conflicts for a given month and hall.
+    #  The month will be given via request.args as 'start' and 'end'.
+    #  The server will then query the database for the appropriate conflicts.
+
+    fromServer = True
+    if hallId is None and startDateStr is None and endDateStr is None:
+        userDict = getAuth()                                                    # Get the user's info from our database
+        hallId = userDict["hall_id"]
+        startDateStr = request.args.get("start").split("T")[0]                  # No need for the timezone in our current application
+        endDateStr = request.args.get("end").split("T")[0]                      # No need for the timezone in our current application
+
+        fromServer = False
+
+    logging.debug("Get Staff Conflicts - From Server: {}".format(fromServer))
+
+    res = []
+
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT ra.id, ra.first_name, ra.last_name, ra.color, TO_CHAR(day.date, 'YYYY-MM-DD')
+        FROM conflicts JOIN day ON (conflicts.day_id = day.id)
+                       JOIN ra ON (conflicts.ra_id = ra.id)
+        WHERE day.date >= TO_DATE('{}', 'YYYY-MM-DD')
+        AND day.date <= TO_DATE('{}', 'YYYY-MM-DD')
+        AND ra.hall_ID = {};
+    """.format(startDateStr, endDateStr, hallId))
+
+    rawRes = cur.fetchall()
+
+    for row in rawRes:
+        res.append({
+            "id": row[0],
+            "title": row[1] + " " + row[2],
+            "start": row[4],
+            "color": row[3]
+        })
+
+    if fromServer:
+        return rawRes
+    else:
+        return jsonify(res)
+
+@app.route("/api/getConflictNums", methods=["GET"])
+@login_required
+def getNumberConflicts(hallId=None,monthNum=None,year=None):
+
+    fromServer = True
+    if hallId is None and monthNum is None and year is None:
+        userDict = getAuth()                                                    # Get the user's info from our database
+        hallId = userDict["hall_id"]
+        monthNum = request.args.get("monthNum")
+        year = request.args.get("year")
+
+        fromServer = False
+
+    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
+        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
+        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
+
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT ra.id, COUNT(cons.id)
+        FROM ra LEFT JOIN (
+            SELECT conflicts.id, ra_id
+            FROM conflicts JOIN day ON (conflicts.day_id = day.id)
+                           JOIN month ON (month.id = day.month_id)
+            WHERE month.num = {}
+            AND EXTRACT(YEAR FROM month.year) = {}
+        ) AS cons ON (cons.ra_id = ra.id)
+        WHERE ra.hall_id = {}
+        GROUP BY ra.id;
+    """.format(monthNum, year, hallId))
+
+    res = {}
+    for row in cur.fetchall():
+        res[row[0]] = row[1]
+
+    if fromServer:
+        return res
+    else:
+        return jsonify(res)
 
 #     -- Error Handling --
 
 @app.route("/error/<string:msg>")
 def err(msg):
+    logging.info("Rendering error page")
     return render_template("error.html", errorMsg=msg)
 
 if __name__ == "__main__":
+    logging.basicConfig(format='%(levelname)s: %(message)s', level=logLevel)
+
     local = os.environ["USE_ADHOC"]
     if local:
         app.run(ssl_context="adhoc", debug=True)
