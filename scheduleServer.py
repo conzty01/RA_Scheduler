@@ -15,8 +15,24 @@ import copy as cp
 import datetime
 import psycopg2
 import calendar
+import logging
 import json
 import os
+
+logLevel = os.environ["LOG_LEVEL"].upper()
+
+if logLevel == "DEBUG":
+    logLevel = logging.DEBUG
+elif logLevel == "INFO":
+    logLevel = logging.INFO
+elif logLevel == "WARNING":
+    logLevel = logging.WARNING
+elif logLevel == "ERROR":
+    logLevel = logging.ERROR
+elif logLevel == "CRITICAL":
+    logLevel = logging.CRITICAL
+else:
+    logLevel = logging.WARNING
 
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
@@ -1322,6 +1338,8 @@ def err(msg):
     return render_template("error.html", errorMsg=msg)
 
 if __name__ == "__main__":
+    logging.basicConfig(format='%(levelname)s: %(message)s', level=logLevel)
+
     local = os.environ["USE_ADHOC"]
     if local:
         app.run(ssl_context="adhoc", debug=True)
