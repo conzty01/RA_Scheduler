@@ -11,6 +11,8 @@ from flask.wrappers import Response
 from scheduler import scheduling
 from ra_sched import RA
 import scheduler3_0
+import scheduler3_0_1
+import scheduler3_1
 import copy as cp
 import datetime
 import psycopg2
@@ -294,7 +296,7 @@ def editSched():
     start, end = getCurSchoolYear()
     ptDict = getRAStats(userDict["hall_id"], start, end)
 
-    logger.debug("Point Dict: {}".format(ptDict))
+    logging.debug("Point Dict: {}".format(ptDict))
 
     cur = conn.cursor()
     cur.execute("SELECT id, first_name, last_name, color FROM ra WHERE hall_id = {} ORDER BY first_name ASC;".format(userDict["hall_id"]))
@@ -550,7 +552,7 @@ def getSchedule2(monthNum=None,year=None,hallId=None,allColors=None):
     for row in rawRes:
         # If the ra is the same as the user, then display their color
         #  Otherwise, display a generic color.
-        logging.debug("Ra is same as user? {}".format(userDict["ra_id"] == row[3]))
+        #logging.debug("Ra is same as user? {}".format(userDict["ra_id"] == row[3]))
         if not(showAllColors):
             # If the desired behavior is to not show all of the unique RA colors
             #  then check to see if the current user is the ra on the duty being
@@ -654,10 +656,10 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
 
     cur.execute("SELECT id, year FROM month WHERE num = {} AND EXTRACT(YEAR FROM year) = {}".format(monthNum,year))
     monthId, date = cur.fetchone()                                              # Get the month_id from the database
-    logger.debug("MonthId: {}".format(monthId))
+    logging.debug("MonthId: {}".format(monthId))
 
     if monthId == None:                                                         # If the database does not have the correct month
-        logger.warning("Unable to find month {}/{} in DB".format(monthNum,year))
+        logging.warning("Unable to find month {}/{} in DB".format(monthNum,year))
         return jsonify(stdRet(-1,"Unable to find month {}/{} in DB".format(monthNum,year)))
 
     # Select all RAs in a particular hall whose auth_level is below 3 (HD)
@@ -691,13 +693,13 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
 
     ra_list = [RA(res[0],res[1],res[2],res[3],res[4],res[5],ptsDict[res[2]]["pts"]) for res in partialRAList]
 
-    # logger.debug("RA_LIST_______________________")
+    # logging.debug("RA_LIST_______________________")
     # for ra in ra_list:
-    #     logger.debug("Name: {}".format(ra.getName()))
-    #     logger.debug("ID: {}".format(ra.getId()))
-    #     logger.debug("Hall: {}".format(ra.getHallId()))
-    #     logger.debug("Started: {}".format(ra.getStartDate()))
-    #     logger.debug("Hash: {}".format(hash(ra)))
+    #     logging.debug("Name: {}".format(ra.getName()))
+    #     logging.debug("ID: {}".format(ra.getId()))
+    #     logging.debug("Hall: {}".format(ra.getHallId()))
+    #     logging.debug("Started: {}".format(ra.getStartDate()))
+    #     logging.debug("Hash: {}".format(hash(ra)))
     #
     # input()
     # Set the Last Duty Assigned Tolerance based on floor dividing the number of
@@ -717,12 +719,12 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
 
     endMonthStr = '{}-{}'.format(year, "{0:02d}".format(monthNum))
 
-    logging.debug("StartMonthStr: "+startMonthStr)
-    logging.debug("EndMonthStr: "+endMonthStr)
-    logging.debug("Hall Id: "+userDict["hall_id"])
-    logging.debug("Year: "+year)
+    logging.debug("StartMonthStr: {}".format(startMonthStr))
+    logging.debug("EndMonthStr: {}".format(endMonthStr))
+    logging.debug("Hall Id: {}".format(userDict["hall_id"]))
+    logging.debug("Year: {}".format(year))
     logging.debug('MonthNum: {0:02d}'.format(monthNum))
-    logging.debug("LDAT: "+ldat)
+    logging.debug("LDAT: {}".format(ldat))
 
     cur.execute("""SELECT ra.first_name, ra.last_name, ra.id, ra.hall_id,
                           ra.date_started, day.date - TO_DATE('{}-{}-01','YYYY-MM-DD')
@@ -752,7 +754,7 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
     # Create shell RA objects that will hash to the appropriate value
     prevRADuties = [ ( RA(d[0],d[1],d[2],d[3],d[4]), d[5] ) for d in prevDuties ]
 
-    logging.debug("PREVIOUS DUTIES:",prevRADuties)
+    logging.debug("PREVIOUS DUTIES: {}".format(prevRADuties))
 
     # Attempt to run the scheduler using deep copies of the raList and noDutyList.
     #  This is so that if the scheduler does not resolve on the first run, we
@@ -765,7 +767,9 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
     successful = True
     while not completed:
         # Create the Schedule
+        #sched = scheduler3_1.schedule(copy_raList,year,monthNum,noDutyDates=copy_noDutyList,ldaTolerance=ldat,prevDuties=prevRADuties)
         sched = scheduler3_0.schedule(copy_raList,year,monthNum,noDutyDates=copy_noDutyList,ldaTolerance=ldat,prevDuties=prevRADuties)
+        #sched = scheduler3_0_1.schedule(copy_raList,year,monthNum,noDutyDates=copy_noDutyList,ldaTolerance=ldat,prevDuties=prevRADuties)
 
         if len(sched) == 0:
             # If we were unable to schedule with the previous parameters,
@@ -788,7 +792,7 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
             # We were able to create a schedule
             completed = True
 
-    logger.debug("Schedule: {}".format(sched))
+    logging.debug("Schedule: {}".format(sched))
 
     if not successful:
         logging.info("Unable to Generate Schedule for Hall: {} MonthNum: {} Year: {}".format(userDict["hall_id"], monthNum, year))
@@ -798,7 +802,7 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
     cur.execute("INSERT INTO schedule (hall_id, month_id, created) VALUES ({},{},NOW()) RETURNING id;".format(hallId, monthId))
     schedId = cur.fetchone()[0]
     conn.commit()
-    logger.debug("Schedule ID: {}".format(schedId))
+    logging.debug("Schedule ID: {}".format(schedId))
 
     # Get the id of the schedule that was just created
     #cur.execute("SELECT id FROM schedule WHERE hall_id = {} AND month_id = {} ORDER BY created DESC, id DESC;".format(hallId, monthId))
@@ -1146,12 +1150,12 @@ def importStaff():
 
         #  Example:
         #  FName, LName-Hyphen, example@email.com, 05/28/2020, #OD1E76, RA
-        logger.debug(dataStr)
+        logging.debug(dataStr)
         cur = conn.cursor()
         for row in dataStr.split("\n")[1:]:
             if row != "":
                 pl = [ part.strip() for part in row.split(",") ]
-                logger.debug("PL: {}".format(pl))
+                logging.debug("PL: {}".format(pl))
 
                 # Do some validation checking
 
@@ -1394,10 +1398,17 @@ def err(msg):
     return render_template("error.html", errorMsg=msg)
 
 if __name__ == "__main__":
-    logging.basicConfig(format='%(levelname)s: %(message)s', level=logLevel)
 
     local = os.environ["USE_ADHOC"]
     if local:
+        logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)s: %(message)s', \
+                            datefmt='%H:%M:%S', \
+                            level=logLevel, \
+                            #filename="scheduleServer_DEBUG.log", \
+                            #filemode="w"
+                            )
+
         app.run(ssl_context="adhoc", debug=True)
     else:
+        logging.basicConfig(format='%(levelname)s: %(message)s', level=logLevel)
         app.run()
