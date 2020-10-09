@@ -10,8 +10,6 @@ from flask_bootstrap import Bootstrap
 from flask.wrappers import Response
 from scheduler import scheduling
 from ra_sched import RA
-import scheduler3_0
-import scheduler3_0_1
 import scheduler3_1
 import copy as cp
 import datetime
@@ -767,9 +765,7 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
     successful = True
     while not completed:
         # Create the Schedule
-        #sched = scheduler3_1.schedule(copy_raList,year,monthNum,noDutyDates=copy_noDutyList,ldaTolerance=ldat,prevDuties=prevRADuties)
-        sched = scheduler3_0.schedule(copy_raList,year,monthNum,noDutyDates=copy_noDutyList,ldaTolerance=ldat,prevDuties=prevRADuties)
-        #sched = scheduler3_0_1.schedule(copy_raList,year,monthNum,noDutyDates=copy_noDutyList,ldaTolerance=ldat,prevDuties=prevRADuties)
+        sched = scheduler3_1.schedule(copy_raList,year,monthNum,noDutyDates=copy_noDutyList,ldaTolerance=ldat,prevDuties=prevRADuties)
 
         if len(sched) == 0:
             # If we were unable to schedule with the previous parameters,
@@ -1401,7 +1397,7 @@ if __name__ == "__main__":
 
     local = os.environ["USE_ADHOC"]
     if local:
-        logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)s: %(message)s', \
+        logging.basicConfig(format='%(asctime)s.%(msecs)d %(levelname)s: %(message)s', \
                             datefmt='%H:%M:%S', \
                             level=logLevel, \
                             #filename="scheduleServer_DEBUG.log", \
