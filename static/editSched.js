@@ -86,7 +86,7 @@ function eventClicked(info) {
     errDiv.style.display = "none";
 
     // Display the modal with RAs
-    $('#editModal').modal('toggle');
+    $('#editModal').modal('show');
 }
 
 function saveModal() {
@@ -144,7 +144,7 @@ function passModalSave(modalId, msg, extraWork=() => {}) {
             // Complete any additional work
             extraWork();
             // Hide the modal
-            $(modalId).modal('toggle');
+            $(modalId).modal('hide');
 
             // Ensure the respective errorDiv is hidden
             modal.getElementsByClassName("modalError")[0].style.display = "none";
@@ -188,7 +188,7 @@ function showRunModal() {
     let errDiv = modal.getElementsByClassName("modalError")[0];
     errDiv.style.display = "none";
 
-    $('#runModal').modal('toggle');
+    $('#runModal').modal('show');
 }
 
 function runScheduler() {
@@ -273,7 +273,7 @@ function showAddDutyModal(info=null) {
     let errDiv = modal.getElementsByClassName("modalError")[0];
     errDiv.style.display = "none";
 
-    $('#addDutyModal').modal('toggle');
+    $('#addDutyModal').modal('show');
 }
 
 function addDuty() {
