@@ -181,8 +181,76 @@ function deleteBreakDuty() {
 }
 
 function getBreakCount() {
+    // In order to determine what school year the user is currently in
+    //  we need to get the current date and determine if its between
+    //  08-01 and 06-01
 
+    let curMonNum = appConfig.curDate.getMonth();
+    let startYear;
+    let endYear;
+
+    if (curMonNum >= 7) {
+        // If the current month is August or later
+        //  then the current year is the startYear
+
+        startYear = appConfig.curDate.getFullYear();
+        endYear = appConfig.curDate.getFullYear() + 1;
+
+    } else {
+        // If the current month is earlier than August
+        //  then the current year is the endYear
+
+        startYear = appConfig.curDate.getFullYear() - 1;
+        endYear = appConfig.curDate.getFullYear();
+    }
+
+    let params = {
+        start: startYear.toString() + '-08-01',
+        end: endYear.toString() + '-06-01'
+    }
+
+    appConfig.base.callAPI("getRABreakStats", params, updateBDCount, "GET");
 }
+
+function updateBDCount(bkDict) {
+    // PointDict is expected to be as follows:
+    // { raId: {name: x, pts: x}, ... }
+    console.log(bkDict);
+
+    let raListDiv = document.getElementById("raList");
+
+    for (let idKey in bkDict) {
+        // Get the Div containing the points for the respective RA
+        let bkDiv = document.getElementById("list_points_" + idKey);
+
+        if (bkDiv == null) {
+            // If the RA is not currently in the raList
+            //  then create a new entry for them.
+
+            let newLi = document.createElement("li");
+            newLi.id = "list_" + idKey;
+
+            let newNameDiv = document.createElement("div");
+            newNameDiv.id = "list_name_" + idKey;
+            newNameDiv.classList.add("tName");
+            newNameDiv.innerHTML = pointDict[idKey].name;
+
+            let newCountDiv = document.createElement("div");
+            newCountDiv.id = "list_points_" + idKey;
+            newCountDiv.classList.add("tPoints");
+            newCountDiv.innerHTML = pointDict[idKey].count;
+
+            newLi.appendChild(newNameDiv);
+            newLi.appendChild(newCountDiv);
+            raListDiv.getElementsByTagName("ul")[0].appendChild(newLi);
+
+        } else {
+            // Else update the point value
+            bkDiv.innerHTML = bkDict[idKey].count;
+        }
+    }
+}
+
 
 function passModalSave(modalId, msg, extraWork=() => {}) {
 
