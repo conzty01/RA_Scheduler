@@ -1565,6 +1565,54 @@ def addBreakDuty():
 
     return jsonify(stdRet(1,"successful"))
 
+@app.route("/api/deleteBreakDuty", methods=["POST"])
+@login_required
+def deleteBreakDuty():
+        userDict = getAuth()
+
+        data = request.json
+        fName, lName = data["raName"].split()
+        hallId = userDict["hall_id"]
+        dateStr = data["dateStr"]
+
+        if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
+            logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
+            return jsonify(stdRet(-1,"NOT AUTHORIZED"))
+
+        logging.debug("Deleted Break Duty RA Name: {}".format(fName + " " + lName))
+        logging.debug("HallID: {}".format(hallId))
+        # Expected as x-x-xxxx
+        logging.debug("DateStr: {}".format(dateStr))
+
+        cur = conn.cursor()
+
+        cur.execute("SELECT id FROM ra WHERE first_name LIKE '{}' AND last_name LIKE '{}' AND hall_id = {};".format(fName,lName,userDict["hall_id"]))
+        raId = cur.fetchone()
+
+        cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE('{}', 'MM/DD/YYYY');".format(data["dateStr"]))
+        dayID, monthId = cur.fetchone()
+
+        if raId is not None and dayID is not None and monthId is not None:
+            cur.execute("""DELETE FROM break_duties
+                            WHERE ra_id = {}
+                            AND hall_id = {}
+                            AND day_id = {}
+                            AND month_id = {}""".format(raId[0], hallId, dayID, monthId))
+
+            conn.commit()
+
+            cur.close()
+
+            logging.info("Successfully deleted duty")
+            return jsonify(stdRet(1,"successful"))
+
+        else:
+
+            cur.close()
+
+            logging.info("Unable to locate beak duty to delete: RA {}, Date {}".format(fName + " " + lName, dateStr))
+            return jsonify({"status":0,"error":"Unable to find parameters in DB"})
+
 #     -- Error Handling --
 
 @app.route("/error/<string:msg>")
