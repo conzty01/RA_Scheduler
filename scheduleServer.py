@@ -352,14 +352,18 @@ def editBreaks():
         return jsonfiy(stdRet(-1,"NOT AUTHORIZED"))
 
     start, end = getCurSchoolYear()
+    logging.debug(start)
+    logging.debug(end)
+
     bkDict = getRABreakStats(userDict["hall_id"], start, end)
+
+    logging.debug(bkDict)
 
     cur = conn.cursor()
     cur.execute("SELECT id, first_name, last_name, color FROM ra WHERE hall_id = {} ORDER BY first_name ASC;".format(userDict["hall_id"]))
 
     return render_template("editBreaks.html", raList=cur.fetchall(), auth_level=userDict["auth_level"], \
-                            bkDict={},\
-                            #bkDict=sorted(bkDict.items(), key=lambda x: x[1]["name"].split(" ")[1] ), \
+                            bkDict=sorted(bkDict.items(), key=lambda x: x[1]["name"].split(" ")[1] ), \
                             curView=3, opts=baseOpts, hall_name=userDict["hall_name"])
 
 #     -- API --
@@ -1408,61 +1412,50 @@ def getNumberConflicts(hallId=None,monthNum=None,year=None):
 @app.route("/api/getRABreakStats", methods=["GET"])
 @login_required
 def getRABreakStats(hallId=None,startDateStr=None,endDateStr=None):
-        # API Hook that will get the RA stats for a given month.
-        #  The month will be given via request.args as 'monthNum' and 'year'.
-        #  The server will then query the database for the appropriate statistics
-        #  and send back a json object.
+    # API Hook that will get the RA stats for a given month.
+    #  The month will be given via request.args as 'monthNum' and 'year'.
+    #  The server will then query the database for the appropriate statistics
+    #  and send back a json object.
 
-        fromServer = True
-        if hallId is None and startDateStr is None and endDateStr is None:          # Effectively: If API was called from the client and not from the server
-            userDict = getAuth()                                                    # Get the user's info from our database
-            hallId = userDict["hall_id"]
-            fromServer = False
-            startDateStr = request.args.get("start")
-            endDateStr = request.args.get("end")
+    fromServer = True
+    if hallId is None and startDateStr is None and endDateStr is None:          # Effectively: If API was called from the client and not from the server
+        userDict = getAuth()                                                    # Get the user's info from our database
+        hallId = userDict["hall_id"]
+        fromServer = False
+        startDateStr = request.args.get("start")
+        endDateStr = request.args.get("end")
 
-        logging.debug("Get RA Break Duty Stats - FromServer: {}".format(fromServer))
+    logging.debug("Get RA Break Duty Stats - FromServer: {}".format(fromServer))
 
-        res = {}
+    res = {}
 
-        cur = conn.cursor()
+    cur = conn.cursor()
 
-        cur.execute("""SELECT ra.id, ra.first_name, ra.last_name, COALESCE(ptQuery.pts,0)
-                       FROM (SELECT ra.id AS rid, SUM(duties.point_val) AS pts
-                             FROM duties JOIN day ON (day.id=duties.day_id)
-                                         JOIN ra ON (ra.id=duties.ra_id)
-                             WHERE duties.hall_id = {}
-                             AND duties.sched_id IN
-                             (
-                                SELECT DISTINCT ON (schedule.month_id) schedule.id
-                                FROM schedule
-                                WHERE schedule.hall_id = {}
-                                AND schedule.month_id IN
-                                (
-                                    SELECT month.id
-                                    FROM month
-                                    WHERE month.year >= TO_DATE('{}', 'YYYY-MM-DD')
-                                    AND month.year <= TO_DATE('{}', 'YYYY-MM-DD')
-                                )
-                                ORDER BY schedule.month_id, schedule.created DESC, schedule.id DESC
-                            )
-                            GROUP BY rid) AS ptQuery
-                       RIGHT JOIN ra ON (ptQuery.rid = ra.id)
-                       WHERE ra.hall_id = {};""".format(hallId, hallId, startDateStr, endDateStr, hallId))
+    cur.execute("""SELECT ra.id, ra.first_name, ra.last_name, COALESCE(numQuery.count, 0)
+                   FROM (SELECT ra.id AS rid, COUNT(break_duties.id) AS count
+                         FROM break_duties JOIN day ON (day.id=break_duties.day_id)
+                                           JOIN ra ON (ra.id=break_duties.ra_id)
+                         WHERE break_duties.hall_id = {}
+                         AND day.date BETWEEN TO_DATE('{}', 'YYYY-MM-DD')
+                                          AND TO_DATE('{}', 'YYYY-MM-DD')
+                        GROUP BY rid) AS numQuery
+                   RIGHT JOIN ra ON (numQuery.rid = ra.id)
+                   WHERE ra.hall_id = {};""".format(hallId, startDateStr, \
+                        endDateStr, hallId))
 
-        raList = cur.fetchall()
+    raList = cur.fetchall()
 
-        for ra in raList:
-            res[ra[0]] = { "name": ra[1] + " " + ra[2], "pts": ra[3] }
+    for ra in raList:
+        res[ra[0]] = { "name": ra[1] + " " + ra[2], "count": ra[3] }
 
-        cur.close()
-        if fromServer:
-            # If this function call is from the server, simply return the results
-            return res
-        else:
-            # Otherwise, if this function call is from the client, return the
-            #  results as a JSON response object.
-            return jsonify(res)
+    cur.close()
+    if fromServer:
+        # If this function call is from the server, simply return the results
+        return res
+    else:
+        # Otherwise, if this function call is from the client, return the
+        #  results as a JSON response object.
+        return jsonify(res)
 
 @app.route("/api/getBreakDuties", methods=["GET"])
 @login_required
