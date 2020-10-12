@@ -377,9 +377,9 @@ function updatePoints(pointDict) {
             newNameDiv.innerHTML = pointDict[idKey].name;
 
             let newPtsDiv = document.createElement("div");
-            newNameDiv.id = "list_points_" + idKey;
-            newNameDiv.classList.add("tPoints");
-            newNameDiv.innerHTML = pointDict[idKey].pts;
+            newPtsDiv.id = "list_points_" + idKey;
+            newPtsDiv.classList.add("tPoints");
+            newPtsDiv.innerHTML = pointDict[idKey].pts;
 
             newLi.appendChild(newNameDiv);
             newLi.appendChild(newPtsDiv);
