@@ -342,6 +342,26 @@ def manStaff():
     return render_template("staff.html",raList=cur.fetchall(),auth_level=userDict["auth_level"], \
                             opts=baseOpts,curView=3, hall_name=userDict["hall_name"], pts=ptStats)
 
+@app.route("/editBreaks", methods=['GET'])
+@login_required
+def editBreaks():
+    userDict = getAuth()
+
+    if userDict["auth_level"] < 2:
+        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
+        return jsonfiy(stdRet(-1,"NOT AUTHORIZED"))
+
+    start, end = getCurSchoolYear()
+    bkDict = getRABreakStats(userDict["hall_id"], start, end)
+
+    cur = conn.cursor()
+    cur.execute("SELECT id, first_name, last_name, color FROM ra WHERE hall_id = {} ORDER BY first_name ASC;".format(userDict["hall_id"]))
+
+    return render_template("editBreaks.html", raList=cur.fetchall(), auth_level=userDict["auth_level"], \
+                            bkDict={},\
+                            #bkDict=sorted(bkDict.items(), key=lambda x: x[1]["name"].split(" ")[1] ), \
+                            curView=3, opts=baseOpts, hall_name=userDict["hall_name"])
+
 #     -- API --
 
 @app.route("/api/enterConflicts/", methods=['POST'])
@@ -1011,7 +1031,6 @@ def changeRAforDutyDay():
 
         return jsonify(stdRet(0,"Unable to find parameters in DB"))
 
-
 @app.route("/api/addNewDuty", methods=["POST"])
 @login_required
 def addNewDuty():
@@ -1385,6 +1404,166 @@ def getNumberConflicts(hallId=None,monthNum=None,year=None):
         return res
     else:
         return jsonify(res)
+
+@app.route("/api/getRABreakStats", methods=["GET"])
+@login_required
+def getRABreakStats(hallId=None,startDateStr=None,endDateStr=None):
+        # API Hook that will get the RA stats for a given month.
+        #  The month will be given via request.args as 'monthNum' and 'year'.
+        #  The server will then query the database for the appropriate statistics
+        #  and send back a json object.
+
+        fromServer = True
+        if hallId is None and startDateStr is None and endDateStr is None:          # Effectively: If API was called from the client and not from the server
+            userDict = getAuth()                                                    # Get the user's info from our database
+            hallId = userDict["hall_id"]
+            fromServer = False
+            startDateStr = request.args.get("start")
+            endDateStr = request.args.get("end")
+
+        logging.debug("Get RA Break Duty Stats - FromServer: {}".format(fromServer))
+
+        res = {}
+
+        cur = conn.cursor()
+
+        cur.execute("""SELECT ra.id, ra.first_name, ra.last_name, COALESCE(ptQuery.pts,0)
+                       FROM (SELECT ra.id AS rid, SUM(duties.point_val) AS pts
+                             FROM duties JOIN day ON (day.id=duties.day_id)
+                                         JOIN ra ON (ra.id=duties.ra_id)
+                             WHERE duties.hall_id = {}
+                             AND duties.sched_id IN
+                             (
+                                SELECT DISTINCT ON (schedule.month_id) schedule.id
+                                FROM schedule
+                                WHERE schedule.hall_id = {}
+                                AND schedule.month_id IN
+                                (
+                                    SELECT month.id
+                                    FROM month
+                                    WHERE month.year >= TO_DATE('{}', 'YYYY-MM-DD')
+                                    AND month.year <= TO_DATE('{}', 'YYYY-MM-DD')
+                                )
+                                ORDER BY schedule.month_id, schedule.created DESC, schedule.id DESC
+                            )
+                            GROUP BY rid) AS ptQuery
+                       RIGHT JOIN ra ON (ptQuery.rid = ra.id)
+                       WHERE ra.hall_id = {};""".format(hallId, hallId, startDateStr, endDateStr, hallId))
+
+        raList = cur.fetchall()
+
+        for ra in raList:
+            res[ra[0]] = { "name": ra[1] + " " + ra[2], "pts": ra[3] }
+
+        cur.close()
+        if fromServer:
+            # If this function call is from the server, simply return the results
+            return res
+        else:
+            # Otherwise, if this function call is from the client, return the
+            #  results as a JSON response object.
+            return jsonify(res)
+
+@app.route("/api/getBreakDuties", methods=["GET"])
+@login_required
+def getBreakDuties(hallId=None,monthNum=None,year=None):
+    userDict = getAuth()
+
+    fromServer = True
+    if monthNum is None and year is None and hallId is None:                    # Effectively: If API was called from the client and not from the server
+        monthNum = int(request.args.get("monthNum"))
+        year = int(request.args.get("year"))
+        start = request.args.get("start").split("T")[0]                         # No need for the timezone in our current application
+        end = request.args.get("end").split("T")[0]                             # No need for the timezone in our current application
+        showAllColors = bool(request.args.get("allColors"))                     # Should all colors be displayed or only the current user's colors
+
+        userDict = getAuth()                                                    # Get the user's info from our database
+        hallID = userDict["hall_id"]
+        fromServer = False
+
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT ra.first_name, ra.last_name, ra.color, ra.id, TO_CHAR(day.date, 'YYYY-MM-DD')
+        FROM break_duties JOIN day ON (day.id=break_duties.day_id)
+                          JOIN month ON (month.id=break_duties.month_id)
+                          JOIN ra ON (ra.id=break_duties.ra_id)
+        WHERE break_duties.hall_id = {}
+        AND month.year >= TO_DATE('{}','YYYY-MM')
+        AND month.year <= TO_DATE('{}','YYYY-MM')
+    """.format(hallID,start,end))
+
+    res = []
+
+    for row in cur.fetchall():
+        res.append({
+            "id": row[3],
+            "title": row[0] + " " + row[1],
+            "start": row[4],
+            "color": row[2]
+        })
+
+    if fromServer:
+        return res
+    else:
+        return jsonify(res)
+
+@app.route("/api/addBreakDuty", methods=["POST"])
+def addBreakDuty():
+    userDict = getAuth()
+
+    data = request.json
+
+    selID = data["id"]
+    hallId = userDict["hall_id"]
+    ptVal = data["pts"]
+    dateStr = data["dateStr"]
+
+    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
+        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
+        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
+
+    cur = conn.cursor()
+
+    # Validate that the RA desired exists and belongs to the same hall
+    cur.execute("SELECT id FROM ra WHERE id = {} AND hall_id = {};".format(selID, hallId))
+    raId = cur.fetchone()
+
+    if raId is None:
+        cur.close()
+        logging.warning("Unable to find RA {} in hall {}".format(selID,hallId))
+        ret = stdRet(-1,"Unable to find RA {} in hall {}".format(selID,hallId))
+
+    else:
+        # Extract the id from the tuple
+        raId = raId[0]
+
+    # Get the month and day IDs necessary to associate a record in break_duties
+    cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE('{}', 'YYYY-MM-DD');".format(dateStr))
+    dayID, monthId = cur.fetchone()
+
+    # No Day found
+    if dayID is None:
+        cur.close()
+        logging.warning("Unable to find day {} in database".format(data["dateStr"]))
+        return stdRet(-1,"Unable to find day {} in database".format(data["dateStr"]))
+
+    # No month found
+    if monthId is None:
+        cur.close()
+        logging.warning("Unable to find month for {} in database".format(data["dateStr"]))
+        return stdRet(-1,"Unable to find month for {} in database".format(data["dateStr"]))
+
+    cur.execute("""INSERT INTO break_duties (ra_id, hall_id, month_id, day_id, point_val)
+                    VALUES ({}, {}, {}, {}, {});""".format(raId, hallId, monthId, dayID, ptVal))
+
+    conn.commit()
+
+    cur.close()
+
+    logging.info("Successfully added new Break Duty for Hall {} and Month {}".format(hallId, monthId))
+
+    return jsonify(stdRet(1,"successful"))
 
 #     -- Error Handling --
 
