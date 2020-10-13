@@ -481,27 +481,47 @@ def getRAStats(hallId=None,startDateStr=None,endDateStr=None):
     cur = conn.cursor()
 
     cur.execute("""SELECT ra.id, ra.first_name, ra.last_name, COALESCE(ptQuery.pts,0)
-                   FROM (SELECT ra.id AS rid, SUM(duties.point_val) AS pts
-                         FROM duties JOIN day ON (day.id=duties.day_id)
-                                     JOIN ra ON (ra.id=duties.ra_id)
-                         WHERE duties.hall_id = {}
-                         AND duties.sched_id IN
-                         (
-                            SELECT DISTINCT ON (schedule.month_id) schedule.id
-                            FROM schedule
-                            WHERE schedule.hall_id = {}
-                            AND schedule.month_id IN
-                            (
-                                SELECT month.id
-                                FROM month
-                                WHERE month.year >= TO_DATE('{}', 'YYYY-MM-DD')
-                                AND month.year <= TO_DATE('{}', 'YYYY-MM-DD')
-                            )
-                            ORDER BY schedule.month_id, schedule.created DESC, schedule.id DESC
-                        )
-                        GROUP BY rid) AS ptQuery
+                   FROM
+                   (
+                       SELECT combined_res.rid AS rid, CAST(SUM(combined_res.pts) AS INTEGER) AS pts
+                       FROM
+                       (
+                          SELECT ra.id AS rid, SUM(duties.point_val) AS pts
+                          FROM duties JOIN day ON (day.id=duties.day_id)
+                                      JOIN ra ON (ra.id=duties.ra_id)
+                          WHERE duties.hall_id = {}
+                          AND duties.sched_id IN
+                          (
+                             SELECT DISTINCT ON (schedule.month_id) schedule.id
+                             FROM schedule
+                             WHERE schedule.hall_id = {}
+                             AND schedule.month_id IN
+                             (
+                                 SELECT month.id
+                                 FROM month
+                                 WHERE month.year >= TO_DATE('{}', 'YYYY-MM-DD')
+                                 AND month.year <= TO_DATE('{}', 'YYYY-MM-DD')
+                             )
+                             ORDER BY schedule.month_id, schedule.created DESC, schedule.id DESC
+                          )
+                          GROUP BY rid
+
+                          UNION
+
+                          SELECT ra.id AS rid, SUM(break_duties.point_val) AS pts
+                          FROM break_duties JOIN day ON (day.id=break_duties.day_id)
+                                            JOIN ra ON (ra.id=break_duties.ra_id)
+                          WHERE break_duties.hall_id = {}
+                          AND day.date BETWEEN TO_DATE('{}', 'YYYY-MM-DD')
+                                           AND TO_DATE('{}', 'YYYY-MM-DD')
+                          GROUP BY rid
+                       ) AS combined_res
+                       GROUP BY combined_res.rid
+                   ) ptQuery
                    RIGHT JOIN ra ON (ptQuery.rid = ra.id)
-                   WHERE ra.hall_id = {};""".format(hallId, hallId, startDateStr, endDateStr, hallId))
+                   WHERE ra.hall_id = {};""".format(hallId, hallId, startDateStr, \
+                                                    endDateStr, hallId, startDateStr, \
+                                                    endDateStr, hallId))
 
     raList = cur.fetchall()
 
