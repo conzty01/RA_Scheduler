@@ -119,7 +119,7 @@ function addRow(data, table) {
 
         if (d == "startDate") {
             let tmp = new Date(data[i]);
-            col.innerHTML = tmp.getFullYear().toString()+"-"+(tmp.getMonth()+1).toString()+"-"+tmp.getDate().toString();
+            col.innerHTML = tmp.toISOString().substring(0,10);
 
         } else if (d == "color") {
             let tmp = document.createElement("input");
