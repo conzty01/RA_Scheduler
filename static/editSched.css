@@ -73,3 +73,6 @@
 #raListContainer {
     float: right;
 }
+#breakDutyWarning {
+    color: red;
+}
