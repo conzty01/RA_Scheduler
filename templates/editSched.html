@@ -46,12 +46,15 @@
               </div>
 
           </div>
+          <div id="breakDutyWarning" class="row">
+              <div class="col">&#42; Break duties <em>MUST</em> be edited in the <a href="/editBreaks">Break Duty Portal</a>.</div>
+          </div>
       </div>
       <div class="modalError">Update Assignment Failed: <span class="msg"></span></div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-        <button type="button" class="btn btn-danger" onclick="deleteDuty()">Delete Duty</button>
-        <button type="button" class="btn btn-primary" onclick="saveModal()">Save Changes</button>
+        <button id="editDelButt" type="button" class="btn btn-danger" onclick="deleteDuty()">Delete Duty</button>
+        <button id="editSavButt" type="button" class="btn btn-primary" onclick="saveModal()">Save Changes</button>
       </div>
     </div>
   </div>
