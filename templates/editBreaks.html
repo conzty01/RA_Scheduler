@@ -4,18 +4,18 @@
 <link rel="stylesheet" href="{{url_for('.static', filename='main.css')}}">
 <link href='https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.13.1/css/all.css' rel='stylesheet'>
 <link rel="stylesheet" href="{{url_for('.static', filename='calendar.css')}}">
-<link rel="stylesheet" href="{{url_for('.static', filename='editSched.css')}}">
+<link rel="stylesheet" href="{{url_for('.static', filename='editBreaks.css')}}">
 
 {% endblock %}
 
 {% block contentRows %}
 
-<!-- Edit Duty Modal -->
+<!-- Edit Break Duty Modal -->
 <div class="modal fade" id="editModal" tabindex="-1" role="dialog" aria-labelledby="editModalTitle" aria-hidden="true">
   <div class="modal-dialog modal-dialog" role="document">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 class="modal-title">Change Duty: <span id="editModalLongTitle" style="font-weight:bold;"></span></h3>
+        <h3 class="modal-title">Change Break Duty: <span id="editModalLongTitle" style="font-weight:bold;"></span></h3>
       </div>
       <div class="modal-body">
           <div class="row">
@@ -46,30 +46,27 @@
               </div>
 
           </div>
-          <div id="breakDutyWarning" class="row">
-              <div class="col">&#42; Break duties <em>MUST</em> be edited in the <a href="/editBreaks">Break Duty Portal</a>.</div>
-          </div>
       </div>
       <div class="modalError">Update Assignment Failed: <span class="msg"></span></div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-        <button id="editDelButt" type="button" class="btn btn-danger" onclick="deleteDuty()">Delete Duty</button>
-        <button id="editSavButt" type="button" class="btn btn-primary" onclick="saveModal()">Save Changes</button>
+        <button type="button" class="btn btn-danger" onclick="deleteBreakDuty()">Delete Break Duty</button>
+        <button type="button" class="btn btn-primary" onclick="saveModal()">Save Changes</button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Add Duty Modal -->
+<!-- Add Break Duty Modal -->
 <div class="modal fade" id="addDutyModal" tabindex="-1" role="dialog" aria-labelledby="addDutyModalTitle" aria-hidden="true">
   <div class="modal-dialog modal-dialog" role="document">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 class="modal-title">Add a New Duty</h3>
+        <h3 class="modal-title">Add a New Break Duty</h3>
       </div>
       <div class="modal-body">
           <div class="form-group">
-              <label for="addDateDate">Duty Date:</label>
+              <label for="addDateDate">Break Duty Date:</label>
               <input class="form-control" type="date" id="addDateDate">
           </div>
           <div class="form-group">
@@ -82,58 +79,13 @@
           </div>
           <div class="form-group">
               <label for="addDatePts">Point Value:</label>
-              <input class="form-control" type="number" id="addDatePts" name="addDatePts" value="1">
+              <input class="form-control" type="number" id="addDatePts" name="addDatePts" value="3">
          </div>
       </div>
       <div class="modalError">Update Assignment Failed: <span class="msg"></span></div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-        <button type="button" class="btn btn-primary" onclick="addDuty()">Save Changes</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Run Scheduler Modal -->
-<div class="modal fade" id="runModal" tabindex="-1" role="dialog" aria-labelledby="runModalTitle" aria-hidden="true">
-  <div class="modal-dialog modal-dialog" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3 class="modal-title">Run Scheduler: <span id="runModalLongTitle" style="font-weight:bold;"></span></h3>
-      </div>
-      <div class="modal-body">
-          <div class="form-group">
-              <label for="runNoDutyDates">
-                  Enter the days where no duties should be assigned separated by commas.
-              </label>
-              <input class="form-control" id="runNoDutyDates" type="text" placeholder="Example: 14,15,30" />
-          </div>
-          <div class="form-group">
-              <label for="runRAList">
-                  Select the RAs that SHOULD be scheduled for duty for this month.
-              </label>
-              <div>
-                  <ul id="runRAList">
-                      {% for ra in raList: %}
-                      <li>
-                          <input id="{{ ra[0] }}" type="checkbox" checked >
-                          <label for="{{ ra[0] }}">{{ ra[1] }} {{ra[2] }}</label>
-                      </li>
-                      {% endfor %}
-                  </ul>
-              </div>
-          </div>
-          <!--<div class="row">
-              <label for="runLDA">
-                  Number of days between duties.
-              </label>
-              <input id="runNoDutyDates" type="text" placeholder="Example: 14,15,30" />
-          </div>-->
-      </div>
-      <div class="modalError">Update Assignment Failed: <span class="msg"></span></div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-        <button id="runButton" type="button" class="btn btn-primary" onclick="runScheduler()">Run Scheduler</button>
+        <button type="button" class="btn btn-primary" onclick="addBreakDuty()">Save Changes</button>
       </div>
     </div>
   </div>
@@ -149,12 +101,12 @@
         <ul>
             <li id="list_header">
                 <div id="list_name_header" class="tName">Name</div>
-                <div id="list_points_header" class="tPoints"># Points</div>
+                <div id="list_points_header" class="tPoints"># Break Duties</div>
             </li>
-            {% for idKey, idVal in ptDict: %}
+            {% for idKey, idVal in bkDict: %}
             <li id="list_{{ idKey }}">
                 <div id="list_name_{{ idKey }}" class="tName">{{ idVal["name"] }}</div>
-                <div id="list_points_{{ idKey }}" class="tPoints">{{ idVal["pts"] }}</div>
+                <div id="list_points_{{ idKey }}" class="tPoints">{{ idVal["count"] }}</div>
             </li>
             {% endfor %}
         </ul>
@@ -167,7 +119,7 @@
 <script src="{{url_for('.static', filename='main.js')}}"></script>
 <script src="{{url_for('.static', filename='locales-all.js')}}"></script>
 <script src="{{url_for('.static', filename='fullCal.js')}}"></script>
-<script src="{{url_for('.static', filename='editSched.js')}}"></script>
+<script src="{{url_for('.static', filename='editBreaks.js')}}"></script>
 <script>
     initEditSchedCal();
 </script>

@@ -129,6 +129,25 @@ def createOAuthDB(conn):
 			PRIMARY KEY (id)
 		);""")
 
+def createBreakDutiesTable(conn):
+	conn.execute('DROP TABLE IF EXISTS break_duties CASCADE;')
+
+	con.execute("""
+		CREATE TABLE break_duties(
+			id			serial UNIQUE,
+			ra_id		int,
+			hall_id		int,
+			month_id	int,
+			day_id		int,
+			point_val	int DEFAULT 0 CONSTRAINT pos_break_duty_point_value CHECK (point_val >= 0),
+
+			PRIMARY KEY (hall_id, month_id, day_id, ra_id),
+			FOREIGN KEY (ra_id) 	REFERENCES ra(id),
+			FOREIGN KEY (hall_id) 	REFERENCES res_hall(id),
+			FOREIGN KEY (month_id) 	REFERENCES month(id),
+			FOREIGN KEY (day_id) 	REFERENCES day(id),
+		);""")
+
 def main():
 	conn = psycopg2.connect(os.environ["DATABASE_URL"])
 	createHallDB(conn.cursor())
@@ -138,6 +157,7 @@ def main():
 	createConflictDB(conn.cursor())
 	createScheduleDB(conn.cursor())
 	createDutyDB(conn.cursor())
+	createBreakDutiesTable(conn.cursor())
 	createUserDB(conn.cursor())
 	createOAuthDB(conn.cursor())
 
