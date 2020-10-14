@@ -614,7 +614,8 @@ def getSchedule2(monthNum=None,year=None,hallId=None,allColors=None):
             "id": row[3],
             "title": row[0] + " " + row[1],
             "start": row[4],
-            "color": c
+            "color": c,
+            "extendedProps": {"dutyType":"std"}
         })
 
     if fromServer:
@@ -1513,7 +1514,8 @@ def getBreakDuties(hallId=None,monthNum=None,year=None):
             "id": row[3],
             "title": row[0] + " " + row[1],
             "start": row[4],
-            "color": row[2]
+            "color": row[2],
+            "extendedProps": {"dutyType":"brk"}
         })
 
     if fromServer:
