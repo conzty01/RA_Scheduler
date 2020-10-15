@@ -29,18 +29,34 @@ function initIndexCal() {
             center: 'title',
             right: ''
         },
-        events: {
-            url: '/api/getSchedule',
-            failure: function () {
-                alert('there was an error while fetching events!');
+        eventSources: [
+            {
+                url: '/api/getSchedule',
+                failure: function () {
+                    alert('there was an error while fetching Regular Duties!');
+                },
+                extraParams: function () {
+                    return {
+                        monthNum: appConfig.calDate.getMonth() + 1,
+                        year: appConfig.calDate.getFullYear(),
+                        allColors: 0
+                    };
+                },
             },
-            extraParams: function () {
-                return {
-                    monthNum: appConfig.calDate.getMonth() + 1,
-                    year: appConfig.calDate.getFullYear()
-                };
+            {
+                url: '/api/getBreakDuties',
+                failure: function () {
+                    alert('there was an error while fetching Break Duties!');
+                },
+                extraParams: function () {
+                    return {
+                        monthNum: appConfig.calDate.getMonth() + 1,
+                        year: appConfig.calDate.getFullYear(),
+                        allColors: 0
+                    };
+                },
             }
-        },
+        ],
         lazyFetching: true,
         fixedWeekCount: false
     });
