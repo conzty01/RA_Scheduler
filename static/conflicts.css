@@ -1,4 +1,4 @@
-.fc-day-today:not(.fc-day-other) {
+.fc-day-today:not(.fc-day-other):not(.selected) {
     background-color: #90EE90 !important;
 }
 .fc-day-today.fc-day-other {

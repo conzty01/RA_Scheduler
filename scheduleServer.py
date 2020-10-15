@@ -553,7 +553,8 @@ def getSchedule2(monthNum=None,year=None,hallId=None,allColors=None):
         year = int(request.args.get("year"))
         start = request.args.get("start").split("T")[0]                         # No need for the timezone in our current application
         end = request.args.get("end").split("T")[0]                             # No need for the timezone in our current application
-        showAllColors = bool(request.args.get("allColors"))                     # Should all colors be displayed or only the current user's colors
+
+        showAllColors = request.args.get("allColors") == "true"                 # Should all colors be displayed or only the current user's colors
 
         userDict = getAuth()                                                    # Get the user's info from our database
         hallId = userDict["hall_id"]
@@ -1489,7 +1490,8 @@ def getBreakDuties(hallId=None,monthNum=None,year=None):
         year = int(request.args.get("year"))
         start = request.args.get("start").split("T")[0]                         # No need for the timezone in our current application
         end = request.args.get("end").split("T")[0]                             # No need for the timezone in our current application
-        showAllColors = bool(request.args.get("allColors"))                     # Should all colors be displayed or only the current user's colors
+
+        showAllColors = request.args.get("allColors") == "true"                 # Should all colors be displayed or only the current user's colors
 
         userDict = getAuth()                                                    # Get the user's info from our database
         hallID = userDict["hall_id"]
@@ -1510,11 +1512,27 @@ def getBreakDuties(hallId=None,monthNum=None,year=None):
     res = []
 
     for row in cur.fetchall():
+
+        if not(showAllColors):
+            # If the desired behavior is to not show all of the unique RA colors
+            #  then check to see if the current user is the ra on the duty being
+            #  added. If it is the ra, show their unique color, if not, show the
+            #  same color.
+            if userDict["ra_id"] == row[3]:
+                c = row[2]
+            else:
+                c = "#2C3E50"
+
+        # If the desired behavior is to show all of the unique RA colors, then
+        #  simply set their color.
+        else:
+            c = row[2]
+
         res.append({
             "id": row[3],
             "title": row[0] + " " + row[1],
             "start": row[4],
-            "color": row[2],
+            "color": c,
             "extendedProps": {"dutyType":"brk"}
         })
 
