@@ -51,19 +51,6 @@ function initEditSchedCal() {
                         allColors: true
                     };
                 },
-            },
-            {
-                url: '/api/getBreakDuties',
-                failure: function () {
-                    alert('there was an error while fetching Break Duties!');
-                },
-                extraParams: function () {
-                    return {
-                        monthNum: appConfig.calDate.getMonth() + 1,
-                        year: appConfig.calDate.getFullYear(),
-                        allColors: true
-                    };
-                },
             }
         ],
         lazyFetching: true,
