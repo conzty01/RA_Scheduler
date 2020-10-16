@@ -8,7 +8,6 @@ from werkzeug.utils import secure_filename
 from flask_sqlalchemy import SQLAlchemy
 from flask_bootstrap import Bootstrap
 from flask.wrappers import Response
-from scheduler import scheduling
 from ra_sched import RA
 import scheduler4_0
 import copy as cp
@@ -672,7 +671,7 @@ def getMonth(monthNum=None,year=None):
     return jsonify(res)
 
 @app.route("/api/runScheduler", methods=["POST"])
-def runScheduler3(hallId=None, monthNum=None, year=None):
+def runScheduler(hallId=None, monthNum=None, year=None):
 
     # API Hook that will run the scheduler for a given month.
     #  The month will be given via request.args as 'monthNum' and 'year'.
