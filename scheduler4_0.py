@@ -204,7 +204,7 @@ class State:
 
 def schedule(raList,year,month,noDutyDates=[],doubleDays=(4,5),doublePts=2, \
     doubleNum=2,doubleDates=set(),doubleDateNum=2,doubleDatePts=1,
-    ldaTolerance=8,nddTolerance=.1,prevDuties=[]):
+    ldaTolerance=8,nddTolerance=.1,prevDuties=[],breakDuties=[]):
     # This algorithm will schedule RAs for duties based on ...
     #
     # The algorithm returns a Schedule object that contains Day objects which, in
@@ -215,7 +215,7 @@ def schedule(raList,year,month,noDutyDates=[],doubleDays=(4,5),doublePts=2, \
     #     raList        = list containing RA objects that are to be scheduled
     #     year          = year for scheduling
     #     month         = month for scheduling
-    #     noDutyDates   = list of Date objects that represent dates where no RAs
+    #     noDutyDates   = list of integers that represent dates where no RAs
     #                      should be on duty.
     #     doubleDays    = set containing integers denoting the day of the week
     #                      where multiple RAs should be scheduled. These integers
@@ -245,11 +245,14 @@ def schedule(raList,year,month,noDutyDates=[],doubleDays=(4,5),doublePts=2, \
     #                      previous month. This helps prevent RAs from being
     #                      assigned for duties in close succession at the
     #                      change of the month.
+    #     breakDuties   = list containing integers that represent dates where
+    #                      the scheduler should skip due to the occurance of a
+    #                      previously scheduled break duty on that date.
 
     logging.info("Starting Scheduling Process")
 
     def createDateDict(year,month,noDutyDates,doubleDays,doublePts,doubleNum, \
-            doubleDates,doubleDateNum,doubleDatePts):
+            doubleDates,doubleDateNum,doubleDatePts,breakDuties):
         # Create and return the dictionary that describes how to get from one day
         #  to another. The keys are the numeric date of a given day and the value
         #  is the numeric date of the day that should follow the given day. The
@@ -282,8 +285,10 @@ def schedule(raList,year,month,noDutyDates=[],doubleDays=(4,5),doublePts=2, \
             # If the current month day belongs to the month being scheduled...
             if curMonthDay != 0:
 
-                # If the date is not a day with duty, then skip it
-                if curMonthDay not in noDutyDates:
+                # If the date is not a day with duty, or it is a break duty,
+                #  then skip it
+                if (curMonthDay not in noDutyDates) \
+                    and (curMonthDay not in breakDuties):
 
                     if (curWeekDay in doubleDays):
                         # If the day of the week is a double day and should have
@@ -362,7 +367,7 @@ def schedule(raList,year,month,noDutyDates=[],doubleDays=(4,5),doublePts=2, \
     # Create calendar
     logging.debug(" Creating Calendar")
     cal = createDateDict(year,month,noDutyDates,doubleDays,doublePts,doubleNum, \
-                doubleDates,doubleDateNum,doubleDatePts)
+                doubleDates,doubleDateNum,doubleDatePts,breakDuties)
 
     logging.debug(" Finished Creating Calendar")
 

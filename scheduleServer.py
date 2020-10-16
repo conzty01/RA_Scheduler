@@ -11,6 +11,7 @@ from flask.wrappers import Response
 from scheduler import scheduling
 from ra_sched import RA
 import scheduler3_1
+import scheduler4_0
 import copy as cp
 import datetime
 import psycopg2
@@ -800,6 +801,21 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
 
     logging.debug("PREVIOUS DUTIES: {}".format(prevRADuties))
 
+    # -- Query DB for list of break duties for the month. --
+    #     In version 4.0 of the scheduler, break duties essentially are treated
+    #     like noDutyDates and are skipped in the scheduling process. As a result,
+    #     only the date is needed.
+    cur.execute("""
+        SELECT TO_CHAR(day.date, 'DD')
+        FROM break_duties JOIN day ON (break_duties.day_id = day.id)
+        WHERE break_duties.month_id = {}
+        AND break_duties.hall_id = {}
+    """.format(monthId, userDict["hall_id"]))
+
+    breakDuties = [ int(row[0]) for row in cur.fetchall() ]
+    logging.debug("Break Duties: {}".format(breakDuties))
+
+
     # Attempt to run the scheduler using deep copies of the raList and noDutyList.
     #  This is so that if the scheduler does not resolve on the first run, we
     #  can modify the parameters and try again with a fresh copy of the raList
@@ -811,7 +827,10 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
     successful = True
     while not completed:
         # Create the Schedule
-        sched = scheduler3_1.schedule(copy_raList,year,monthNum,noDutyDates=copy_noDutyList,ldaTolerance=ldat,prevDuties=prevRADuties)
+        #sched = scheduler3_1.schedule(copy_raList,year,monthNum,noDutyDates=copy_noDutyList,ldaTolerance=ldat,prevDuties=prevRADuties)
+        sched = scheduler4_0.schedule(copy_raList, year, monthNum,\
+                noDutyDates=copy_noDutyList, ldaTolerance=ldat, \
+                prevDuties=prevRADuties, breakDuties=breakDuties)
 
         if len(sched) == 0:
             # If we were unable to schedule with the previous parameters,
