@@ -83,6 +83,8 @@ function makeBackgroundEvent(event) {
     tmp.title = "Break Duty";
     tmp.display = "background";
     tmp.start = event.start;
+    tmp.classNames = ["bkg-breakDuty"];
+    tmp.extendedProps = event.extendedProps;
 
     return tmp;
 }
@@ -97,6 +99,12 @@ function eventClicked(info) {
     // Get the data clicked and make that the title of the modal
     // Get the name of the selected event (the ra on duty) and show that that
     // was the previous value.
+
+    // If the event that was clicked is a break duty
+    if (info.event.extendedProps.dutyType === "brk") {
+        // Do nothing
+        return;
+    }
 
     let modalTitle = document.getElementById("editModalLongTitle");
     modalTitle.innerHTML = info.event.start.toLocaleDateString();
