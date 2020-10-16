@@ -718,6 +718,7 @@ A HORIZONTAL event
 .fc .fc-daygrid-day-frame {
     position: relative;
     min-height: 100%; /* seems to work better than `height` because sets height after rows/cells naturally do it */
+    height: 100%; /* TC- Added this attribute as I was unable to get background events to display at full height in the date */
   }
 .fc {
 
@@ -1426,4 +1427,3 @@ A VERTICAL event
   .fc-theme-bootstrap a:not([href]) {
     color: inherit; /* natural color for navlinks */
   }
-

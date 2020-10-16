@@ -51,6 +51,20 @@ function initEditSchedCal() {
                         allColors: true
                     };
                 },
+            },
+            {
+                url: '/api/getBreakDuties',
+                failure: function () {
+                    alert('there was an error while fetching Break Duties!');
+                },
+                extraParams: function () {
+                    return {
+                        monthNum: appConfig.calDate.getMonth() + 1,
+                        year: appConfig.calDate.getFullYear(),
+                        allColors: false
+                    };
+                },
+                eventDataTransform: makeBackgroundEvent
             }
         ],
         lazyFetching: true,
@@ -58,6 +72,21 @@ function initEditSchedCal() {
         fixedWeekCount: false,
         eventClick: eventClicked
     });
+}
+
+function makeBackgroundEvent(event) {
+    // Add the display: background attributed to each event
+
+    let tmp = {};
+
+    tmp.id = event.id;
+    tmp.title = "Break Duty";
+    tmp.display = "background";
+    tmp.start = event.start;
+    tmp.classNames = ["bkg-breakDuty"];
+    tmp.extendedProps = event.extendedProps;
+
+    return tmp;
 }
 
 function eventClicked(info) {
@@ -70,6 +99,12 @@ function eventClicked(info) {
     // Get the data clicked and make that the title of the modal
     // Get the name of the selected event (the ra on duty) and show that that
     // was the previous value.
+
+    // If the event that was clicked is a break duty
+    if (info.event.extendedProps.dutyType === "brk") {
+        // Do nothing
+        return;
+    }
 
     let modalTitle = document.getElementById("editModalLongTitle");
     modalTitle.innerHTML = info.event.start.toLocaleDateString();
