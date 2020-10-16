@@ -10,7 +10,6 @@ from flask_bootstrap import Bootstrap
 from flask.wrappers import Response
 from scheduler import scheduling
 from ra_sched import RA
-import scheduler3_1
 import scheduler4_0
 import copy as cp
 import datetime
@@ -867,7 +866,6 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
     successful = True
     while not completed:
         # Create the Schedule
-        #sched = scheduler3_1.schedule(copy_raList,year,monthNum,noDutyDates=copy_noDutyList,ldaTolerance=ldat,prevDuties=prevRADuties)
         sched = scheduler4_0.schedule(copy_raList, year, monthNum,\
                 noDutyDates=copy_noDutyList, ldaTolerance=ldat, \
                 prevDuties=prevRADuties, breakDuties=breakDuties)
