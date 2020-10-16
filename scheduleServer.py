@@ -11,6 +11,7 @@ from flask.wrappers import Response
 from scheduler import scheduling
 from ra_sched import RA
 import scheduler3_1
+import scheduler4_0
 import copy as cp
 import datetime
 import psycopg2
@@ -460,14 +461,16 @@ def getStaffStats():
 
 @app.route("/api/getStats", methods=["GET"])
 @login_required
-def getRAStats(hallId=None,startDateStr=None,endDateStr=None):
+def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None):
     # API Hook that will get the RA stats for a given month.
     #  The month will be given via request.args as 'monthNum' and 'year'.
     #  The server will then query the database for the appropriate statistics
     #  and send back a json object.
 
     fromServer = True
-    if hallId is None and startDateStr is None and endDateStr is None:          # Effectively: If API was called from the client and not from the server
+    if hallId is None and startDateStr is None \
+        and endDateStr is None and maxBreakDay is None:                         # Effectively: If API was called from the client and not from the server
+
         userDict = getAuth()                                                    # Get the user's info from our database
         hallId = userDict["hall_id"]
         fromServer = False
@@ -480,48 +483,67 @@ def getRAStats(hallId=None,startDateStr=None,endDateStr=None):
 
     cur = conn.cursor()
 
+    breakDutyStart = startDateStr
+
+    if maxBreakDay is None:
+        # If maxBreakDay is None, then we should calculate the TOTAL number of points
+        #  that each RA has for the course of the period specified (including
+        #  all break duties).
+
+        breakDutyEnd = endDateStr
+
+    else:
+        # If maxBreakDay is NOT None, then we should calculate the number of REGULAR
+        #  duty points plus the number of BREAK duty points for the specified month.
+
+        breakDutyEnd = maxBreakDay
+
+    logging.debug("breakDutyStart: {}".format(breakDutyStart))
+    logging.debug("breakDutyEnd: {}".format(breakDutyEnd))
+
+
     cur.execute("""SELECT ra.id, ra.first_name, ra.last_name, COALESCE(ptQuery.pts,0)
+               FROM
+               (
+                   SELECT combined_res.rid AS rid, CAST(SUM(combined_res.pts) AS INTEGER) AS pts
                    FROM
                    (
-                       SELECT combined_res.rid AS rid, CAST(SUM(combined_res.pts) AS INTEGER) AS pts
-                       FROM
-                       (
-                          SELECT ra.id AS rid, SUM(duties.point_val) AS pts
-                          FROM duties JOIN day ON (day.id=duties.day_id)
-                                      JOIN ra ON (ra.id=duties.ra_id)
-                          WHERE duties.hall_id = {}
-                          AND duties.sched_id IN
-                          (
-                             SELECT DISTINCT ON (schedule.month_id) schedule.id
-                             FROM schedule
-                             WHERE schedule.hall_id = {}
-                             AND schedule.month_id IN
-                             (
-                                 SELECT month.id
-                                 FROM month
-                                 WHERE month.year >= TO_DATE('{}', 'YYYY-MM-DD')
-                                 AND month.year <= TO_DATE('{}', 'YYYY-MM-DD')
-                             )
-                             ORDER BY schedule.month_id, schedule.created DESC, schedule.id DESC
-                          )
-                          GROUP BY rid
+                      SELECT ra.id AS rid, SUM(duties.point_val) AS pts
+                      FROM duties JOIN day ON (day.id=duties.day_id)
+                                  JOIN ra ON (ra.id=duties.ra_id)
+                      WHERE duties.hall_id = {}
+                      AND duties.sched_id IN
+                      (
+                         SELECT DISTINCT ON (schedule.month_id) schedule.id
+                         FROM schedule
+                         WHERE schedule.hall_id = {}
+                         AND schedule.month_id IN
+                         (
+                             SELECT month.id
+                             FROM month
+                             WHERE month.year >= TO_DATE('{}', 'YYYY-MM-DD')
+                             AND month.year <= TO_DATE('{}', 'YYYY-MM-DD')
+                         )
+                         ORDER BY schedule.month_id, schedule.created DESC, schedule.id DESC
+                      )
+                      GROUP BY rid
 
-                          UNION
+                      UNION
 
-                          SELECT ra.id AS rid, SUM(break_duties.point_val) AS pts
-                          FROM break_duties JOIN day ON (day.id=break_duties.day_id)
-                                            JOIN ra ON (ra.id=break_duties.ra_id)
-                          WHERE break_duties.hall_id = {}
-                          AND day.date BETWEEN TO_DATE('{}', 'YYYY-MM-DD')
-                                           AND TO_DATE('{}', 'YYYY-MM-DD')
-                          GROUP BY rid
-                       ) AS combined_res
-                       GROUP BY combined_res.rid
-                   ) ptQuery
-                   RIGHT JOIN ra ON (ptQuery.rid = ra.id)
-                   WHERE ra.hall_id = {};""".format(hallId, hallId, startDateStr, \
-                                                    endDateStr, hallId, startDateStr, \
-                                                    endDateStr, hallId))
+                      SELECT ra.id AS rid, SUM(break_duties.point_val) AS pts
+                      FROM break_duties JOIN day ON (day.id=break_duties.day_id)
+                                        JOIN ra ON (ra.id=break_duties.ra_id)
+                      WHERE break_duties.hall_id = {}
+                      AND day.date BETWEEN TO_DATE('{}', 'YYYY-MM-DD')
+                                       AND TO_DATE('{}', 'YYYY-MM-DD')
+                      GROUP BY rid
+                   ) AS combined_res
+                   GROUP BY combined_res.rid
+               ) ptQuery
+               RIGHT JOIN ra ON (ptQuery.rid = ra.id)
+               WHERE ra.hall_id = {};""".format(hallId, hallId, startDateStr, \
+                                                endDateStr, hallId, breakDutyStart, \
+                                                breakDutyEnd, hallId))
 
     raList = cur.fetchall()
 
@@ -652,7 +674,6 @@ def getMonth(monthNum=None,year=None):
 
 @app.route("/api/runScheduler", methods=["POST"])
 def runScheduler3(hallId=None, monthNum=None, year=None):
-    # TODO: Add ability to query double dates from arg values
 
     # API Hook that will run the scheduler for a given month.
     #  The month will be given via request.args as 'monthNum' and 'year'.
@@ -660,6 +681,7 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
     #  request.args and can either be a string of comma separated integers
     #  ("1,2,3,4") or an empty string ("").
 
+    # -- Check authorization --
     userDict = getAuth()                                                        # Get the user's info from our database
     if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
         logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
@@ -667,6 +689,7 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
 
     logging.debug("Request.json: {}".format(request.json))
 
+    # -- Begin parsing provided parameters --
     fromServer = True
     if monthNum == None and year == None and hallId == None:                    # Effectively: If API was called from the client and not from the server
         monthNum = int(request.json["monthNum"])
@@ -698,6 +721,7 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
     hallId = userDict["hall_id"]
     cur = conn.cursor()
 
+    # -- Find the month in the Database
     cur.execute("SELECT id, year FROM month WHERE num = {} AND EXTRACT(YEAR FROM year) = {}".format(monthNum,year))
     monthId, date = cur.fetchone()                                              # Get the month_id from the database
     logging.debug("MonthId: {}".format(monthId))
@@ -705,6 +729,9 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
     if monthId == None:                                                         # If the database does not have the correct month
         logging.warning("Unable to find month {}/{} in DB".format(monthNum,year))
         return jsonify(stdRet(-1,"Unable to find month {}/{} in DB".format(monthNum,year)))
+
+
+    # -- Get all eligible RAs and their conflicts --
 
     # Select all RAs in a particular hall whose auth_level is below 3 (HD)
     #  as well as all of their respective conflicts for a given month
@@ -731,9 +758,22 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
     cur.execute(queryStr)       # Query the database for the appropriate RAs and their respective information
     partialRAList = cur.fetchall()
 
+
+    # -- Get the start and end date for the school year --
+
     start, end = getSchoolYear(date.month, date.year)
 
-    ptsDict = getRAStats(userDict["hall_id"], start, end)
+    # -- Get the number of points that the RAs have --
+
+    # Calculate maxBreakDay
+    dateNum = calendar.monthrange(date.year, date.month)[1]
+    mBD = "{:04d}-{:02d}-{:02d}".format(date.year, date.month, dateNum)
+
+    ptsDict = getRAStats(userDict["hall_id"], start, end, maxBreakDay=mBD)
+
+    logging.debug("ptsDict: {}".format(ptsDict))
+
+    # -- Assemble the RA List --
 
     ra_list = [RA(res[0],res[1],res[2],res[3],res[4],res[5],ptsDict[res[2]]["pts"]) for res in partialRAList]
 
@@ -746,6 +786,7 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
     #     logging.debug("Hash: {}".format(hash(ra)))
     #
     # input()
+
     # Set the Last Duty Assigned Tolerance based on floor dividing the number of
     #  RAs by 2 then adding 1. For example, with a staff of 15, the LDA Tolerance
     #  would be 8 days.
@@ -800,6 +841,21 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
 
     logging.debug("PREVIOUS DUTIES: {}".format(prevRADuties))
 
+    # -- Query DB for list of break duties for the month. --
+    #     In version 4.0 of the scheduler, break duties essentially are treated
+    #     like noDutyDates and are skipped in the scheduling process. As a result,
+    #     only the date is needed.
+    cur.execute("""
+        SELECT TO_CHAR(day.date, 'DD')
+        FROM break_duties JOIN day ON (break_duties.day_id = day.id)
+        WHERE break_duties.month_id = {}
+        AND break_duties.hall_id = {}
+    """.format(monthId, userDict["hall_id"]))
+
+    breakDuties = [ int(row[0]) for row in cur.fetchall() ]
+    logging.debug("Break Duties: {}".format(breakDuties))
+
+
     # Attempt to run the scheduler using deep copies of the raList and noDutyList.
     #  This is so that if the scheduler does not resolve on the first run, we
     #  can modify the parameters and try again with a fresh copy of the raList
@@ -811,7 +867,10 @@ def runScheduler3(hallId=None, monthNum=None, year=None):
     successful = True
     while not completed:
         # Create the Schedule
-        sched = scheduler3_1.schedule(copy_raList,year,monthNum,noDutyDates=copy_noDutyList,ldaTolerance=ldat,prevDuties=prevRADuties)
+        #sched = scheduler3_1.schedule(copy_raList,year,monthNum,noDutyDates=copy_noDutyList,ldaTolerance=ldat,prevDuties=prevRADuties)
+        sched = scheduler4_0.schedule(copy_raList, year, monthNum,\
+                noDutyDates=copy_noDutyList, ldaTolerance=ldat, \
+                prevDuties=prevRADuties, breakDuties=breakDuties)
 
         if len(sched) == 0:
             # If we were unable to schedule with the previous parameters,

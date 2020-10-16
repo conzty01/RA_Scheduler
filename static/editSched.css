@@ -43,6 +43,10 @@
 .fc-event-main {
     cursor: pointer;
 }
+.bkg-breakDuty {
+    color: #000;
+    background-color: gainsboro !important;
+}
 #runRAList {
     height: 200px;
     overflow-y: scroll;
