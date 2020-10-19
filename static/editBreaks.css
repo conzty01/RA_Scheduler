@@ -43,26 +43,6 @@
 .fc-event-main {
     cursor: pointer;
 }
-.bkg-breakDuty {
-    color: #000;
-    background-color: gainsboro !important;
-}
-#runRAList {
-    height: 200px;
-    overflow-y: scroll;
-    list-style: none;
-}
-#runRAList li {
-    display: block;
-    clear: left;
-    overflow: auto;
-}
-#runRAList li:hover {
-    background-color: #E1E1E1;
-}
-#runRAList li label {
-    cursor: pointer;
-}
 .modalError {
     display: none;
     color: rgb(255,0,0);
@@ -76,7 +56,4 @@
 }
 #raListContainer {
     float: right;
-}
-#breakDutyWarning {
-    color: red;
 }

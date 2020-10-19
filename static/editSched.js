@@ -38,24 +38,55 @@ function initEditSchedCal() {
             center: 'title',
             right: 'addEventButton runSchedulerButton'
         },
-        events: {
-            url: '/api/getSchedule',
-            failure: function () {
-                alert('there was an error while fetching events!');
+        eventSources: [
+            {
+                url: '/api/getSchedule',
+                failure: function () {
+                    alert('there was an error while fetching Regular Duties!');
+                },
+                extraParams: function () {
+                    return {
+                        monthNum: appConfig.calDate.getMonth() + 1,
+                        year: appConfig.calDate.getFullYear(),
+                        allColors: true
+                    };
+                },
             },
-            extraParams: function () {
-                return {
-                    monthNum: appConfig.calDate.getMonth() + 1,
-                    year: appConfig.calDate.getFullYear(),
-                    allColors: true
-                };
+            {
+                url: '/api/getBreakDuties',
+                failure: function () {
+                    alert('there was an error while fetching Break Duties!');
+                },
+                extraParams: function () {
+                    return {
+                        monthNum: appConfig.calDate.getMonth() + 1,
+                        year: appConfig.calDate.getFullYear(),
+                        allColors: false
+                    };
+                },
+                eventDataTransform: makeBackgroundEvent
             }
-        },
+        ],
         lazyFetching: true,
         showNonCurrentDates: false,
         fixedWeekCount: false,
         eventClick: eventClicked
     });
+}
+
+function makeBackgroundEvent(event) {
+    // Add the display: background attributed to each event
+
+    let tmp = {};
+
+    tmp.id = event.id;
+    tmp.title = "Break Duty";
+    tmp.display = "background";
+    tmp.start = event.start;
+    tmp.classNames = ["bkg-breakDuty"];
+    tmp.extendedProps = event.extendedProps;
+
+    return tmp;
 }
 
 function eventClicked(info) {
@@ -64,9 +95,16 @@ function eventClicked(info) {
     //console.log(info.event.start);
     //console.log(info.event.title);
     //console.log(info.event.backgroundColor);
+    //console.log(info.event.extendedProps);
     // Get the data clicked and make that the title of the modal
     // Get the name of the selected event (the ra on duty) and show that that
     // was the previous value.
+
+    // If the event that was clicked is a break duty
+    if (info.event.extendedProps.dutyType === "brk") {
+        // Do nothing
+        return;
+    }
 
     let modalTitle = document.getElementById("editModalLongTitle");
     modalTitle.innerHTML = info.event.start.toLocaleDateString();
@@ -76,6 +114,39 @@ function eventClicked(info) {
 
     let selector = document.getElementById("editModalNextRA");
     selector.value = info.event.backgroundColor;
+
+    switch (info.event.extendedProps.dutyType) {
+        case "std":
+            // If the duty clicked is a normal duty, then activate the del and save buttons
+            document.getElementById("editDelButt").disabled = false;
+            document.getElementById("editSavButt").disabled = false;
+
+            // Also hide the break duty message
+            document.getElementById("breakDutyWarning").style.display = "none";
+
+            break;
+
+        case "brk":
+            // If it is a break duty, disable the del and save buttons
+            document.getElementById("editDelButt").disabled = true;
+            document.getElementById("editSavButt").disabled = true;
+
+            // Also hide the break duty message
+            document.getElementById("breakDutyWarning").style.display = "block";
+
+            break;
+
+        default:
+            console.log("Reached Default State for dutyType: ", info.event.extendedProps.dutyType);
+
+            // Disable del and sav buttons
+            document.getElementById("editDelButt").disabled = true;
+            document.getElementById("editSavButt").disabled = true;
+
+            // Hide the break duty msesage
+            document.getElementById("breakDutyWarning").style.display = "none";
+
+    }
 
     // Set the ID of the clicked element so that we can find the event later
     info.el.id = "lastEventSelected";
@@ -377,9 +448,9 @@ function updatePoints(pointDict) {
             newNameDiv.innerHTML = pointDict[idKey].name;
 
             let newPtsDiv = document.createElement("div");
-            newNameDiv.id = "list_points_" + idKey;
-            newNameDiv.classList.add("tPoints");
-            newNameDiv.innerHTML = pointDict[idKey].pts;
+            newPtsDiv.id = "list_points_" + idKey;
+            newPtsDiv.classList.add("tPoints");
+            newPtsDiv.innerHTML = pointDict[idKey].pts;
 
             newLi.appendChild(newNameDiv);
             newLi.appendChild(newPtsDiv);
