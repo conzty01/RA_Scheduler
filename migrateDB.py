@@ -6,7 +6,7 @@ def migrate(conn):
     cur = conn.cursor()
 
     logging.info("Creating Table: break_duties")
-    con.execute("""
+    cur.execute("""
 		CREATE TABLE break_duties(
 			id			serial UNIQUE,
 			ra_id		int,
@@ -19,7 +19,7 @@ def migrate(conn):
 			FOREIGN KEY (ra_id) 	REFERENCES ra(id),
 			FOREIGN KEY (hall_id) 	REFERENCES res_hall(id),
 			FOREIGN KEY (month_id) 	REFERENCES month(id),
-			FOREIGN KEY (day_id) 	REFERENCES day(id),
+			FOREIGN KEY (day_id) 	REFERENCES day(id)
 		);""")
     logging.info("  Finished Creating Table: break_duties")
 
