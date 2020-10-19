@@ -1,5 +1,5 @@
 import psycopg2
-import loging
+import logging
 import os
 
 def migrate(conn):
