@@ -2,3 +2,4 @@
 *devTest*
 .idea/
 *.log
+*.dump
