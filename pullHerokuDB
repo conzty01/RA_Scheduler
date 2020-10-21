@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# NOTE: Before running, make sure to shutdown any local server that might be
+#        using the local ra_sched DB as it could cause the restore to skip
+#        over the tables in use and cause data issues.
+
+# Create a backup of the local DB saved as `localDB.dump`
+#  in the working directory
+pg_dump ra_sched --clean --file localDB.dump
+
+# Capture the current Heroku DB state
+heroku pg:backups:capture
+
+# Download the `latest.dump` from Heroku to the working directory
+heroku pg:backups:download
+
+# Restore the local DB using the remote DB's dump
+pg_restore latest.dump --dbname ra_sched --clean
