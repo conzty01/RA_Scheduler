@@ -132,7 +132,7 @@ def createOAuthDB(conn):
 def createBreakDutiesTable(conn):
 	conn.execute('DROP TABLE IF EXISTS break_duties CASCADE;')
 
-	con.execute("""
+	conn.execute("""
 		CREATE TABLE break_duties(
 			id			serial UNIQUE,
 			ra_id		int,
@@ -145,7 +145,7 @@ def createBreakDutiesTable(conn):
 			FOREIGN KEY (ra_id) 	REFERENCES ra(id),
 			FOREIGN KEY (hall_id) 	REFERENCES res_hall(id),
 			FOREIGN KEY (month_id) 	REFERENCES month(id),
-			FOREIGN KEY (day_id) 	REFERENCES day(id),
+			FOREIGN KEY (day_id) 	REFERENCES day(id)
 		);""")
 
 def main():
