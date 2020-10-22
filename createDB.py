@@ -7,7 +7,7 @@ def createHallDB(conn):
 		CREATE TABLE res_hall(
 			id				serial UNIQUE,
 			name			varchar(50),
-			calendar_id		text,
+			g_cal_token		bytea,
 
 		PRIMARY KEY (name)
 		);""")
