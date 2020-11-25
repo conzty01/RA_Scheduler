@@ -5,9 +5,10 @@ def createHallDB(conn):
 	conn.execute("DROP TABLE IF EXISTS res_hall CASCADE;")
 	conn.execute("""
 		CREATE TABLE res_hall(
-			id				serial UNIQUE,
-			name			varchar(50),
-			g_cal_token		bytea,
+			id				 serial UNIQUE,
+			name			 varchar(50),
+			g_cal_token		 bytea,
+			g_cal_auth_state varchar(30),
 
 		PRIMARY KEY (name)
 		);""")
