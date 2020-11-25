@@ -16,10 +16,19 @@ export HOST_URL='https://localhost:5000'
 export OAUTHLIB_RELAX_TOKEN_SCOPE=1
 export OAUTHLIB_INSECURE_TRANSPORT=1
 
-# The following need to be set with the appropriate oAuth2 information.
+# The following needs to be set with the appropriate oAuth2 information.
 export SECRET_KEY=''
 export CLIENT_ID=''
 export CLIENT_SECRET=''
+
+# The following needs to be set with the appropriate Google Calendar API information.
+export GCAL_APIKEY=''
+export PROJECT_ID=''
+export AUTH_URI=''
+export TOKEN_URI=''
+export AUTH_PROVIDER_X509_CERT_URL=''
+export REDIRECT_URIS=''
+export JAVASCRIPT_ORIGINS=''
 
 # The USE_ADHOC boolean is for setting the ssl_context of the flask
 #  this is only to be used for development purposes.
@@ -28,4 +37,4 @@ export USE_ADHOC=true
 # The LOG_LEVEL is for setting the log level that is displayed to std.out
 #  The possible options from lowest to highest are DEBUG, INFO, WARNING, ERROR,
 #  and CRITICAL. If the LOG_LEVEL is not recognized, then WARNING is used.
-export LOG_LEVEL='WARNING'
+export LOG_LEVEL='DEBUG'
