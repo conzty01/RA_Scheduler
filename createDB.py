@@ -7,9 +7,7 @@ def createHallDB(conn):
 		CREATE TABLE res_hall(
 			id				 serial UNIQUE,
 			name			 varchar(50),
-			g_cal_token		 bytea,
-			g_cal_auth_state varchar(30),
-
+			
 		PRIMARY KEY (name)
 		);""")
 
@@ -149,6 +147,21 @@ def createBreakDutiesTable(conn):
 			FOREIGN KEY (day_id) 	REFERENCES day(id)
 		);""")
 
+
+def createGoogleCalendarDB(conn):
+	conn.execute("DROP TABLE IF EXISTS google_calendar_info CASCADE;")
+	conn.execute("""
+		CREATE TABLE google_calendar_info(
+			id				serial UNIQUE.
+			res_hall_id		int,
+			auth_state		varchar(30),
+			token 			bytea,
+			calendar_id		varchar(60),
+
+		PRIMARY KEY (res_hall_id),
+		FOREIGN KEY (res_hall_id) REFERENCES res_hall(id));
+		);""")
+
 def main():
 	conn = psycopg2.connect(os.environ["DATABASE_URL"])
 	createHallDB(conn.cursor())
@@ -161,6 +174,7 @@ def main():
 	createBreakDutiesTable(conn.cursor())
 	createUserDB(conn.cursor())
 	createOAuthDB(conn.cursor())
+	createGoogleCalendarDB(conn.cursor())
 
 	conn.commit()
 
