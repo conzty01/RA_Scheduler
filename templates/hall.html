@@ -114,7 +114,7 @@
             <tr id="1" scope="row">
                 <td class="settingName">Google Calendar Integration</td>
                 <td class="settingValue">
-                    {% if hallInfo[0][1] == None: %}
+                    {% if hallInfo == None: %}
                     <a href="/int/GCalRedirect" >Connect to Google Calendar</a>
                     {% else %}
                     Connected
