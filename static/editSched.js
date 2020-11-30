@@ -30,13 +30,17 @@ function initEditSchedCal() {
             addEventButton: {
                 text: 'Add Addtional Duty',
                 click: showAddDutyModal
+            },
+            exportScheduleButton: {
+                text: 'Export to Google Calendar',
+                click: exportSchedule
             }
         },
         dateClick: showAddDutyModal,
         headerToolbar: {
             left: 'customPrevButton,customNextButton customTodayButton',
             center: 'title',
-            right: 'addEventButton runSchedulerButton'
+            right: 'exportScheduleButton addEventButton runSchedulerButton'
         },
         eventSources: [
             {
@@ -473,4 +477,18 @@ function highlightRA(i) {
             entry.style.boxShadow = "none";
         }
     }
+}
+
+/*   Export to Google Calendar   */
+function exportSchedule() {
+    let params = {
+        monthNum: appConfig.calDate.getMonth() + 1,
+        year: appConfig.calDate.getFullYear()
+    };
+
+    appConfig.base.callAPI("exportToGCal", params, handleExportResp, "GET");
+}
+
+function handleExportResp(opts) {
+    console.log(opts);
 }
