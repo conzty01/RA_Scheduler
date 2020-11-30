@@ -269,6 +269,44 @@ def getCurSchoolYear():
 
     return getSchoolYear(month, year)
 
+def formatDateStr(day, month, year, format="YYYY-MM-DD", divider="-"):
+    # Generate a date string so that it follows the provided format.
+
+    # Make sure the day is two digits
+    if day < 10:
+        dayStr = "0" + str(day)
+    else:
+        dayStr = str(day)
+
+    # Make sure the month is two digits
+    if month < 10:
+        monthStr = "0" + str(month)
+    else:
+        monthStr = str(month)
+
+    # Figure out what the desired format is
+    #  this can be done by splitting the format string
+    #  by the divider and checking each part to see
+    #  if it contains a "Y", "M", or "D"
+
+    partList = format.split(divider)
+
+    result = ""
+    for part in partList:
+        if "Y" in part.upper():
+            result += str(year)
+
+        elif "M" in part.upper():
+            result += monthStr
+
+        elif "D" in part.upper():
+            result += dayStr
+
+        # Add the divider to the result
+        result += divider
+
+    return result[:-1]
+
 #     -- Views --
 
 @app.route("/logout")
@@ -370,10 +408,12 @@ def manHall():
 
     cur = conn.cursor()
 
-    cur.execute("SELECT name, g_cal_token FROM res_hall WHERE id = %s", (userDict["hall_id"],))
+    cur.execute("""SELECT name, token 
+                   FROM res_hall JOIN google_calendar_info ON 
+                        (res_hall.id = google_calendar_info.res_hall_id)
+                   WHERE res_hall.id = %s""", (userDict["hall_id"],))
 
-    hInfo = cur.fetchall()
-    print(hInfo)
+    hInfo = cur.fetchone()
 
     return render_template("hall.html", hallInfo=hInfo, opts=baseOpts,
                             auth_level=userDict["auth_level"], hall_name=userDict["hall_name"])
@@ -596,7 +636,7 @@ def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None
 
 @app.route("/api/getSchedule", methods=["GET"])
 @login_required
-def getSchedule2(monthNum=None,year=None,hallId=None,allColors=None):
+def getSchedule2(start=None,end=None,hallId=None, showAllColors=None):
     # API Hook that will get the requested schedule for a given month.
     #  The month will be given via request.args as 'monthNum' and 'year'.
     #  The server will then query the database for the appropriate schedule
@@ -605,9 +645,7 @@ def getSchedule2(monthNum=None,year=None,hallId=None,allColors=None):
     #  return an empty list
 
     fromServer = True
-    if monthNum is None and year is None and hallId is None and allColors is None:                    # Effectively: If API was called from the client and not from the server
-        monthNum = int(request.args.get("monthNum"))
-        year = int(request.args.get("year"))
+    if start is None and end is None and hallId is None and showAllColors is None:                    # Effectively: If API was called from the client and not from the server
         start = request.args.get("start").split("T")[0]                         # No need for the timezone in our current application
         end = request.args.get("end").split("T")[0]                             # No need for the timezone in our current application
 
@@ -673,7 +711,7 @@ def getSchedule2(monthNum=None,year=None,hallId=None,allColors=None):
             "title": row[0] + " " + row[1],
             "start": row[4],
             "color": c,
-            "extendedProps": {"dutyType":"std"}
+            "extendedProps": {"dutyType": "std"}
         })
 
     if fromServer:
@@ -1741,6 +1779,48 @@ def deleteBreakDuty():
 
 #  -- Integration Methods --
 
+def createGoogleCalendar(calInfoId):
+    # Create a Secondary Google Calendar for the provided hall
+
+    # Get the hall's credentials
+    cur = conn.cursor()
+
+    logging.debug("Searching for the Hall's Calendar Information")
+    cur.execute("SELECT token FROM google_calendar_info WHERE id = %s",
+                (calInfoId,))
+
+    memview = cur.fetchone()
+
+    # Check to see if we got a result
+    if memview is None:
+        logging.info("No Google Calendar token found for Id: {}".format(calInfoId))
+
+        return jsonify(stdRet(-1, "No Token Found"))
+
+    # If there is a token in the DB it will be returned as a MemoryView
+
+    logging.debug("Converting Google Calendar Token to pickle")
+
+    # Convert the memview object to BytesIO object
+    tmp = BytesIO(memview[0])
+
+    # Convert the BytesIO object to a google.oauth2.credentials.Credentials object
+    #  This is done by unpickling the object
+    token = pickle.load(tmp)
+
+    logging.debug("Creating Google Calendar")
+    calId = gCalInterface.createGoogleCalendar(token)
+
+    logging.debug("Updating Google Calendar Information")
+    # Add the calendar_id into the Google Calendar Info table
+    cur.execute("""UPDATE google_calendar_info
+                   SET calendar_id = %s
+                   WHERE id = %s""", (calId, calInfoId))
+
+    conn.commit()
+
+    return stdRet(1, "Successful")
+
 @app.route("/int/GCalRedirect", methods=["GET"])
 def returnGCalRedirect():
     # Redirect the user to the Google Calendar Authorization Page
@@ -1759,9 +1839,29 @@ def returnGCalRedirect():
     # Create the DB cursor object
     cur = conn.cursor()
 
-    # Update the appropriate hall with the current state
+    logging.debug("Checking for previously associated calendar for Hall: {}".format(userDict["hall_id"]))
+
+    # Check to see if a Google Calendar has been associated with the given hall.
     #  This is used to keep track of the incoming authorization response
-    cur.execute("UPDATE res_hall SET g_cal_auth_state = %s WHERE id = %s", (state, userDict["hall_id"]))
+    cur.execute("SELECT id FROM google_calendar_info WHERE res_hall_id = %s",
+                (userDict["hall_id"], ))
+
+    res = cur.fetchone()
+
+    # If there is not a calendar associated with the hall
+    if res is None:
+        # Then insert a new row
+        logging.debug("Insert new row into Google Calendar Info table")
+
+        cur.execute("""INSERT INTO google_calendar_info (res_hall_id, auth_state) 
+                        VALUES (%s, %s)""", (userDict["hall_id"], state))
+
+    else:
+        # Otherwise update the entry for the appropriate hall with the current state
+        logging.debug("Updating previous Google Calendar Info Row: {}".format(res[0]))
+
+        cur.execute("UPDATE google_calendar_info SET auth_state = %s WHERE id = %s",
+                    (state, res[0]))
 
     logging.debug("Committing auth state to DB for Hall: {}".format(userDict["hall_id"]))
     conn.commit()
@@ -1795,12 +1895,12 @@ def handleGCalAuthResponse():
     # Identify which hall maps to the state
     logging.debug("Searching for hall associated with state")
 
-    cur.execute("SELECT id FROM res_hall WHERE g_cal_auth_state = %s", (state,))
+    cur.execute("SELECT id FROM google_calendar_info WHERE auth_state = %s", (state,))
 
-    hallId = cur.fetchone()
+    calInfoId = cur.fetchone()
 
     # Check to see if we have a result
-    if hallId is None:
+    if calInfoId is None:
         # If not, stop processing
         logging.debug("Associated hall not found")
 
@@ -1824,20 +1924,33 @@ def handleGCalAuthResponse():
     logging.debug("Created credential pickle")
 
     # Insert the credentials in the DB for the respective res_hall
-    cur.execute("""UPDATE res_hall
-                   SET g_cal_token = %s ,
-                       g_cal_auth_state = NULL
+    cur.execute("""UPDATE google_calendar_info
+                   SET token = %s ,
+                       auth_state = NULL
                    WHERE id = %s;""",
-                (tmp.getvalue(), hallId[0]))
+                (tmp.getvalue(), calInfoId[0]))
 
-    logging.debug("Committing credentials to DB for Hall: {}".format(hallId[0]))
+    logging.debug("Committing credentials to DB for Google Calendar Info: {}".format(calInfoId[0]))
 
-    conn.commit()
+    res = createGoogleCalendar(calInfoId[0])
+
+    # If the calendar creation failed...
+    if res["status"] < 0:
+        # Then rollback the Google Calendar Connection
+        logging.warning("Unable to Create Google Calendar- Rolling back changes")
+        conn.rollback()
+
+    else:
+        # Otherwise add the calendar id to the DB.
+        logging.debug("Adding newly created Calendar Id to DB")
+
+        logging.info("Google Calendar Creation complete for Hall: {}".format(userDict["hall_id"]))
+        conn.commit()
 
     # Return the user back to the Manage Hall page
     return redirect(url_for("manHall"))
 
-@app.route("/int/exportToGCal", methods=["GET"])
+@app.route("/api/exportToGCal", methods=["GET"])
 def exportToGCal():
 
     # Get the user's information
@@ -1850,32 +1963,71 @@ def exportToGCal():
 
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
 
-    # Get the credentials from the DB
+    logging.info("Attempting to export Schedule to Google Calendar")
+
+    # Get the Google Calendar credentials from the DB
+    logging.debug("Retrieving Google Calendar info from DB for Hall: {}".format(userDict["hall_id"]))
     cur = conn.cursor()
 
-    cur.execute("SELECT g_cal_token FROM res_hall WHERE id = {}".format(userDict["hall_id"]))
+    cur.execute("SELECT calendar_id, token FROM google_calendar_info WHERE res_hall_id = %s",
+                (userDict["hall_id"], ))
 
-    memview = cur.fetchone()
+    res = cur.fetchone()
 
     # Check to see if we got a result
-    if memview is None:
+    if res is None:
         logging.info("No Google Calendar token found for Hall: {}".format(userDict["hall_id"]))
 
         return jsonify(stdRet(-1, "No Token Found"))
 
+    else:
+        # Split the result into its components
+        gCalId, memview = res
+
+    logging.debug("GCalId: {}".format(gCalId))
+
     # If there is a token in the DB it will be returned as a MemoryView
 
     # Convert the memview object to BytesIO object
-    tmp = BytesIO(memview[0])
+    tmp = BytesIO(memview)
 
     # Convert the BytesIO object to a google.oauth2.credentials.Credentials object
     #  This is done by unpickling the object
     token = pickle.load(tmp)
 
-    logging.debug("Testing bit")
-    # Check to see if we've done a good job so far.
-    gCalInterface.testBit(token)
+    logging.debug("Google Calendar information found.")
 
+    # Get the month/schedule information from the request args
+    #  and create the start and end strings
+    monthNum = int(request.args.get("monthNum"))
+    year = int(request.args.get("year"))
+
+    start = formatDateStr(1, monthNum, year)
+    end = formatDateStr(calendar.monthrange(year, monthNum)[-1], monthNum, year)
+
+    logging.debug("Retrieving schedule information for MonthNum: {} and Year: {}".format(monthNum, year))
+
+    # Get the appropriate schedule from the DB
+    #  Should be able to leverage existing RADSA API
+    sched = getSchedule2(start=start, end=end,
+                         hallId=userDict["hall_id"], showAllColors=True)
+
+    logging.debug("Exporting schedule to Google Calendar.")
+
+    # Pass the schedule to the Integratinator to be exported.
+    status = gCalInterface.exportScheduleToGoogleCalendar(token, gCalId, sched)
+
+    # If the export failed
+    if status < 0:
+        # Log that an error was encountered for future reference.
+        logging.warning("Error: {} encountered while exporting to Google Calendar for Hall: {}".format(status, userDict["hall_id"]))
+
+        # Then we will need to let the user know that they will need
+        #  to connect/reconnect their Google Calendar Account.
+
+        return jsonify(stdRet(-1, "reconnect_gcal"))
+
+    # Otherwise report that it was a success!
     return jsonify(stdRet(1, "successful"))
 
 #     -- Error Handling --
