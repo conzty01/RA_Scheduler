@@ -79,7 +79,7 @@ class gCalIntegratinator:
         #    REDIRECT_URIS -> This should be the urls separated by a ',' only
         #    JAVASCRIPT_ORIGINS -> This should be the urls separated by a ',' only
 
-        logging.debug("Loading app settings from environment")
+        logging.info("Loading app settings from environment")
 
         return {
             "web": {
@@ -142,7 +142,7 @@ class gCalIntegratinator:
 
     def generateAuthURL(self, redirect_uri):
         # Generate and return an authorization url as well as a state
-        logging.debug("Generating Google Authorization URL")
+        logging.info("Generating Google Authorization URL")
 
         # Set the flow's redirect_uri
         self.flow.redirect_uri = redirect_uri
@@ -155,7 +155,7 @@ class gCalIntegratinator:
     def handleAuthResponse(self, auth_response, redirect_uri):
         # Generate authorization credentials from the authorization response
 
-        logging.debug("Generating Google Client Credentials")
+        logging.info("Generating Google Client Credentials")
 
         self.flow.redirect_uri = redirect_uri
 
@@ -167,7 +167,7 @@ class gCalIntegratinator:
     def createGoogleCalendar(self, client_creds):
         # Create a Secondary Google Calendar using the user credentials
 
-        logging.debug("Creating Google Calendar")
+        logging.info("Creating Google Calendar")
 
         # Check to make sure the credentials are valid
         if self._checkIfValidCreds(client_creds) < 0:
@@ -186,7 +186,7 @@ class gCalIntegratinator:
 
         created_calendar = service.calendars().insert(body=newCalBody).execute()
 
-        logging.debug("Calendar Creation Complete")
+        logging.info("Calendar Creation Complete")
 
         # logging.debug("Closing Calendar Creation Service")
         # service.close()
@@ -226,6 +226,7 @@ class gCalIntegratinator:
 
         try:
             # Iterate through the schedule
+            logging.info("Exporting schedule")
             for duty in schedule:
 
                 # Create an Event Object that will handle assembling the event's body for the Google Calendar API
@@ -248,6 +249,7 @@ class gCalIntegratinator:
             return -5
 
         # Once finished with the export, return back a status of 1
+        logging.info("Export complete")
 
         return 1
 
