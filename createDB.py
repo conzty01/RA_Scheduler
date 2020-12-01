@@ -158,8 +158,8 @@ def createGoogleCalendarDB(conn):
 			token 			bytea,
 			calendar_id		varchar(60),
 
-		PRIMARY KEY (res_hall_id),
-		FOREIGN KEY (res_hall_id) REFERENCES res_hall(id));
+			PRIMARY KEY (res_hall_id),
+			FOREIGN KEY (res_hall_id) REFERENCES res_hall(id)
 		);""")
 
 def main():
