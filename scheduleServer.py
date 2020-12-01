@@ -2025,7 +2025,7 @@ def exportToGCal():
         # Then we will need to let the user know that they will need
         #  to connect/reconnect their Google Calendar Account.
 
-        return jsonify(stdRet(-1, "reconnect_gcal"))
+        return jsonify(stdRet(0, "Reconnect Google Calendar Account"))
 
     # Otherwise report that it was a success!
     return jsonify(stdRet(1, "successful"))
