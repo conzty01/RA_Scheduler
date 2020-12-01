@@ -406,17 +406,33 @@ def manHall():
         logging.info("User Not Authorized - RA: {} attempted to reach Manage Hall page".format(userDict["ra_id"]))
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
 
+    # Create the setting list that will be passed to the template
+    settingList = []
+
     cur = conn.cursor()
 
-    cur.execute("""SELECT name, token 
-                   FROM res_hall JOIN google_calendar_info ON 
-                        (res_hall.id = google_calendar_info.res_hall_id)
-                   WHERE res_hall.id = %s""", (userDict["hall_id"],))
+    # Get the hall name
+    cur.execute("SELECT name FROM res_hall WHERE id = %s", (userDict["hall_id"],))
+    tmp = {"settingName": "Residence Hall Name",
+           "settingDesc": "The name of the Residence Hall",
+           "settingVal": cur.fetchone()[0]}
 
-    hInfo = cur.fetchone()
+    # Add the hall settings to the settingList
+    settingList.append(tmp)
 
-    return render_template("hall.html", hallInfo=hInfo, opts=baseOpts,
-                            auth_level=userDict["auth_level"], hall_name=userDict["hall_name"])
+    # Get the Google Calendar Information
+    cur.execute("""SELECT EXISTS 
+                  (SELECT token 
+                   FROM google_calendar_info
+                   WHERE res_hall_id = %s)""", (userDict["hall_id"],))
+    tmp = {"settingName": "Google Calendar Integration",
+           "settingDesc": "Connecting a Google Calendar account allows AHDs and HDs to export a given month's duty schedule to Google Calendar.",
+           "settingVal": "Connected" if cur.fetchone()[0] else "Not Connected"}
+
+    settingList.append(tmp)
+
+    return render_template("hall.html", opts=baseOpts, curView=4, settingList=settingList,
+                           auth_level=userDict["auth_level"], hall_name=userDict["hall_name"])
 
 @app.route("/editBreaks", methods=['GET'])
 @login_required
@@ -1948,6 +1964,28 @@ def handleGCalAuthResponse():
         conn.commit()
 
     # Return the user back to the Manage Hall page
+    return redirect(url_for("manHall"))
+
+@app.route("/int/disconnectGCal", methods=["GET"])
+def disconnectGoogleCalendar():
+    # Disconnect the Google Calendar for the given hall/user
+
+    userDict = getAuth()
+
+    # Make sure the user is at least a Hall Director
+    if userDict["auth_level"] < 3:
+        logging.info("User Not Authorized - RA: {} attempted to disconnect Google Calendar for Hall: {} -G"
+                     .format(userDict["ra_id"], userDict["hall_id"]))
+
+        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+
+    # Create the cursor
+    cur = conn.cursor()
+
+    # Delete the google_calendar_info record for the appropriate hall.
+    cur.execute("DELETE FROM google_calendar_info WHERE res_hall_id = %s;", (userDict["hall_id"], ))
+
+    # Redirect user back to Manage Hall page
     return redirect(url_for("manHall"))
 
 @app.route("/api/exportToGCal", methods=["GET"])
