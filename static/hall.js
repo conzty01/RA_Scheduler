@@ -102,5 +102,149 @@ function generateGoogleRow(alreadyConnected) {
 }
 
 function submitChanges() {
-    console.log("SUBMIT CHANGES");
+    // Submit the Hall Setting changes to be saved.
+
+    let setName = document.getElementById("modalTitle").innerHTML;
+    let setVal = document.getElementById("modalSettingValue").value;
+
+    // Indicate to user that the setting is being saved
+    document.getElementById("savBut").disabled = true;
+    $("body").css("cursor", "wait");
+
+    // Set the parameters for the API
+    let params = {
+        "name": setName,
+        "value": setVal
+    }
+
+    console.log(params);
+
+    // Call the API
+    appConfig.base.callAPI("saveHallSettings",
+            params,
+            function(msg) {
+                passModalSave("#editSettingModal", msg, () => {
+                    // Re-enable the save button
+                    document.getElementById("savBut").disabled = false;
+                    $("body").css("cursor", "auto");
+                    // Get the latest setting information
+                    getSettingInfo();
+
+                });
+            }, "POST", function(msg) {passModalSave("#editSettingModal", msg)});
+}
+
+function passModalSave(modalId, msg, extraWork=() => {}) {
+
+    //console.log(msg);
+
+    let modal = document.getElementById(modalId.slice(1));
+
+    // If the status is '1', then the save was successful
+    switch (msg.status) {
+        case 1:
+            // If the status is '1', then the save was successful
+
+            // Complete any additional work
+            extraWork();
+            // Hide the modal
+            $(modalId).modal('hide');
+
+            // Ensure the respective errorDiv is hidden
+            modal.getElementsByClassName("modalError")[0].style.display = "none";
+
+            break;
+
+        case -1:
+            // If the status is '-1', then there was an error
+
+            // Log the Error
+            console.error(msg.msg);
+
+            // Continue to handle the unsuccessful save
+        case 0:
+            // If the status is '0', then the save was unsuccessful
+
+            console.log(msg.msg);
+            // Get the modal's errorDiv
+            let errDiv = modal.getElementsByClassName("modalError")[0];
+
+            // Complete any additional work
+            extraWork();
+
+            // Update the errorDiv with the message
+            errDiv.getElementsByClassName("msg")[0].innerHTML = msg.msg;
+            // Display the errorDiv
+            errDiv.style.display = "block";
+
+            break;
+
+        default:
+            console.error("REACHED DEFAULT STATE: ",msg);
+            break;
+    }
+}
+
+function getSettingInfo() {
+    console.log("Refreshing Setting List");
+
+    appConfig.base.callAPI("getHallSettings",{},
+                             (data) => {
+                                reDrawTable(data);
+                             },"GET");
+}
+
+function reDrawTable(settingList) {
+    // data = [ {settingName: "", settingDesc: "", settingVal: ""}, {...}, ...],
+
+    console.log("Redrawing Setting Table");
+
+    let table = document.getElementById("settingTable");
+    let oldTBody = table.getElementsByTagName("tbody")[0];
+
+    let newTBody = document.createElement("tbody");
+
+    let i = 0;
+    for (let setting of settingList) {
+
+        // Add the row to the table
+        addRow(setting, i, newTBody);
+
+        // Increment the counter
+        i++;
+    }
+
+    table.replaceChild(newTBody, oldTBody);
+}
+
+function addRow(data, rowId, table) {
+    let newRow = table.insertRow(-1);
+    newRow.id = rowId;
+    newRow.setAttribute("scope","row");
+
+    let col;
+
+    // Add SettingName
+    col = newRow.insertCell(0);
+    col.className = "settingName";
+    col.innerHTML = data["settingName"];
+
+    // Add SettingDescription
+    col = newRow.insertCell(1);
+    col.className = "settingDescription";
+    col.innerHTML = data["settingDesc"];
+
+    // Add SettingValue
+    col = newRow.insertCell(2);
+    col.className = "settingValue";
+    col.innerHTML = data["settingVal"];
+
+    // Add Edit column
+    let edit = newRow.insertCell(3);
+    let editSpan = document.createElement("span");
+
+    editSpan.className = "fa fa-pencil";
+    editSpan.setAttribute("onclick","showEditModal("+rowId.toString()+")");
+    edit.appendChild(editSpan);
+
 }
