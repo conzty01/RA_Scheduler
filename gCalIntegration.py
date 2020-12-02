@@ -48,22 +48,21 @@ class gCalIntegratinator:
         self.flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
             'client_secret.json', scopes=scopes)
 
-        # The credentials that will allows us to interact with Google Calendar
-        #  API on the client's behalf.
-        self.credentials = None
-
         # Name of Google service being used
         self.serviceName = "calendar"
 
         # API version number of Google service being used
         self.serviceVersion = "v3"
 
+        # Set the scopes for reference
+        self.scopes = scopes
+
         # Load the app credentials from the environment
         self.__appCreds = self.__getCredsFromEnv()
 
         # Generate the oAuth2 flow for handling the client/app authentication
         self.flow = google_auth_oauthlib.flow.Flow.from_client_config(
-            self.__getCredsFromEnv(), scopes)
+            self.__appCreds, scopes=scopes)
 
     def __getCredsFromEnv(self):
         # This will return a desearlized JSON object that is assembled per
