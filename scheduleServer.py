@@ -406,32 +406,7 @@ def manHall():
         logging.info("User Not Authorized - RA: {} attempted to reach Manage Hall page".format(userDict["ra_id"]))
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
 
-    # Create the setting list that will be passed to the template
-    settingList = []
-
-    cur = conn.cursor()
-
-    # Get the hall name
-    cur.execute("SELECT name FROM res_hall WHERE id = %s", (userDict["hall_id"],))
-    tmp = {"settingName": "Residence Hall Name",
-           "settingDesc": "The name of the Residence Hall",
-           "settingVal": cur.fetchone()[0]}
-
-    # Add the hall settings to the settingList
-    settingList.append(tmp)
-
-    # Get the Google Calendar Information
-    cur.execute("""SELECT EXISTS 
-                  (SELECT token 
-                   FROM google_calendar_info
-                   WHERE res_hall_id = %s)""", (userDict["hall_id"],))
-    tmp = {"settingName": "Google Calendar Integration",
-           "settingDesc": "Connecting a Google Calendar account allows AHDs and HDs to export a given month's duty schedule to Google Calendar.",
-           "settingVal": "Connected" if cur.fetchone()[0] else "Not Connected"}
-
-    settingList.append(tmp)
-
-    return render_template("hall.html", opts=baseOpts, curView=4, settingList=settingList,
+    return render_template("hall.html", opts=baseOpts, curView=4, settingList=getHallSettings(userDict["hall_id"]),
                            auth_level=userDict["auth_level"], hall_name=userDict["hall_name"])
 
 @app.route("/editBreaks", methods=['GET'])
@@ -1793,6 +1768,125 @@ def deleteBreakDuty():
             logging.info("Unable to locate beak duty to delete: RA {}, Date {}".format(fName + " " + lName, dateStr))
             return jsonify({"status":0,"error":"Unable to find parameters in DB"})
 
+@app.route("/api/saveHallSettings", methods=["POST"])
+@login_required
+def saveHallSettings():
+    # Save the hall settings received
+
+    userDict = getAuth()
+
+    # Ensure that the user is at least an AHD
+    if userDict["auth_level"] < 3:
+        logging.info("User Not Authorized - RA: {} attempted to overwrite Hall Settings for : {}"
+                     .format(userDict["ra_id"], userDict["hall_id"]))
+
+        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+
+    # Get the name and value of the setting that was changed.
+    data = request.json
+    setName = data["name"]
+    setVal = data["value"]
+
+    logging.debug("Setting Name: {}".format(setName))
+    logging.debug("Setting Value: {}".format(setVal))
+
+    # Create a cursor
+    cur = conn.cursor()
+
+    # Figure out what setting we are attempting to change and whether
+    # is should be handled in a special way.
+
+    if setName == "Residence Hall Name":
+        # We are attempting to update the res_hall.name field in the DB
+
+        # Make sure that the user belongs to that Hall
+        cur.execute("""SELECT res_hall.id
+                       FROM res_hall JOIN ra ON (ra.hall_id = res_hall.id)
+                       WHERE ra.id = %s;""", (userDict["ra_id"],))
+
+        dbHallId = cur.fetchone()
+
+        if dbHallId is None:
+            # If we returned no values, then something fishy is going on.
+            #  Simply return a not authorized message and stop processing.
+
+            logging.info("User Not Authorized - RA: {} attempted to overwrite Hall Settings for : {}"
+                         .format(userDict["ra_id"], userDict["hall_id"]))
+
+            return jsonify(stdRet(0, "NOT AUTHORIZED"))
+
+        else:
+            # Otherwise go ahead and update the value.
+
+            logging.info("User: {} is updating Hall Setting: '{}' for Hall: {}".format(userDict["ra_id"],
+                                                                                       setName, userDict["hall_id"]))
+
+            cur.execute("UPDATE res_hall SET name = %s WHERE id = %s", (setVal, userDict["hall_id"]))
+
+            # set the return value to successful
+            return jsonify(stdRet(1, "successful"))
+
+    else:
+        # We are attempting to update a setting that does not require any special attention.
+
+        # Currently there are no other settings to be modified so this is just a placeholder
+        #  for future implementation.
+        pass
+
+    # Return the result back to the client.
+    return jsonify(stdRet(1, "successful"))
+
+@app.route("/api/getHallSettings", methods=["GET"])
+@login_required
+def getHallSettings(hallId=None):
+    # Return an object containing the list of Hall Settings for the desired Hall
+
+    fromServer = True
+    if hallId is None:          # Effectively: If API was called from the client and not from the server
+        userDict = getAuth()                                                    # Get the user's info from our database
+        hallId = userDict["hall_id"]
+        fromServer = False
+
+        # Check to see if the user is authorized to view these settings
+        if userDict["auth_level"] < 3:
+            logging.info("User Not Authorized - RA: {} attempted to get Hall Settings".format(userDict["ra_id"]))
+            return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+
+    logging.debug("Retrieving Hall Setting information for Hall: {}, From Server: {}".format(hallId, fromServer))
+
+
+    # Create the setting list that will be returned
+    settingList = []
+
+    cur = conn.cursor()
+
+    # Get the hall name
+    cur.execute("SELECT name FROM res_hall WHERE id = %s", (hallId,))
+
+    tmp = {"settingName": "Residence Hall Name",
+           "settingDesc": "The name of the Residence Hall.",
+           "settingVal": cur.fetchone()[0]}
+
+    # Add the hall settings to the settingList
+    settingList.append(tmp)
+
+    # Get the Google Calendar Information
+    cur.execute("""SELECT EXISTS 
+                      (SELECT token 
+                       FROM google_calendar_info
+                       WHERE res_hall_id = %s)""", (hallId,))
+
+    tmp = {"settingName": "Google Calendar Integration",
+           "settingDesc": "Connecting a Google Calendar account allows AHDs and HDs to export a given month's duty schedule to Google Calendar.",
+           "settingVal": "Connected" if cur.fetchone()[0] else "Not Connected"}
+
+    settingList.append(tmp)
+
+    if fromServer:
+        return settingList
+    else:
+        return jsonify(settingList)
+
 #  -- Integration Methods --
 
 def createGoogleCalendar(calInfoId):
@@ -1838,6 +1932,7 @@ def createGoogleCalendar(calInfoId):
     return stdRet(1, "Successful")
 
 @app.route("/int/GCalRedirect", methods=["GET"])
+@login_required
 def returnGCalRedirect():
     # Redirect the user to the Google Calendar Authorization Page
     userDict = getAuth()
@@ -1886,6 +1981,7 @@ def returnGCalRedirect():
     return redirect(authURL)
 
 @app.route("/int/GCalAuth", methods=["GET"])
+@login_required
 def handleGCalAuthResponse():
     # Generate Google Calendar credentials and save in DB
 
@@ -1967,6 +2063,7 @@ def handleGCalAuthResponse():
     return redirect(url_for("manHall"))
 
 @app.route("/int/disconnectGCal", methods=["GET"])
+@login_required
 def disconnectGoogleCalendar():
     # Disconnect the Google Calendar for the given hall/user
 
@@ -1989,6 +2086,7 @@ def disconnectGoogleCalendar():
     return redirect(url_for("manHall"))
 
 @app.route("/api/exportToGCal", methods=["GET"])
+@login_required
 def exportToGCal():
 
     # Get the user's information
