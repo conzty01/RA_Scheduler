@@ -19,10 +19,15 @@ function showEditModal(id) {
     let valDiv;
     if (setName === "Google Calendar Integration") {
         valDiv = generateGoogleRow( setVal === "Connected" );
+        // Hide the Save button as it is not necessary
+        document.getElementById("savBut").style.display = "none";
 
     } else {
         // Otherwise generate a "standard" input valDiv
         valDiv = generateInputRow(setVal, "text");
+
+        // Make sure the Save Button is displayed
+        document.getElementById("savBut").style.display = "block";
 
     }
 
@@ -76,16 +81,16 @@ function generateGoogleRow(alreadyConnected) {
     let disconnButton = document.createElement("button");
 
     // If an account/partial account has not already been connected
-    if (!(alreadyConnected)) {
-        // Disable the Disconnect button
-        disconnButton.setAttribute("disabled", true)
-    }
+    if (alreadyConnected) {
+        // Set the Disconnect Attributes
+        disconnButton.innerHTML = "Disconnect Account";
+        disconnButton.setAttribute("type", "button");
+        disconnButton.setAttribute("class", "btn btn-danger");
+        disconnButton.setAttribute("onclick", "location.href='../int/disconnectGCal'");
 
-    // Set the Disconnect Attributes
-    disconnButton.innerHTML = "Disconnect Account";
-    disconnButton.setAttribute("type", "button");
-    disconnButton.setAttribute("class", "btn btn-danger");
-    disconnButton.setAttribute("onclick", "location.href='../int/disconnectGCal'");
+        // Add the disconnect button to the div
+        valDiv.appendChild(disconnButton);
+    }
 
     // Set the Connect/Reconnect Attributes
     connectButton.setAttribute("type", "button");
@@ -94,7 +99,6 @@ function generateGoogleRow(alreadyConnected) {
     connectButton.innerHTML = alreadyConnected ? "Reconnect Account" : "Connect Account";
 
     // Assemble the valDiv
-    valDiv.appendChild(disconnButton);
     valDiv.appendChild(connectButton);
 
     // Return the newly generated valDiv
