@@ -1,10 +1,9 @@
-from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import google_auth_oauthlib.flow
-import os.path
 import logging
+import os
 
 
 class gCalIntegratinator:
@@ -43,11 +42,6 @@ class gCalIntegratinator:
     def __init__(self, scopes=SCOPES):
         logging.debug("Creating gCalIntegratinator Object")
 
-        # Load the application credentials from the client_secret.json file
-        #  and use the scopes outlined in the scopes list
-        self.flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
-            'client_secret.json', scopes=scopes)
-
         # Name of Google service being used
         self.serviceName = "calendar"
 
@@ -58,13 +52,13 @@ class gCalIntegratinator:
         self.scopes = scopes
 
         # Load the app credentials from the environment
-        self.__appCreds = self.__getCredsFromEnv()
+        self.__appCreds = self._getCredsFromEnv()
 
         # Generate the oAuth2 flow for handling the client/app authentication
         self.flow = google_auth_oauthlib.flow.Flow.from_client_config(
             self.__appCreds, scopes=scopes)
 
-    def __getCredsFromEnv(self):
+    def _getCredsFromEnv(self):
         # This will return a desearlized JSON object that is assembled per
         #  Google's specifications. This object will be configured for a 'web' app
 
@@ -133,7 +127,7 @@ class gCalIntegratinator:
             retStatus = -3
 
         except Exception as e:
-            logging.exception(str(e))
+            logging.error(str(e))
             retStatus = -1
 
         logging.debug("Credential Status: {}".format(retStatus))
@@ -147,7 +141,7 @@ class gCalIntegratinator:
         self.flow.redirect_uri = redirect_uri
 
         # Return (auth_url, state) for the given redirect_uri
-        return self.flow.authorization_url(accses_type="offline",
+        return self.flow.authorization_url(access_type="offline",
                                            include_granted_scopes="true",
                                            prompt="select_account")
 
@@ -317,8 +311,32 @@ class Event:
         return self.__body
 
 
-def main():
-    pass
-
 if __name__ == "__main__":
-    main()
+
+    from unittest.mock import patch, MagicMock, PropertyMock
+
+    g = gCalIntegratinator()
+
+    #  -- ARRANGE --
+
+    # Create the Mocked objects
+    #  In this test, when the credentials are called, they should raise
+    #   an AttributeError
+    mockedClientCreds = MagicMock()
+    mocked_RefreshMethod = MagicMock(side_effect=ValueError)
+
+    # Mock the client credentials
+    credsMockAttrs = {
+        "valid": False,
+        "expired": True,
+        "refresh_token": True,
+        "refresh": mocked_RefreshMethod
+    }
+
+    # Configure the Mocked Client Creds
+    mockedClientCreds.configure_mock(**credsMockAttrs)
+
+    #  -- ACT --
+
+    validationStatus = g._checkIfValidCreds(mockedClientCreds)
+
