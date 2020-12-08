@@ -5,25 +5,63 @@ import unittest
 
 class TestGCalIntegratinatorObject(unittest.TestCase):
     def setUp(self):
-        # Create the gCalIntegrantinator object
-        self.gCalIntObj = gCalIntegratinator()
 
-        # # Mocked values
-        # self.authorization_url = "https://success.html"
-        # self.credentials = "VALID Credentials"
-        #
-        # # Replace the flow with a Mocked flow
-        # flowMockAttrs = {
-        #     "authorization_url.return_value" : self.authorization_url,
-        #     "credentials.return_value" : self.credentials,
-        # }
-        #
-        # flowMock = MagicMock()
-        # flowMock.configure_mock(**flowMockAttrs)
-        # self.gCalIntObj.flow = flowMock
-        #
-        #
-        # # Replace client credentials with Mocked client credentials
+        # Mock the os.environ method
+
+        # Helper Dict for holding the os.environ configuration
+        self.helper_osEnviron = {"CLIENT_ID": "TEST CLIENT_ID",
+                                      "PROJECT_ID": "TEST PROJECT_ID",
+                                      "AUTH_URI": "TEST AUTH_URI",
+                                      "TOKEN_URI": "TEST TOKEN_URI",
+                                      "AUTH_PROVIDER_X509_CERT_URL": "TEST AUTH_PROVIDER_X509_CERT_URL",
+                                      "CLIENT_SECRET": "TEST CLIENT_SECRET",
+                                      "REDIRECT_URIS": "TEST1,TEST2,TEST3,TEST4",
+                                      "JAVASCRIPT_ORIGINS": "TEST5,TEST6"}
+
+        # Create a dictionary patcher for the os.environ method
+        self.patcher_os = patch.dict("gCalIntegration.os.environ", self.helper_osEnviron)
+
+        self.patcher_flow = patch("gCalIntegration.google_auth_oauthlib.flow.Flow", autospec=True)
+
+        # Create the patcher for the googleapiclient
+        self.patcher_build = patch("gCalIntegration.build", autospec=True)
+
+        # Start the os patcher (No mock object is returned since we used patch.dict()
+        self.patcher_os.start()
+
+        # Start the flow patcher
+        self.mocked_flow = self.patcher_flow.start()
+
+        # Create the mocked .from_client_config.return_value object
+        self.authorizationURL = "TEST AUTH URL"
+        self.credentials = "TEST CREDENTIALS"
+
+        mocked_flowInstance_Config = {
+            "redirect_uri": "",
+            "authorization_url.return_value": self.authorizationURL,
+            "fetch_token.return_value": None,
+            "credentials": self.credentials
+        }
+        self.mocked_flowInstance = MagicMock(**mocked_flowInstance_Config)
+
+        # Mock the google_auth_oauthlib.flow.Flow module
+        mocked_flow_config = {
+            "from_client_config": MagicMock(return_value=self.mocked_flowInstance),
+            "redirect_uri": "",
+            "authorization_url": MagicMock(return_value=self.authorizationURL),
+            "fetch_token": MagicMock(return_value=None),
+            "credentials": MagicMock(return_value=self.credentials)}
+
+        self.mocked_flow.configure_mock(**mocked_flow_config)
+
+        # Start the googleapiclient patcher
+        self.mocked_build = self.patcher_build.start()
+
+    def tearDown(self):
+        # Stop all of the patchers
+        self.patcher_build.stop()
+        self.patcher_flow.stop()
+        self.patcher_os.stop()
 
     def test_HasExpectedMethods(self):
         # Test to make sure the Integration Object has the following methods:
@@ -33,11 +71,18 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         #  - exportScheduleToGoogleCalendar
         #  - _checkIfValidCreds
 
+        #  -- ARRANGE --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+        #  --   ACT   --
+        #  -- ASSERT  --
+
+        self.assertTrue(hasattr(gCalIntegratinator, "_getCredsFromEnv"))
+        self.assertTrue(hasattr(gCalIntegratinator, "_checkIfValidCreds"))
         self.assertTrue(hasattr(gCalIntegratinator, "generateAuthURL"))
         self.assertTrue(hasattr(gCalIntegratinator, "handleAuthResponse"))
         self.assertTrue(hasattr(gCalIntegratinator, "createGoogleCalendar"))
         self.assertTrue(hasattr(gCalIntegratinator, "exportScheduleToGoogleCalendar"))
-        self.assertTrue(hasattr(gCalIntegratinator, "_checkIfValidCreds"))
     def test_HasExpectedProperties(self):
         # Test to make sure the Integration Object has the following properties:
         #  - flow            :: Flow
@@ -45,33 +90,67 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         #  - serviceVersion  :: str
         #  - scopes          :: list<str>
 
-        self.assertEqual(type(self.gCalIntObj.flow), Flow)
-        self.assertEqual(type(self.gCalIntObj.serviceName), str)
-        self.assertEqual(type(self.gCalIntObj.serviceVersion), str)
-        self.assertEqual(type(self.gCalIntObj.scopes), list)
+        #  -- ARRANGE --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+
+        # Create a gCalIntegratinator
+        gCalIntObj = gCalIntegratinator()
+
+        #  --   ACT   --
+        #  -- ASSERT  --
+
+        self.assertIsInstance(gCalIntObj.serviceName, str)
+        self.assertIsInstance(gCalIntObj.serviceVersion, str)
+        self.assertIsInstance(gCalIntObj.scopes, list)
+        # The following asserts that the .flow attribute is a Mock object instead of a true Flow
+        #  object. This is because we mock the Flow object from a module level for these tests.
+        #  As a result, if the .flow attribute is a Mock object, then we know it was created
+        #  through the module as we would expect.
+        self.assertIsInstance(gCalIntObj.flow, MagicMock)
     def test_HasExpectedDefaultScopes(self):
         # Test to make sure the Integration Object has the default scopes:
         #  - https://www.googleapis.com/auth/calendar.app.created
         #  - https://www.googleapis.com/auth/calendar.calendarlist.readonly
 
+        #  -- ARRANGE --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+
+        # The default scopes we would expect to use
         defaultScopes = ['https://www.googleapis.com/auth/calendar.app.created',
                          'https://www.googleapis.com/auth/calendar.calendarlist.readonly']
 
-        self.assertEqual(self.gCalIntObj.scopes, defaultScopes)
-    @patch("gCalIntegration.google_auth_oauthlib.flow.Flow", autospec=True)
-    @patch.dict("gCalIntegration.os.environ", {"CLIENT_ID": "TEST CLIENT_ID",
-                                               "PROJECT_ID": "TEST PROJECT_ID",
-                                               "AUTH_URI": "TEST AUTH_URI",
-                                               "TOKEN_URI": "TEST TOKEN_URI",
-                                               "AUTH_PROVIDER_X509_CERT_URL": "TEST AUTH_PROVIDER_X509_CERT_URL",
-                                               "CLIENT_SECRET": "TEST CLIENT_SECRET",
-                                               "REDIRECT_URIS": "TEST1,TEST2,TEST3,TEST4",
-                                               "JAVASCRIPT_ORIGINS": "TEST5,TEST6"})
-    def test_HasExpectedFlow(self, mocked_flow):
+        gCalIntObj = gCalIntegratinator()
+
+        #  --   ACT   --
+        #  -- ASSERT  --
+        self.assertEqual(gCalIntObj.scopes, defaultScopes)
+    def test_HasUsesProvidedScopes(self):
+        # Test to make sure the Integration Object uses the scopes passed
+        #  in to it
+        #  - https://www.googleapis.com/auth/calendar.app.created
+        #  - https://www.googleapis.com/auth/calendar.calendarlist.readonly
+
+        #  -- ARRANGE --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+
+        # The "scopes" we are passing in
+        newScopes = ['TEST SCOPE 1', 'TEST SCOPE 1']
+
+        gCalIntObj = gCalIntegratinator(newScopes)
+
+        #  --   ACT   --
+        #  -- ASSERT  --
+        self.assertEqual(gCalIntObj.scopes, newScopes)
+
+    def test_HasExpectedFlow(self):
         # Test to ensure that the Google API Flow is created
         #  as expected
 
-        #  -- ARRANGE --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
 
         # Configure the mocked_os to return results as we would expect
 
@@ -80,14 +159,14 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         # The expected .__appCreds that should be passed into the flow upon construction
         expectedConfigFormat = {
             "web": {
-                "client_id": "TEST CLIENT_ID",
-                "project_id": "TEST PROJECT_ID",
-                "auth_uri": "TEST AUTH_URI",
-                "token_uri": "TEST TOKEN_URI",
-                "auth_provider_x509_cert_url": "TEST AUTH_PROVIDER_X509_CERT_URL",
-                "client_secret": "TEST CLIENT_SECRET",
-                "redirect_uris": [entry for entry in "TEST1,TEST2,TEST3,TEST4".split(",")],
-                "javascript_origins": [entry for entry in "TEST5,TEST6".split(",")]
+                "client_id": self.helper_osEnviron["CLIENT_ID"],
+                "project_id": self.helper_osEnviron["PROJECT_ID"],
+                "auth_uri": self.helper_osEnviron["AUTH_URI"],
+                "token_uri": self.helper_osEnviron["TOKEN_URI"],
+                "auth_provider_x509_cert_url": self.helper_osEnviron["AUTH_PROVIDER_X509_CERT_URL"],
+                "client_secret": self.helper_osEnviron["CLIENT_SECRET"],
+                "redirect_uris": [entry for entry in self.helper_osEnviron["REDIRECT_URIS"].split(",")],
+                "javascript_origins": [entry for entry in self.helper_osEnviron["JAVASCRIPT_ORIGINS"].split(",")]
             }
         }
 
@@ -96,12 +175,6 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         expectedScopes = ['https://www.googleapis.com/auth/calendar.app.created',
                           'https://www.googleapis.com/auth/calendar.calendarlist.readonly']
 
-        # Create the .from_client_config method for the mocked flow
-        mocked_FromClientConfigMethod = MagicMock()
-
-        # Pass the mocked .from_client_config method to the mocked_flow object
-        mocked_flow.from_client_config = mocked_FromClientConfigMethod
-
         #  -- ACT --
 
         # Build the gCaleIntegratinator that will have the mocked Flow and os
@@ -109,21 +182,44 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
 
         #  -- ASSERT --
 
-        mocked_FromClientConfigMethod.assert_called_once_with(expectedConfigFormat, scopes=expectedScopes)
+        self.mocked_flow.from_client_config.assert_called_once_with(
+                                    expectedConfigFormat, scopes=expectedScopes)
 
     def test_UsesCalendarService(self):
-        # Test to make sure the Integration Object has a serviceName of 'calendar':
+        # Test to make sure the Integration Object has a serviceName of 'calendar'
 
-        self.assertEqual(self.gCalIntObj.serviceName, "calendar")
+        #  -- ARRANGE --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+
+        # Create the gCalIntObj
+        gCalIntObj = gCalIntegratinator()
+
+        #  --   ACT   --
+        #  -- ASSERT  --
+
+        self.assertEqual(gCalIntObj.serviceName, "calendar")
     def test_UsesCalendarVersion3(self):
         # Test to make sure the Integration Object has a serviceVersion of 'v3':
 
-        self.assertEqual(self.gCalIntObj.serviceVersion, "v3")
+        #  -- ARRANGE --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+
+        # Create the gCalIntObj
+        gCalIntObj = gCalIntegratinator()
+
+        #  --   ACT   --
+        #  -- ASSERT  --
+
+        self.assertEqual(gCalIntObj.serviceVersion, "v3")
 
     def test_checkIfValidCreds_AcceptsValidCreds(self):
         # Test to make sure _checkIfValidCreds accepts valid credentials
 
         #  -- ARRANGE --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
 
         # Create the Mocked objects
         mockedClientCreds = MagicMock()
@@ -142,9 +238,12 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         # Configure the Mocked Client Creds
         mockedClientCreds.configure_mock(**credsMockAttrs)
 
+        # Create the gCalIntObj
+        gCalIntObj = gCalIntegratinator()
+
         #  -- ACT --
 
-        validationStatus = self.gCalIntObj._checkIfValidCreds(mockedClientCreds)
+        validationStatus = gCalIntObj._checkIfValidCreds(mockedClientCreds)
 
         #  -- ASSERT --
 
@@ -161,6 +260,11 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         #  that have expired but do have a refresh token associated with them.
 
         #  -- ARRANGE --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+
+        # Create the gCalIntObj
+        gCalIntObj = gCalIntegratinator()
 
         # Create the Mocked objects
         mockedClientCreds = MagicMock()
@@ -179,7 +283,7 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
 
         #  -- ACT --
 
-        validationStatus = self.gCalIntObj._checkIfValidCreds(mockedClientCreds)
+        validationStatus = gCalIntObj._checkIfValidCreds(mockedClientCreds)
 
         #  -- ASSERT --
 
@@ -194,6 +298,11 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         #  token associated with them.
 
         #  -- ARRANGE --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+
+        # Create the gCalIntObj
+        gCalIntObj = gCalIntegratinator()
 
         # Create the Mocked objects
         mockedClientCreds = MagicMock()
@@ -212,7 +321,7 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
 
         #  -- ACT --
 
-        validationStatus = self.gCalIntObj._checkIfValidCreds(mockedClientCreds)
+        validationStatus = gCalIntObj._checkIfValidCreds(mockedClientCreds)
 
         #  -- ASSERT --
 
@@ -226,6 +335,11 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         #  receives an object that is not a Google Credential
 
         #  -- ARRANGE --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+
+        # Create the gCalIntObj
+        gCalIntObj = gCalIntegratinator()
 
         # Create the Mocked objects
         #  In this test, when the credentials are used, they should raise
@@ -246,7 +360,7 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
 
         #  -- ACT --
 
-        validationStatus = self.gCalIntObj._checkIfValidCreds(mockedClientCreds)
+        validationStatus = gCalIntObj._checkIfValidCreds(mockedClientCreds)
 
         #  -- ASSERT --
 
@@ -257,6 +371,11 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         #  occurs when attempting to validate credentials
 
         #  -- ARRANGE --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+
+        # Create the gCalIntObj
+        gCalIntObj = gCalIntegratinator()
 
         # Create the Mocked objects
         #  In this test, when the credentials are called, they should raise
@@ -277,96 +396,59 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
 
         #  -- ACT --
 
-        validationStatus = self.gCalIntObj._checkIfValidCreds(mockedClientCreds)
+        validationStatus = gCalIntObj._checkIfValidCreds(mockedClientCreds)
 
         #  -- ASSERT --
 
         # Assert that we received a validation status of -3
         self.assertEqual(validationStatus, -1)
 
-    @patch("gCalIntegration.os", autospec=True)
-    def test_getCredsFromEnv_ReturnsConfigurationInExpectedFormat(self, mocked_os):
+    def test_getCredsFromEnv_ReturnsConfigurationInExpectedFormat(self):
         # Test to ensure that the proper values get imported from
         #  the environment.
 
         #  -- ARRANGE --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
 
         # Create the Mocked objects
-
-        # Helper Dict to keep track of the keys we want
-        helperDict = {
-            "CLIENT_ID": "TEST CLIENT_ID",
-            "PROJECT_ID": "TEST PROJECT_ID",
-            "AUTH_URI": "TEST AUTH_URI",
-            "TOKEN_URI": "TEST TOKEN_URI",
-            "AUTH_PROVIDER_X509_CERT_URL": "TEST AUTH_PROVIDER_X509_CERT_URL",
-            "CLIENT_SECRET": "TEST CLIENT_SECRET",
-            "REDIRECT_URIS": "TEST1,TEST2,TEST3,TEST4",
-            "JAVASCRIPT_ORIGINS": "TEST5,TEST6"
-        }
-
-        # Create the .environ Mock object
-        mocked_EnvironMethod = MagicMock()
-        mocked_EnvironMethod.__getitem__.side_effect = helperDict.__getitem__
-
-        # Mock the os module
-        osMockAttrs = {
-            "environ": mocked_EnvironMethod
-        }
 
         # The expected dictionary to be returned
         expectedConfigFormat = {
             "web": {
-                "client_id": helperDict["CLIENT_ID"],
-                "project_id": helperDict["PROJECT_ID"],
-                "auth_uri": helperDict["AUTH_URI"],
-                "token_uri": helperDict["TOKEN_URI"],
-                "auth_provider_x509_cert_url": helperDict["AUTH_PROVIDER_X509_CERT_URL"],
-                "client_secret": helperDict["CLIENT_SECRET"],
-                "redirect_uris": [entry for entry in helperDict["REDIRECT_URIS"].split(",")],
-                "javascript_origins": [entry for entry in helperDict["JAVASCRIPT_ORIGINS"].split(",")]
+                "client_id": self.helper_osEnviron["CLIENT_ID"],
+                "project_id": self.helper_osEnviron["PROJECT_ID"],
+                "auth_uri": self.helper_osEnviron["AUTH_URI"],
+                "token_uri": self.helper_osEnviron["TOKEN_URI"],
+                "auth_provider_x509_cert_url": self.helper_osEnviron["AUTH_PROVIDER_X509_CERT_URL"],
+                "client_secret": self.helper_osEnviron["CLIENT_SECRET"],
+                "redirect_uris": [entry for entry in self.helper_osEnviron["REDIRECT_URIS"].split(",")],
+                "javascript_origins": [entry for entry in self.helper_osEnviron["JAVASCRIPT_ORIGINS"].split(",")]
             }
         }
 
-        # Configure the mocked_os
-        mocked_os.configure_mock(**osMockAttrs)
+        # Create the gCalIntObj
+        gCalIntObj = gCalIntegratinator()
 
         #  -- ACT --
 
-        returnConfigurationDict = self.gCalIntObj._getCredsFromEnv()
+        returnConfigurationDict = gCalIntObj._getCredsFromEnv()
 
         #  -- ASSERT --
 
         # Ensure that the return dict is in the format the Flow expects
         self.assertEqual(returnConfigurationDict, expectedConfigFormat)
 
-    @patch("gCalIntegration.google_auth_oauthlib.flow.Flow", autospec=True)
-    @patch.dict("gCalIntegration.os.environ", {"CLIENT_ID": "TEST CLIENT_ID",
-                                               "PROJECT_ID": "TEST PROJECT_ID",
-                                               "AUTH_URI": "TEST AUTH_URI",
-                                               "TOKEN_URI": "TEST TOKEN_URI",
-                                               "AUTH_PROVIDER_X509_CERT_URL": "TEST AUTH_PROVIDER_X509_CERT_URL",
-                                               "CLIENT_SECRET": "TEST CLIENT_SECRET",
-                                               "REDIRECT_URIS": "TEST1,TEST2,TEST3,TEST4",
-                                               "JAVASCRIPT_ORIGINS": "TEST5,TEST6"})
-    def test_generateAuthURL_SetsRedirectURI(self, mocked_flow):
+    def test_generateAuthURL_SetsRedirectURI(self):
         # Test to ensure that generateAuthURL sets the redirect_uri
         #  of the flow
 
         #  -- ARRANGE --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+        self.mocked_flowInstance.reset_mock()
 
-        testAuthURI = "TEST_AUTH_URL"
-
-        # Create the result from .from_client_config
-        mocked_FromClientConfigResult = MagicMock()
-
-        # Add the mocked .from_client_config method to mocked flow
-        mocked_flow.configure_mock(**{"from_client_config.return_value": mocked_FromClientConfigResult})
-
-        # Since the .from_client_config method returns a Flow that is used by the gCalIntegratinator,
-        #  we will create a new variable name for the same object to keep it clear in our heads
-        #  as to how we want to use it.
-        mocked_FlowInstance = mocked_FromClientConfigResult
+        testAuthURI = self.authorizationURL
 
         #  -- ACT --
 
@@ -379,32 +461,15 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         #  -- ASSERT --
 
         # Make sure that the redirect_uri has been set
-        self.assertEqual(mocked_FlowInstance.redirect_uri, testAuthURI)
-    @patch("gCalIntegration.google_auth_oauthlib.flow.Flow", autospec=True)
-    @patch.dict("gCalIntegration.os.environ", {"CLIENT_ID": "TEST CLIENT_ID",
-                                               "PROJECT_ID": "TEST PROJECT_ID",
-                                               "AUTH_URI": "TEST AUTH_URI",
-                                               "TOKEN_URI": "TEST TOKEN_URI",
-                                               "AUTH_PROVIDER_X509_CERT_URL": "TEST AUTH_PROVIDER_X509_CERT_URL",
-                                               "CLIENT_SECRET": "TEST CLIENT_SECRET",
-                                               "REDIRECT_URIS": "TEST1,TEST2,TEST3,TEST4",
-                                               "JAVASCRIPT_ORIGINS": "TEST5,TEST6"})
-    def test_generateAuthURL_PassesExpectedParametersToFlowAuthorizationUrl(self, mocked_flow):
+        self.assertEqual(self.mocked_flowInstance.redirect_uri, testAuthURI)
+    def test_generateAuthURL_PassesExpectedParametersToFlowAuthorizationUrl(self):
         # Test to ensure that generateAuthURL passes the expected parameters into
         #  flow.authorization_url()
 
         #  -- ARRANGE --
-
-        # Create the result from .from_client_config
-        mocked_FromClientConfigResult = MagicMock()
-
-        # Add the mocked .from_client_config method to mocked flow
-        mocked_flow.configure_mock(**{"from_client_config.return_value": mocked_FromClientConfigResult})
-
-        # Since the .from_client_config method returns a Flow that is used by the gCalIntegratinator,
-        #  we will create a new variable name for the same object to keep it clear in our heads
-        #  as to how we want to use it.
-        mocked_FlowInstance = mocked_FromClientConfigResult
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+        self.mocked_flowInstance.reset_mock()
 
         #  -- ACT --
 
@@ -418,39 +483,16 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
 
         # Make sure that the expected parameters were passed to the authorization_url
         #  method within the mocked Flow
-        mocked_FlowInstance.authorization_url.assert_called_once_with(access_type="offline",
-                                                                      include_granted_scopes="true",
-                                                                      prompt="select_account")
-    @patch("gCalIntegration.google_auth_oauthlib.flow.Flow", autospec=True)
-    @patch.dict("gCalIntegration.os.environ", {"CLIENT_ID": "TEST CLIENT_ID",
-                                               "PROJECT_ID": "TEST PROJECT_ID",
-                                               "AUTH_URI": "TEST AUTH_URI",
-                                               "TOKEN_URI": "TEST TOKEN_URI",
-                                               "AUTH_PROVIDER_X509_CERT_URL": "TEST AUTH_PROVIDER_X509_CERT_URL",
-                                               "CLIENT_SECRET": "TEST CLIENT_SECRET",
-                                               "REDIRECT_URIS": "TEST1,TEST2,TEST3,TEST4",
-                                               "JAVASCRIPT_ORIGINS": "TEST5,TEST6"})
-    def test_generateAuthURL_ReturnsAuthorizationURL(self, mocked_flow):
+        self.mocked_flowInstance.authorization_url.assert_called_once_with(access_type="offline",
+                                                                           include_granted_scopes="true",
+                                                                           prompt="select_account")
+    def test_generateAuthURL_ReturnsAuthorizationURL(self):
         # Test to ensure that generateAuthURL returns an authorization url
 
         #  -- ARRANGE --
-
-        expectedAuthURL = "The Expected Authorization URL"
-
-        # Create the result from .from_client_config
-        mocked_FromClientConfigResult = MagicMock()
-
-        # Configure the mocked_FromClientConfigResult to return
-        #  the expectedAuthURL when called
-        mocked_FromClientConfigResult.configure_mock(**{"authorization_url.return_value": expectedAuthURL})
-
-        # Add the mocked .from_client_config method to mocked flow
-        mocked_flow.configure_mock(**{"from_client_config.return_value": mocked_FromClientConfigResult})
-
-        # Since the .from_client_config method returns a Flow that is used by the gCalIntegratinator,
-        #  we will create a new variable name for the same object to keep it clear in our heads
-        #  as to how we want to use it.
-        mocked_FlowInstance = mocked_FromClientConfigResult
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+        self.mocked_flowInstance.reset_mock()
 
         #  -- ACT --
 
@@ -461,84 +503,208 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         result = gCalIntObj.generateAuthURL("TEST")
 
         #  -- ASSERT --
-        mocked_FlowInstance.authorization_url.assert_called_once()
-        self.assertEqual(expectedAuthURL, result)
+        self.mocked_flowInstance.authorization_url.assert_called_once()
+        self.assertEqual(self.authorizationURL, result)
 
     def test_handleAuthResponse_SetsRedirectURI(self):
         # Test to ensure that handleAuthResponse sets the flow's redirect_uri
 
         #  -- ARRANGE --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+        self.mocked_flowInstance.reset_mock()
+
+        testRedirectURI = "TEST_AUTH_URL"
+        testAuthResponse = ""
 
         #  -- ACT --
 
+        # Build the gCaleIntegratinator that will have use the mocked Flow
+        gCalIntObj = gCalIntegratinator()
+
+        # Run the auth url generation process
+        gCalIntObj.handleAuthResponse(testAuthResponse, testRedirectURI)
+
         #  -- ASSERT --
-        pass
+
+        # Make sure that the redirect_uri has been set
+        self.assertEqual(self.mocked_flowInstance.redirect_uri, testRedirectURI)
     def test_handleAuthResponse_FetchesTheFlowToken(self):
         # Test to ensure that handleAuthResponse calls flow.fetch_token
         #  while passing it the authorization_response
 
         #  -- ARRANGE --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+        self.mocked_flowInstance.reset_mock()
+
+        testRedirectURI = "TEST_AUTH_URL"
 
         #  -- ACT --
 
+        # Build the gCaleIntegratinator that will have use the mocked Flow
+        gCalIntObj = gCalIntegratinator()
+
+        # Run the auth url generation process
+        gCalIntObj.handleAuthResponse(None, testRedirectURI)
+
         #  -- ASSERT --
-        pass
+
+        # Make sure that the redirect_uri has been set
+        self.assertEqual(self.mocked_flowInstance.redirect_uri, testRedirectURI)
     def test_handleAuthResponse_ReturnsFlowCredentials(self):
         # Test to ensure that handleAuthResponse returns the flow.credentials
 
         #  -- ARRANGE --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+        self.mocked_flowInstance.reset_mock()
+
+        testRedirectURI = "TEST_AUTH_URL"
 
         #  -- ACT --
 
+        # Build the gCaleIntegratinator that will have use the mocked Flow
+        gCalIntObj = gCalIntegratinator()
+
+        # Run the auth url generation process
+        result = gCalIntObj.handleAuthResponse(None, testRedirectURI)
+
         #  -- ASSERT --
-        pass
+
+        # Make sure that the redirect_uri has been set
+        self.assertEqual(self.credentials, result)
 
     def test_createGoogleCalendar_checksIfCredentialsAreValid(self):
         # Test to ensure that createGoogleCalendar checks to ensure
         #  that the passed credentials are valid
 
         #  -- ARRANGE --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+        self.mocked_flowInstance.reset_mock()
+        self.mocked_build.reset_mock()
+
+        # Mock the client credentials
+        mocked_creds = MagicMock(**{
+            "valid": False,
+            "expired": True,
+            "refresh_token": True,
+            "refresh": MagicMock(side_effect=AttributeError)
+        })
 
         #  -- ACT --
 
+        # Create the gCalIntObj
+        gCalIntObj = gCalIntegratinator()
+
+        # Call the createGoogleCalendar method
+        result = gCalIntObj.createGoogleCalendar(mocked_creds)
+
         #  -- ASSERT --
-        pass
+        self.assertEqual(-3, result)
     def test_createGoogleCalendar_buildsCalendarV3Service(self):
         # Test to ensure that createGoogleCalendar builds the Calendar V3
         #  service with the client credentials
 
         #  -- ARRANGE --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+        self.mocked_flowInstance.reset_mock()
+        self.mocked_build.reset_mock()
+
+        # Mock the client credentials
+        mocked_creds = MagicMock(**{"valid": True})
+
+        # Create the gCalIntObj
+        gCalIntObj = gCalIntegratinator()
 
         #  -- ACT --
 
+        # Call the createGoogleCalendar method
+        gCalIntObj.createGoogleCalendar(mocked_creds)
+
         #  -- ASSERT --
-        pass
-    def test_createGoogleCalendar_buildsInsertsExpectedCalendarBody(self):
+        self.mocked_build.assert_called_once_with("calendar", "v3", credentials=mocked_creds)
+    def test_createGoogleCalendar_InsertsExpectedCalendarBody(self):
         # Test to ensure that createGoogleCalendar calls the Google Calendar
         #  api to insert a calendar using the expected body
 
         #  -- ARRANGE --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+        self.mocked_flowInstance.reset_mock()
+
+        # Mock the client credentials
+        mocked_creds = MagicMock(**{"valid": True})
+
+        # Get the mocked "service" that is returned from the build function
+        mocked_service = self.mocked_build("calendar", "v3", credentials=mocked_creds)
+
+        # Reset the mocked "build" function so that the last call does not
+        #  count towards it
+        self.mocked_build.reset_mock()
+
+        # Create the expected calendar body object
+        expectedCalBody = {
+            "summary": "RA Duty Schedule",
+            "description": "Calendar for the Resident Assistant Duty Schedule.\n\nCreated and added to by the RA Duty Scheduler Application (RADSA)."
+        }
+
+        # Create the gCalIntObj
+        gCalIntObj = gCalIntegratinator()
 
         #  -- ACT --
 
+        # Call the createGoogleCalendar method
+        gCalIntObj.createGoogleCalendar(mocked_creds)
+
         #  -- ASSERT --
-        pass
-    def test_createGoogleCalendar_buildsCalendarService(self):
+        mocked_service.calendars().insert.assert_called_once_with(body=expectedCalBody)
+        mocked_service.calendars().insert().execute.assert_called_once()
+    def test_createGoogleCalendar_ReturnsNewGoogleCalendarId(self):
         # Test to ensure that createGoogleCalendar returns the newly
         #  created Google calendar ID
 
         #  -- ARRANGE --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+        self.mocked_flowInstance.reset_mock()
+
+        # Mock the client credentials
+        mocked_creds = MagicMock(**{"valid": True})
+
+        # Get the mocked "service" that is returned from the build function
+        mocked_service = self.mocked_build("calendar", "v3", credentials=mocked_creds)
+
+        # Reset the mocked "build" function so that the last call does not
+        #  count towards it
+        self.mocked_build.reset_mock()
+
+        # Set up the mocked service to return a dict object with an "id" key
+        expectedID = "TEST ID"
+        mocked_service.calendars().insert().execute = MagicMock(return_value={"id": expectedID})
+
+        # Create the gCalIntObj
+        gCalIntObj = gCalIntegratinator()
 
         #  -- ACT --
 
+        # Call the createGoogleCalendar method
+        result = gCalIntObj.createGoogleCalendar(mocked_creds)
+
         #  -- ASSERT --
-        pass
+        self.assertEqual(expectedID, result)
 
     def test_exportScheduleToGoogleCalendar_checksIfCredentialsAreValid(self):
         # Test to ensure that exportScheduleToGoogleCalendar checks to ensure
         #  that the passed credentials are valid
 
         #  -- ARRANGE --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+        self.mocked_flowInstance.reset_mock()
+        self.mocked_build.reset_mock()
 
         #  -- ACT --
 
@@ -549,6 +715,10 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         #  appropriate Calendar V3 Service
 
         #  -- ARRANGE --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+        self.mocked_flowInstance.reset_mock()
+        self.mocked_build.reset_mock()
 
         #  -- ACT --
 
@@ -559,6 +729,10 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         #  that the expected calendar exists for the user
 
         #  -- ARRANGE --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+        self.mocked_flowInstance.reset_mock()
+        self.mocked_build.reset_mock()
 
         #  -- ACT --
 
@@ -569,6 +743,10 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         #  it is unable to locate an existing calendar for the user
 
         #  -- ARRANGE --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+        self.mocked_flowInstance.reset_mock()
+        self.mocked_build.reset_mock()
 
         #  -- ACT --
 
@@ -579,6 +757,10 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         #  an unknown HttpError from the Google API
 
         #  -- ARRANGE --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+        self.mocked_flowInstance.reset_mock()
+        self.mocked_build.reset_mock()
 
         #  -- ACT --
 
@@ -589,6 +771,10 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         #  to the Google Calendar API
 
         #  -- ARRANGE --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+        self.mocked_flowInstance.reset_mock()
+        self.mocked_build.reset_mock()
 
         #  -- ACT --
 
@@ -599,6 +785,10 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         #  from the Google Calendar API when attempting to create new events
 
         #  -- ARRANGE --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+        self.mocked_flowInstance.reset_mock()
+        self.mocked_build.reset_mock()
 
         #  -- ACT --
 
