@@ -1,37 +1,49 @@
 from flask_login import UserMixin, current_user, LoginManager, login_required, login_user, logout_user
-from flask import Flask, render_template, request, jsonify, redirect, url_for, make_response
+from flask import Flask, render_template, request, jsonify, redirect, url_for
 from flask_dance.consumer.backend.sqla import OAuthConsumerMixin, SQLAlchemyBackend
-from flask_dance.contrib.google import make_google_blueprint, google
+from flask_dance.contrib.google import make_google_blueprint
 from flask_dance.consumer import oauth_authorized
+from gCalIntegration import gCalIntegratinator
 from sqlalchemy.orm.exc import NoResultFound
-from werkzeug.utils import secure_filename
 from flask_sqlalchemy import SQLAlchemy
 from flask_bootstrap import Bootstrap
-from flask.wrappers import Response
+from logging.config import dictConfig
 from ra_sched import RA
+from io import BytesIO
 import scheduler4_0
 import copy as cp
 import datetime
 import psycopg2
 import calendar
 import logging
-import json
+import pickle
 import os
 
+import getGCalAuth
+
+# Configure the logger immediately per Flask recommendation
+
+# Get the logging level from the environment
 logLevel = os.environ["LOG_LEVEL"].upper()
 
-if logLevel == "DEBUG":
-    logLevel = logging.DEBUG
-elif logLevel == "INFO":
-    logLevel = logging.INFO
-elif logLevel == "WARNING":
-    logLevel = logging.WARNING
-elif logLevel == "ERROR":
-    logLevel = logging.ERROR
-elif logLevel == "CRITICAL":
-    logLevel = logging.CRITICAL
-else:
-    logLevel = logging.WARNING
+dictConfig({
+    'version': 1, # logging module specific-- DO NOT CHANGE
+    'formatters': {'default': {
+        'format': '[%(asctime)s.%(msecs)d] %(levelname)s in %(module)s: %(message)s',
+        'datefmt': '%Y-%m-%d %H:%M:%S',
+    }},
+    'handlers': {'wsgi': {
+        'class': 'logging.StreamHandler',
+        'stream': 'ext://flask.logging.wsgi_errors_stream',
+        'formatter': 'default'
+    }},
+    'root': {
+        'level': logLevel,
+        'handlers': ['wsgi']
+    }
+})
+
+HOST_URL = os.environ["HOST_URL"]
 
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
@@ -47,10 +59,16 @@ gBlueprint = make_google_blueprint(
 )
 app.register_blueprint(gBlueprint, url_prefix="/login")
 
+# Establish DB connection
 conn = psycopg2.connect(os.environ["DATABASE_URL"])
+
+# Set up baseOpts to be sent to each HTML template
 baseOpts = {
     "HOST_URL": os.environ["HOST_URL"]
 }
+
+# Instantiate gCalIntegratinator
+gCalInterface = gCalIntegratinator()
 
 ALLOWED_EXTENSIONS = {'txt','csv'}
 UPLOAD_FOLDER = "./static"
@@ -251,6 +269,44 @@ def getCurSchoolYear():
 
     return getSchoolYear(month, year)
 
+def formatDateStr(day, month, year, format="YYYY-MM-DD", divider="-"):
+    # Generate a date string so that it follows the provided format.
+
+    # Make sure the day is two digits
+    if day < 10:
+        dayStr = "0" + str(day)
+    else:
+        dayStr = str(day)
+
+    # Make sure the month is two digits
+    if month < 10:
+        monthStr = "0" + str(month)
+    else:
+        monthStr = str(month)
+
+    # Figure out what the desired format is
+    #  this can be done by splitting the format string
+    #  by the divider and checking each part to see
+    #  if it contains a "Y", "M", or "D"
+
+    partList = format.split(divider)
+
+    result = ""
+    for part in partList:
+        if "Y" in part.upper():
+            result += str(year)
+
+        elif "M" in part.upper():
+            result += monthStr
+
+        elif "D" in part.upper():
+            result += dayStr
+
+        # Add the divider to the result
+        result += divider
+
+    return result[:-1]
+
 #     -- Views --
 
 @app.route("/logout")
@@ -341,6 +397,18 @@ def manStaff():
     return render_template("staff.html",raList=cur.fetchall(),auth_level=userDict["auth_level"], \
                             opts=baseOpts,curView=3, hall_name=userDict["hall_name"], pts=ptStats)
 
+@app.route("/hall")
+@login_required
+def manHall():
+    userDict = getAuth()
+
+    if userDict["auth_level"] < 3:
+        logging.info("User Not Authorized - RA: {} attempted to reach Manage Hall page".format(userDict["ra_id"]))
+        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+
+    return render_template("hall.html", opts=baseOpts, curView=4, settingList=getHallSettings(userDict["hall_id"]),
+                           auth_level=userDict["auth_level"], hall_name=userDict["hall_name"])
+
 @app.route("/editBreaks", methods=['GET'])
 @login_required
 def editBreaks():
@@ -348,7 +416,7 @@ def editBreaks():
 
     if userDict["auth_level"] < 2:
         logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
-        return jsonfiy(stdRet(-1,"NOT AUTHORIZED"))
+        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
 
     start, end = getCurSchoolYear()
     logging.debug(start)
@@ -559,7 +627,7 @@ def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None
 
 @app.route("/api/getSchedule", methods=["GET"])
 @login_required
-def getSchedule2(monthNum=None,year=None,hallId=None,allColors=None):
+def getSchedule2(start=None,end=None,hallId=None, showAllColors=None):
     # API Hook that will get the requested schedule for a given month.
     #  The month will be given via request.args as 'monthNum' and 'year'.
     #  The server will then query the database for the appropriate schedule
@@ -568,9 +636,7 @@ def getSchedule2(monthNum=None,year=None,hallId=None,allColors=None):
     #  return an empty list
 
     fromServer = True
-    if monthNum is None and year is None and hallId is None and allColors is None:                    # Effectively: If API was called from the client and not from the server
-        monthNum = int(request.args.get("monthNum"))
-        year = int(request.args.get("year"))
+    if start is None and end is None and hallId is None and showAllColors is None:                    # Effectively: If API was called from the client and not from the server
         start = request.args.get("start").split("T")[0]                         # No need for the timezone in our current application
         end = request.args.get("end").split("T")[0]                             # No need for the timezone in our current application
 
@@ -615,7 +681,7 @@ def getSchedule2(monthNum=None,year=None,hallId=None,allColors=None):
     for row in rawRes:
         # If the ra is the same as the user, then display their color
         #  Otherwise, display a generic color.
-        #logging.debug("Ra is same as user? {}".format(userDict["ra_id"] == row[3]))
+        # logging.debug("Ra is same as user? {}".format(userDict["ra_id"] == row[3]))
         if not(showAllColors):
             # If the desired behavior is to not show all of the unique RA colors
             #  then check to see if the current user is the ra on the duty being
@@ -636,7 +702,7 @@ def getSchedule2(monthNum=None,year=None,hallId=None,allColors=None):
             "title": row[0] + " " + row[1],
             "start": row[4],
             "color": c,
-            "extendedProps": {"dutyType":"std"}
+            "extendedProps": {"dutyType": "std"}
         })
 
     if fromServer:
@@ -1702,25 +1768,417 @@ def deleteBreakDuty():
             logging.info("Unable to locate beak duty to delete: RA {}, Date {}".format(fName + " " + lName, dateStr))
             return jsonify({"status":0,"error":"Unable to find parameters in DB"})
 
+@app.route("/api/saveHallSettings", methods=["POST"])
+@login_required
+def saveHallSettings():
+    # Save the hall settings received
+
+    userDict = getAuth()
+
+    # Ensure that the user is at least an AHD
+    if userDict["auth_level"] < 3:
+        logging.info("User Not Authorized - RA: {} attempted to overwrite Hall Settings for : {}"
+                     .format(userDict["ra_id"], userDict["hall_id"]))
+
+        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+
+    # Get the name and value of the setting that was changed.
+    data = request.json
+    setName = data["name"]
+    setVal = data["value"]
+
+    logging.debug("Setting Name: {}".format(setName))
+    logging.debug("Setting Value: {}".format(setVal))
+
+    # Create a cursor
+    cur = conn.cursor()
+
+    # Figure out what setting we are attempting to change and whether
+    # is should be handled in a special way.
+
+    if setName == "Residence Hall Name":
+        # We are attempting to update the res_hall.name field in the DB
+
+        # Make sure that the user belongs to that Hall
+        cur.execute("""SELECT res_hall.id
+                       FROM res_hall JOIN ra ON (ra.hall_id = res_hall.id)
+                       WHERE ra.id = %s;""", (userDict["ra_id"],))
+
+        dbHallId = cur.fetchone()
+
+        if dbHallId is None:
+            # If we returned no values, then something fishy is going on.
+            #  Simply return a not authorized message and stop processing.
+
+            logging.info("User Not Authorized - RA: {} attempted to overwrite Hall Settings for : {}"
+                         .format(userDict["ra_id"], userDict["hall_id"]))
+
+            return jsonify(stdRet(0, "NOT AUTHORIZED"))
+
+        else:
+            # Otherwise go ahead and update the value.
+
+            logging.info("User: {} is updating Hall Setting: '{}' for Hall: {}".format(userDict["ra_id"],
+                                                                                       setName, userDict["hall_id"]))
+
+            cur.execute("UPDATE res_hall SET name = %s WHERE id = %s", (setVal, userDict["hall_id"]))
+
+            # set the return value to successful
+            return jsonify(stdRet(1, "successful"))
+
+    else:
+        # We are attempting to update a setting that does not require any special attention.
+
+        # Currently there are no other settings to be modified so this is just a placeholder
+        #  for future implementation.
+        pass
+
+    # Return the result back to the client.
+    return jsonify(stdRet(1, "successful"))
+
+@app.route("/api/getHallSettings", methods=["GET"])
+@login_required
+def getHallSettings(hallId=None):
+    # Return an object containing the list of Hall Settings for the desired Hall
+
+    fromServer = True
+    if hallId is None:          # Effectively: If API was called from the client and not from the server
+        userDict = getAuth()                                                    # Get the user's info from our database
+        hallId = userDict["hall_id"]
+        fromServer = False
+
+        # Check to see if the user is authorized to view these settings
+        if userDict["auth_level"] < 3:
+            logging.info("User Not Authorized - RA: {} attempted to get Hall Settings".format(userDict["ra_id"]))
+            return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+
+    logging.debug("Retrieving Hall Setting information for Hall: {}, From Server: {}".format(hallId, fromServer))
+
+
+    # Create the setting list that will be returned
+    settingList = []
+
+    cur = conn.cursor()
+
+    # Get the hall name
+    cur.execute("SELECT name FROM res_hall WHERE id = %s", (hallId,))
+
+    tmp = {"settingName": "Residence Hall Name",
+           "settingDesc": "The name of the Residence Hall.",
+           "settingVal": cur.fetchone()[0]}
+
+    # Add the hall settings to the settingList
+    settingList.append(tmp)
+
+    # Get the Google Calendar Information
+    cur.execute("""SELECT EXISTS 
+                      (SELECT token 
+                       FROM google_calendar_info
+                       WHERE res_hall_id = %s)""", (hallId,))
+
+    tmp = {"settingName": "Google Calendar Integration",
+           "settingDesc": "Connecting a Google Calendar account allows AHDs and HDs to export a given month's duty schedule to Google Calendar.",
+           "settingVal": "Connected" if cur.fetchone()[0] else "Not Connected"}
+
+    settingList.append(tmp)
+
+    if fromServer:
+        return settingList
+    else:
+        return jsonify(settingList)
+
+#  -- Integration Methods --
+
+def createGoogleCalendar(calInfoId):
+    # Create a Secondary Google Calendar for the provided hall
+
+    # Get the hall's credentials
+    cur = conn.cursor()
+
+    logging.debug("Searching for the Hall's Calendar Information")
+    cur.execute("SELECT token FROM google_calendar_info WHERE id = %s",
+                (calInfoId,))
+
+    memview = cur.fetchone()
+
+    # Check to see if we got a result
+    if memview is None:
+        logging.info("No Google Calendar token found for Id: {}".format(calInfoId))
+
+        return jsonify(stdRet(-1, "No Token Found"))
+
+    # If there is a token in the DB it will be returned as a MemoryView
+
+    logging.debug("Converting Google Calendar Token to pickle")
+
+    # Convert the memview object to BytesIO object
+    tmp = BytesIO(memview[0])
+
+    # Convert the BytesIO object to a google.oauth2.credentials.Credentials object
+    #  This is done by unpickling the object
+    token = pickle.load(tmp)
+
+    logging.debug("Creating Google Calendar")
+    calId = gCalInterface.createGoogleCalendar(token)
+
+    logging.debug("Updating Google Calendar Information")
+    # Add the calendar_id into the Google Calendar Info table
+    cur.execute("""UPDATE google_calendar_info
+                   SET calendar_id = %s
+                   WHERE id = %s""", (calId, calInfoId))
+
+    conn.commit()
+
+    return stdRet(1, "Successful")
+
+@app.route("/int/GCalRedirect", methods=["GET"])
+@login_required
+def returnGCalRedirect():
+    # Redirect the user to the Google Calendar Authorization Page
+    userDict = getAuth()
+
+    # Make sure the user is at least a Hall Director
+    if userDict["auth_level"] < 3:
+        logging.info("User Not Authorized - RA: {} attempted to connect Google Calendar for Hall: {} -G"
+                     .format(userDict["ra_id"],userDict["hall_id"]))
+
+        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+
+    # Get the authorization url and state from the Google Calendar Interface
+    authURL, state = gCalInterface.generateAuthURL(HOST_URL + "/int/GCalAuth")
+
+    # Create the DB cursor object
+    cur = conn.cursor()
+
+    logging.debug("Checking for previously associated calendar for Hall: {}".format(userDict["hall_id"]))
+
+    # Check to see if a Google Calendar has been associated with the given hall.
+    #  This is used to keep track of the incoming authorization response
+    cur.execute("SELECT id FROM google_calendar_info WHERE res_hall_id = %s",
+                (userDict["hall_id"], ))
+
+    res = cur.fetchone()
+
+    # If there is not a calendar associated with the hall
+    if res is None:
+        # Then insert a new row
+        logging.debug("Insert new row into Google Calendar Info table")
+
+        cur.execute("""INSERT INTO google_calendar_info (res_hall_id, auth_state) 
+                        VALUES (%s, %s)""", (userDict["hall_id"], state))
+
+    else:
+        # Otherwise update the entry for the appropriate hall with the current state
+        logging.debug("Updating previous Google Calendar Info Row: {}".format(res[0]))
+
+        cur.execute("UPDATE google_calendar_info SET auth_state = %s WHERE id = %s",
+                    (state, res[0]))
+
+    logging.debug("Committing auth state to DB for Hall: {}".format(userDict["hall_id"]))
+    conn.commit()
+
+    # Redirect the user to the Google Authorization URL
+    return redirect(authURL)
+
+@app.route("/int/GCalAuth", methods=["GET"])
+@login_required
+def handleGCalAuthResponse():
+    # Generate Google Calendar credentials and save in DB
+
+    # Get the user's information
+    userDict = getAuth()
+
+    # Ensure that the user is at least a Hall Director
+    if userDict["auth_level"] < 3:
+        logging.info("User Not Authorized - RA: {} attempted to connect Google Calendar for Hall: {} -R"
+                     .format(userDict["ra_id"],userDict["hall_id"]))
+
+        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+
+    # Get the state that was passed back by the authorization response.
+    #  This is used to map the request to the response
+    state = request.args.get("state")
+
+    logging.debug("Found state in request")
+
+    # Create DB cursor object
+    cur = conn.cursor()
+
+    # Identify which hall maps to the state
+    logging.debug("Searching for hall associated with state")
+
+    cur.execute("SELECT id FROM google_calendar_info WHERE auth_state = %s", (state,))
+
+    calInfoId = cur.fetchone()
+
+    # Check to see if we have a result
+    if calInfoId is None:
+        # If not, stop processing
+        logging.debug("Associated hall not found")
+
+        return jsonify(stdRet(-1, "Invalid State Received"))
+
+    # Get the credentials from the Google Calendar Interface
+    creds = gCalInterface.handleAuthResponse(request.url, HOST_URL + "/int/GCalAuth")
+
+    logging.debug("Received user credentials from interface")
+
+    # Create BytesIO to hold the pickled credentials
+    tmp = BytesIO()
+
+    # Dump the pickled credentials into the BytesIO
+    pickle.dump(creds, tmp)
+
+    # Set the read position back to the beginning of the buffer.
+    #  Without doing this, pickle.load will get an EOF error.
+    tmp.seek(0)
+
+    logging.debug("Created credential pickle")
+
+    # Insert the credentials in the DB for the respective res_hall
+    cur.execute("""UPDATE google_calendar_info
+                   SET token = %s ,
+                       auth_state = NULL
+                   WHERE id = %s;""",
+                (tmp.getvalue(), calInfoId[0]))
+
+    logging.debug("Committing credentials to DB for Google Calendar Info: {}".format(calInfoId[0]))
+
+    res = createGoogleCalendar(calInfoId[0])
+
+    # If the calendar creation failed...
+    if res["status"] < 0:
+        # Then rollback the Google Calendar Connection
+        logging.warning("Unable to Create Google Calendar- Rolling back changes")
+        conn.rollback()
+
+    else:
+        # Otherwise add the calendar id to the DB.
+        logging.debug("Adding newly created Calendar Id to DB")
+
+        logging.info("Google Calendar Creation complete for Hall: {}".format(userDict["hall_id"]))
+        conn.commit()
+
+    # Return the user back to the Manage Hall page
+    return redirect(url_for("manHall"))
+
+@app.route("/int/disconnectGCal", methods=["GET"])
+@login_required
+def disconnectGoogleCalendar():
+    # Disconnect the Google Calendar for the given hall/user
+
+    userDict = getAuth()
+
+    # Make sure the user is at least a Hall Director
+    if userDict["auth_level"] < 3:
+        logging.info("User Not Authorized - RA: {} attempted to disconnect Google Calendar for Hall: {} -G"
+                     .format(userDict["ra_id"], userDict["hall_id"]))
+
+        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+
+    # Create the cursor
+    cur = conn.cursor()
+
+    # Delete the google_calendar_info record for the appropriate hall.
+    cur.execute("DELETE FROM google_calendar_info WHERE res_hall_id = %s;", (userDict["hall_id"], ))
+
+    # Redirect user back to Manage Hall page
+    return redirect(url_for("manHall"))
+
+@app.route("/api/exportToGCal", methods=["GET"])
+@login_required
+def exportToGCal():
+
+    # Get the user's information
+    userDict = getAuth()
+
+    # Ensure that the user is at least an AHD
+    if userDict["auth_level"] < 2:
+        logging.info("User Not Authorized - RA: {} attempted to export schedule to Google Calendar"
+                     .format(userDict["ra_id"]))
+
+        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+
+    logging.info("Attempting to export Schedule to Google Calendar")
+
+    # Get the Google Calendar credentials from the DB
+    logging.debug("Retrieving Google Calendar info from DB for Hall: {}".format(userDict["hall_id"]))
+    cur = conn.cursor()
+
+    cur.execute("SELECT calendar_id, token FROM google_calendar_info WHERE res_hall_id = %s",
+                (userDict["hall_id"], ))
+
+    res = cur.fetchone()
+
+    # Check to see if we got a result
+    if res is None:
+        logging.info("No Google Calendar token found for Hall: {}".format(userDict["hall_id"]))
+
+        return jsonify(stdRet(-1, "No Token Found"))
+
+    else:
+        # Split the result into its components
+        gCalId, memview = res
+
+    logging.debug("GCalId: {}".format(gCalId))
+
+    # If there is a token in the DB it will be returned as a MemoryView
+
+    # Convert the memview object to BytesIO object
+    tmp = BytesIO(memview)
+
+    # Convert the BytesIO object to a google.oauth2.credentials.Credentials object
+    #  This is done by unpickling the object
+    token = pickle.load(tmp)
+
+    logging.debug("Google Calendar information found.")
+
+    # Get the month/schedule information from the request args
+    #  and create the start and end strings
+    monthNum = int(request.args.get("monthNum"))
+    year = int(request.args.get("year"))
+
+    start = formatDateStr(1, monthNum, year)
+    end = formatDateStr(calendar.monthrange(year, monthNum)[-1], monthNum, year)
+
+    logging.debug("Retrieving schedule information for MonthNum: {} and Year: {}".format(monthNum, year))
+
+    # Get the appropriate schedule from the DB
+    #  Should be able to leverage existing RADSA API
+    sched = getSchedule2(start=start, end=end,
+                         hallId=userDict["hall_id"], showAllColors=True)
+
+    logging.debug("Exporting schedule to Google Calendar.")
+
+    # Pass the schedule to the Integratinator to be exported.
+    status = gCalInterface.exportScheduleToGoogleCalendar(token, gCalId, sched)
+
+    # If the export failed
+    if status < 0:
+        # Log that an error was encountered for future reference.
+        logging.warning("Error: {} encountered while exporting to Google Calendar for Hall: {}".format(status, userDict["hall_id"]))
+
+        # Then we will need to let the user know that they will need
+        #  to connect/reconnect their Google Calendar Account.
+
+        return jsonify(stdRet(0, "Reconnect Google Calendar Account"))
+
+    # Otherwise report that it was a success!
+    return jsonify(stdRet(1, "successful"))
+
 #     -- Error Handling --
 
 @app.route("/error/<string:msg>")
 def err(msg):
-    logging.info("Rendering error page")
+    logging.warning("Rendering error page with Message: {}".format(msg))
     return render_template("error.html", errorMsg=msg)
 
 if __name__ == "__main__":
 
-    local = os.environ["USE_ADHOC"]
-    if local:
-        logging.basicConfig(format='%(asctime)s.%(msecs)d %(levelname)s: %(message)s', \
-                            datefmt='%H:%M:%S', \
-                            level=logLevel, \
-                            #filename="scheduleServer_DEBUG.log", \
-                            #filemode="w"
-                            )
+    local = bool(os.environ["USE_ADHOC"])
 
-        app.run(ssl_context="adhoc", debug=True)
+    if local:
+        app.run(ssl_context="adhoc", debug=True, host='0.0.0.0')
+
     else:
-        logging.basicConfig(format='%(levelname)s: %(message)s', level=logLevel)
         app.run()

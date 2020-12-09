@@ -13,8 +13,12 @@
 {% block headerRow %}
 <h1>Enter Duty Conflicts</h1>
 <p>
-    <span style="color:green;font-weight:bold;">GREEN:</span> AVAILABLE for duty.
-    <span style="color:red;font-weight:bold;">RED:</span> UNAVAILABLE for duty.
+    <label class="switch" onclick="toggleColorBlind()" title="Color Blind Friendly View">
+        <input id="cbToggle" type="checkbox">
+        <span class="slider round"></span>
+    </label>
+    <span id="infoGreen" class="cbGreen">GREEN:</span> AVAILABLE for duty.
+    <span id="infoRed" class="cbRed">RED:</span> UNAVAILABLE for duty.
 </p>
 {% endblock headerRow %}
 

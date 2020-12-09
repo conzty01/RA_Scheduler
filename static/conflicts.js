@@ -133,6 +133,29 @@ function showPrevConflicts(conRes) {
 
 }
 
+function toggleColorBlind() {
+    // Toggle the color of the custGreen and custRed
+
+    let toggle = document.getElementById("cbToggle");
+
+    // If the toggle is checked, then change colors for colorblindness
+    if (toggle.checked) {
+        document.documentElement.style.setProperty("--custGreen", "var(--cbGreen)");
+        document.documentElement.style.setProperty("--custRed", "var(--cbRed)");
+
+        document.documentElement.style.setProperty("--custGreenTxt", "var(--cbGreenTxt)");
+        document.documentElement.style.setProperty("--custRedTxt", "var(--cbRedTxt)");
+
+    } else {
+        // Otherwise, set everything back to regular
+        document.documentElement.style.setProperty("--custGreen", "var(--rgGreen)");
+        document.documentElement.style.setProperty("--custRed", "var(--rgRed)");
+
+        document.documentElement.style.setProperty("--custGreenTxt", "var(--rgGreenTxt)");
+        document.documentElement.style.setProperty("--custRedTxt", "var(--rgRedTxt)");
+    }
+}
+
 function conflict_Submit() {
     // Submit the conflicts to the server
 
