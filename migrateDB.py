@@ -13,7 +13,7 @@ def migrate(conn):
 
     logging.info("  'google_calendar_info' Table Exists: {}".format(exists))
 
-    if not exists:
+    if not exists[0]:
         # If the table does not exist, create the table
 
         logging.info("  Creating 'google_calendar_info' Table.")
