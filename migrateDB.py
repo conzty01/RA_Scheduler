@@ -21,14 +21,14 @@ def migrate(conn):
         # Create the google_calendar_info table
         cur.execute("""
             CREATE TABLE google_calendar_info(
-                id				serial UNIQUE.
+                id				serial UNIQUE,
                 res_hall_id		int,
                 auth_state		varchar(30),
                 token 			bytea,
                 calendar_id		varchar(60),
     
                 PRIMARY KEY (res_hall_id),
-                FOREIGN KEY (res_hall_id) REFERENCES res_hall(id));
+                FOREIGN KEY (res_hall_id) REFERENCES res_hall(id))
             );""")
 
     # Drop all Google related columns in the res_hall table
