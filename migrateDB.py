@@ -28,7 +28,7 @@ def migrate(conn):
                 calendar_id		varchar(60),
     
                 PRIMARY KEY (res_hall_id),
-                FOREIGN KEY (res_hall_id) REFERENCES res_hall(id));
+                FOREIGN KEY (res_hall_id) REFERENCES res_hall(id))
             );""")
 
     # Drop all Google related columns in the res_hall table
