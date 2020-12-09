@@ -982,6 +982,16 @@ class TestEventObject(unittest.TestCase):
 
         self.event = Event(self.summary, self.description, self.date)
 
+    def test_HasExpectedMethods(self):
+        # Test to make sure the Event Object has the following methods:
+        #  - getBody
+
+        #  -- ARRANGE --
+        #  --   ACT   --
+        #  -- ASSERT  --
+
+        self.assertTrue(hasattr(Event, "getBody"))
+
     def test_getBody_ReturnsExpectedBodyFormat(self):
         # Test to make sure that the Event's .getBody method
         #  returns the body is the format specified by Google
