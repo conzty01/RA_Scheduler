@@ -21,7 +21,7 @@ def migrate(conn):
         # Create the google_calendar_info table
         cur.execute("""
             CREATE TABLE google_calendar_info(
-                id				serial UNIQUE.
+                id				serial UNIQUE,
                 res_hall_id		int,
                 auth_state		varchar(30),
                 token 			bytea,
