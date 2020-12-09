@@ -11,8 +11,12 @@ def migrate(conn):
 
     exists = cur.fetchone()
 
+    logging.info("  'google_calendar_info' Table Exists: {}".format(exists))
+
     if not exists:
         # If the table does not exist, create the table
+
+        logging.info("  Creating 'google_calendar_info' Table.")
 
         # Create the google_calendar_info table
         cur.execute("""
@@ -28,6 +32,9 @@ def migrate(conn):
             );""")
 
     # Drop all Google related columns in the res_hall table
+
+    logging.info("  Removing Google Related Columns From 'res_hall' Table.")
+
     cur.execute("""
         ALTER TABLE res_hall
         DROP COLUMN IF EXISTS calendar_id,
