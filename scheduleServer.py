@@ -19,8 +19,6 @@ import logging
 import pickle
 import os
 
-import getGCalAuth
-
 # Configure the logger immediately per Flask recommendation
 
 # Get the logging level from the environment
