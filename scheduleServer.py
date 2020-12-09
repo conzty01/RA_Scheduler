@@ -381,7 +381,7 @@ def editCons():
 def manStaff():
     userDict = getAuth()                                                        # Get the user's info from our database
 
-    if userDict["auth_level"] < 2:
+    if userDict["auth_level"] < 3:
         logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
         return jsonify(stdRet(-1,"NOT AUTHORIZED"))
 
@@ -395,7 +395,7 @@ def manStaff():
     ptStats = getRAStats(userDict["hall_id"], start, end)
 
     return render_template("staff.html",raList=cur.fetchall(),auth_level=userDict["auth_level"], \
-                            opts=baseOpts,curView=3, hall_name=userDict["hall_name"], pts=ptStats)
+                            opts=baseOpts,curView=4, hall_name=userDict["hall_name"], pts=ptStats)
 
 @app.route("/hall")
 @login_required
@@ -508,7 +508,7 @@ def processConflicts():
 def getStaffStats():
     userDict = getAuth()
 
-    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
+    if userDict["auth_level"] < 3:                                              # If the user is not at least an AHD
         logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
         return jsonify(stdRet(-1,"NOT AUTHORIZED"))
 
@@ -1026,7 +1026,7 @@ def changeStaffInfo():
 
     hallId = userDict["hall_id"]
 
-    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
+    if userDict["auth_level"] < 3:                                              # If the user is not at least an AHD
         logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
         return jsonify(stdRet(-1,"NOT AUTHORIZED"))
 
@@ -1052,7 +1052,7 @@ def changeStaffInfo():
 def removeStaffer():
     userDict = getAuth()
 
-    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
+    if userDict["auth_level"] < 3:                                              # If the user is not at least an AHD
         logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
         return jsonify(stdRet(-1,"NOT AUTHORIZED"))
 
@@ -1079,7 +1079,7 @@ def removeStaffer():
 def addStaffer():
     userDict = getAuth()
 
-    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
+    if userDict["auth_level"] < 3:                                              # If the user is not at least an AHD
         logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
         return jsonify(stdRet(-1,"NOT AUTHORIZED"))
 
@@ -1286,7 +1286,7 @@ def daleteDuty():
 def importStaff():
     userDict = getAuth()
 
-    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
+    if userDict["auth_level"] < 3:                                              # If the user is not at least an AHD
         logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
         return jsonify(stdRet(-1,"NOT AUTHORIZED"))
 
