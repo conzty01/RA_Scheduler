@@ -1,23 +1,123 @@
+:root {
+    /* colorblind color variations */
+    --cbGreen: #57C4AD;
+    --cbGreenTxt: #000;
+
+    --cbRed: #DB4325;
+    --cbRedTxt: #FFF;
+
+    /* Original colors */
+    --rgGreen: #90EE90;
+    --rgGreenTxt: #000;
+
+    --rgRed: #FF7F7F;
+    --rgRedTxt: #FFF;
+
+    /* The default values used */
+    --custGreen: var(--rgGreen);
+    --custRed: var(--rgRed);
+    --custGreenTxt: var(--rgGreenTxt);
+    --custRedTxt: var(--rgRedTxt);
+}
+
+#infoGreen {
+    color: var(--custGreen);
+    font-weight: bold;
+}
+#infoRed {
+    color: var(--custRed);
+    font-weight: bold;
+}
+
 .fc-day-today:not(.fc-day-other):not(.selected) {
-    background-color: #90EE90 !important;
+    background-color: var(--custGreen) !important;
 }
 .fc-day-today.fc-day-other {
     background-color: inherit !important;
 }
 .fc-daygrid-day:not(.fc-day-other) {
-    background-color: #90EE90;
+    background-color: var(--custGreen);
 }
 .selected {
-    background-color: #FF7F7F !important;
+    background-color: var(--custRed) !important;
 }
 .selected a.fc-daygrid-day-number {
-    color: #FFF !important;
+    color: var(--custRedTxt) !important;
 }
 .fc-conflictResetButton-button:hover {
-    background-color: #CC0000 !important;
-    border-color: #AA0000 !important;
+    background-color: var(--custRed) !important;
+    border-color: var(--custRed) !important;
 }
 .fc-conflictSubmitButton-button:hover {
-    background-color: #00BB00 !important;
-    border-color: #009900 !important;
+    background-color: var(--custGreen) !important;
+    border-color: var(--custGreen) !important;
+}
+.fc-daygrid-day-number {
+    color: var(--custGreenTxt) !important;
+}
+
+
+/* Colorblindness switch */
+
+/* The switch - the box around the slider */
+.switch {
+ position: relative;
+ display: inline-block;
+ width: 30px;
+ height: 17px;
+}
+
+/* Hide default HTML checkbox */
+.switch input {
+ opacity: 0;
+ width: 0;
+ height: 0;
+}
+
+/* The slider */
+.slider {
+ position: absolute;
+ cursor: pointer;
+ top: 0;
+ left: 0;
+ right: 0;
+ bottom: 0;
+ background-color: #ccc;
+ -webkit-transition: .4s;
+ transition: .4s;
+}
+
+.slider:before {
+ position: absolute;
+ content: "";
+ height: 13px;
+ width: 13px;
+ left: 2px;
+ bottom: 2px;
+ background-color: white;
+ -webkit-transition: .4s;
+ transition: .4s;
+}
+
+input:checked + .slider {
+ background-color: #2196F3;
+}
+
+input:focus + .slider {
+ box-shadow: 0 0 1px #2196F3;
+}
+
+input:checked + .slider:before {
+ -webkit-transform: translateX(13px);
+ -ms-transform: translateX(13px);
+ transform: translateX(13px);
+}
+
+/* Rounded sliders */
+.slider.round {
+ border-radius: 17px;
+}
+
+.slider.round:before {
+ border-radius: 50%;
 }

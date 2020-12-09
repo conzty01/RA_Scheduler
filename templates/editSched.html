@@ -139,6 +139,41 @@
   </div>
 </div>
 
+<!-- Export Schedule Modal -->
+<div class="modal fade" id="exportModal" tabindex="-1" role="dialog" aria-labelledby="importStaffModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Export Schedule: <span id="exportModalLongTitle" style="font-weight:bold;"></span></h3>
+      </div>
+      <form id="importStaffForm" class="modal-body" action="/api/exportToGCal" method="GET" enctype="multipart/form-data">
+          <div class="form-group form-row">
+              <div class="col">
+                  Export the schedule for <span id="exportModalMonth" style="font-weight:bold;"></span>
+                  to Google Calendar. This process can take a couple of minutes.
+
+                  <br /><br />
+
+                  <em>Note:</em> Clicking the 'Export' button will export the schedule in its current state. Once
+                  exported, this application is unable to update or delete the calendar events that were created
+                  in Google Calendar.
+
+                  <br /><br />
+
+                  As a result, any changes that need to be made to the calendar event, such as a duty change,
+                  must be made through <a target="_blank" href="https://calendar.google.com/">Google Calendar</a>.
+              </div>
+          </div>
+     </form>
+      <div class="modalError">Export Schedule Failed: <span class="msg"></span></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        <button id="exportBut" type="button" class="btn btn-primary" onclick="exportSchedule()">Export</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="calContainer" class="col-lg-9">
     <div id="calendar">
 

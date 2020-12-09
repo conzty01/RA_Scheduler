@@ -44,7 +44,17 @@
                   <a class="dropdown-item" href="/editBreaks">Edit Breaks</a>
                   <a class="dropdown-item" href="/editSched">Edit Schedule</a>
                   <a class="dropdown-item" href="/editCons">Staff Conflicts</a>
-                  <a class="dropdown-item" href="/staff">Staff Members</a>
+                </div>
+              </li>
+              {% endif %}
+              {% if auth_level > 2: %}
+              <li class="nav-item dropdown {% if curView == 4: %}active{% endif %}">
+                <a class="nav-link dropdown-toggle" href="#" id="navbarHDDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                  HD Portal
+                </a>
+                <div class="dropdown-menu" aria-labelledby="navbarHDDropdown">
+                  <a class="dropdown-item" href="/hall">Manage Hall</a>
+                  <a class="dropdown-item" href="/staff">Manage Staff</a>
                 </div>
               </li>
               {% endif %}

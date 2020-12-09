@@ -2,3 +2,6 @@
 *devTest*
 .idea/
 *.log
+*.dump
+*.dump.*
+credentials.json

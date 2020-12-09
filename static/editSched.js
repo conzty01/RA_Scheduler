@@ -30,13 +30,17 @@ function initEditSchedCal() {
             addEventButton: {
                 text: 'Add Addtional Duty',
                 click: showAddDutyModal
+            },
+            exportScheduleButton: {
+                text: 'Export Schedule',
+                click: showExportModal
             }
         },
         dateClick: showAddDutyModal,
         headerToolbar: {
             left: 'customPrevButton,customNextButton customTodayButton',
             center: 'title',
-            right: 'addEventButton runSchedulerButton'
+            right: 'exportScheduleButton addEventButton runSchedulerButton'
         },
         eventSources: [
             {
@@ -235,6 +239,9 @@ function passModalSave(modalId, msg, extraWork=() => {}) {
             console.log(msg.msg);
             // Get the modal's errorDiv
             let errDiv = modal.getElementsByClassName("modalError")[0];
+
+            // Complete any additional work
+            extraWork();
 
             // Update the errorDiv with the message
             errDiv.getElementsByClassName("msg")[0].innerHTML = msg.msg;
@@ -473,4 +480,49 @@ function highlightRA(i) {
             entry.style.boxShadow = "none";
         }
     }
+}
+
+/*   Export to Google Calendar   */
+function exportSchedule() {
+
+    // Verify that the user would like to export.
+    if (confirm("Export this schedule's current state to Google Calendar?")) {
+
+        console.log("Exporting to Google Calendar");
+
+        // Indicate to user that the export is running
+        document.getElementById("exportBut").disabled = true;
+        $("body").css("cursor", "wait");
+
+        let params = {
+            monthNum: appConfig.calDate.getMonth() + 1,
+            year: appConfig.calDate.getFullYear()
+        };
+
+        appConfig.base.callAPI("exportToGCal",
+            params,
+            function(msg) {
+                passModalSave("#exportModal", msg, () => {
+                    document.getElementById("exportBut").disabled = false;
+                    $("body").css("cursor", "auto");
+                });
+            }, "GET", function(msg) {passModalSave("#exportModal", msg)});
+    }
+}
+
+function showExportModal() {
+    // Make the exportModal visible to the user
+
+    let title = document.getElementById("exportModalLongTitle");
+    let sub = document.getElementById("exportModalMonth")
+
+    title.textContent = appConfig.calDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+    sub.textContent = appConfig.calDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    // Hide any errors from previous Export runs
+    let modal = document.getElementById("exportModal");
+    let errDiv = modal.getElementsByClassName("modalError")[0];
+    errDiv.style.display = "none";
+
+    $('#exportModal').modal('show');
 }

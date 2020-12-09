@@ -1,3 +1,4 @@
+from logging.config import dictConfig
 import psycopg2
 import logging
 import os
@@ -5,41 +6,64 @@ import os
 def migrate(conn):
     cur = conn.cursor()
 
-    logging.info("Creating Table: break_duties")
-    cur.execute("""
-		CREATE TABLE break_duties(
-			id			serial UNIQUE,
-			ra_id		int,
-			hall_id		int,
-			day_id		int,
-			month_id	int,
-			point_val	int DEFAULT 0 CONSTRAINT pos_break_duty_point_value CHECK (point_val >= 0),
+    # Check to see if the google_calendar_info table exists
+    cur.execute("SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'google_calendar_info');")
 
-			PRIMARY KEY (hall_id, month_id, day_id, ra_id),
-			FOREIGN KEY (ra_id) 	REFERENCES ra(id),
-			FOREIGN KEY (hall_id) 	REFERENCES res_hall(id),
-			FOREIGN KEY (month_id) 	REFERENCES month(id),
-			FOREIGN KEY (day_id) 	REFERENCES day(id)
-		);""")
-    logging.info("  Finished Creating Table: break_duties")
+    exists = cur.fetchone()
+
+    if not exists:
+        # If the table does not exist, create the table
+
+        # Create the google_calendar_info table
+        cur.execute("""
+            CREATE TABLE google_calendar_info(
+                id				serial UNIQUE.
+                res_hall_id		int,
+                auth_state		varchar(30),
+                token 			bytea,
+                calendar_id		varchar(60),
+    
+                PRIMARY KEY (res_hall_id),
+                FOREIGN KEY (res_hall_id) REFERENCES res_hall(id));
+            );""")
+
+    # Drop all Google related columns in the res_hall table
+    cur.execute("""
+        ALTER TABLE res_hall
+        DROP COLUMN IF EXISTS calendar_id,
+        DROP COLUMN IF EXISTS g_cal_token,
+        DROP COLUMN IF EXISTS g_cal_auth_state
+    """)
+
+
 
 
 if __name__ == "__main__":
 
-    logging.basicConfig(format='%(asctime)s.%(msecs)d %(levelname)s: %(message)s', \
-                        datefmt='%H:%M:%S', \
-                        level=logging.INFO, \
-                        #filename="migrateDB.log", \
-                        #filemode="w"
-                        )
-
     conn = psycopg2.connect(os.environ["DATABASE_URL"])
+
+    dictConfig({
+        'version': 1,  # logging module specific-- DO NOT CHANGE
+        'formatters': {'default': {
+            'format': '[%(asctime)s.%(msecs)d] %(levelname)s in %(module)s: %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        }},
+        'handlers': {'wsgi': {
+            'class': 'logging.StreamHandler',
+            'stream': 'ext://flask.logging.wsgi_errors_stream',
+            'formatter': 'default'
+        }},
+        'root': {
+            'level': os.environ["LOG_LEVEL"],
+            'handlers': ['wsgi']
+        }
+    })
 
     logging.info("Beginning Migration")
     migrate(conn)
 
     logging.info("Committing Changes")
     conn.commit()
-    loging.info("  Finished Committing Changes")
+    logging.info("  Finished Committing Changes")
 
     logging.info("Finished Migration")

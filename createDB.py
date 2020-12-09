@@ -5,10 +5,9 @@ def createHallDB(conn):
 	conn.execute("DROP TABLE IF EXISTS res_hall CASCADE;")
 	conn.execute("""
 		CREATE TABLE res_hall(
-			id				serial UNIQUE,
-			name			varchar(50),
-			calendar_id		text,
-
+			id				 serial UNIQUE,
+			name			 varchar(50),
+			
 		PRIMARY KEY (name)
 		);""")
 
@@ -132,7 +131,7 @@ def createOAuthDB(conn):
 def createBreakDutiesTable(conn):
 	conn.execute('DROP TABLE IF EXISTS break_duties CASCADE;')
 
-	con.execute("""
+	conn.execute("""
 		CREATE TABLE break_duties(
 			id			serial UNIQUE,
 			ra_id		int,
@@ -145,7 +144,22 @@ def createBreakDutiesTable(conn):
 			FOREIGN KEY (ra_id) 	REFERENCES ra(id),
 			FOREIGN KEY (hall_id) 	REFERENCES res_hall(id),
 			FOREIGN KEY (month_id) 	REFERENCES month(id),
-			FOREIGN KEY (day_id) 	REFERENCES day(id),
+			FOREIGN KEY (day_id) 	REFERENCES day(id)
+		);""")
+
+
+def createGoogleCalendarDB(conn):
+	conn.execute("DROP TABLE IF EXISTS google_calendar_info CASCADE;")
+	conn.execute("""
+		CREATE TABLE google_calendar_info(
+			id				serial UNIQUE.
+			res_hall_id		int,
+			auth_state		varchar(30),
+			token 			bytea,
+			calendar_id		varchar(60),
+
+			PRIMARY KEY (res_hall_id),
+			FOREIGN KEY (res_hall_id) REFERENCES res_hall(id)
 		);""")
 
 def main():
@@ -160,6 +174,7 @@ def main():
 	createBreakDutiesTable(conn.cursor())
 	createUserDB(conn.cursor())
 	createOAuthDB(conn.cursor())
+	createGoogleCalendarDB(conn.cursor())
 
 	conn.commit()
 

@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# NOTE: Before running, make sure to shutdown any local server that might be
+#        using the local ra_sched DB as it could cause the restore to skip
+#        over the tables in use and cause data issues.
+
+# Restore the local DB using localDB.dump
+psql ra_sched < localDB.dump
