@@ -942,7 +942,7 @@ def runScheduler(hallId=None, monthNum=None, year=None):
                 # And the LDATolerance is greater than 1
                 #  then decrement the LDATolerance by 1 and try again
 
-                logging.info("DECREASE LDAT: ", ldat)
+                logging.info("DECREASE LDAT: {}".format(ldat))
                 ldat -= 1
                 copy_raList = cp.deepcopy(ra_list)
                 copy_noDutyList = cp.copy(noDutyList)
@@ -1603,20 +1603,18 @@ def getRABreakStats(hallId=None,startDateStr=None,endDateStr=None):
 
 @app.route("/api/getBreakDuties", methods=["GET"])
 @login_required
-def getBreakDuties(hallId=None,monthNum=None,year=None):
+def getBreakDuties(hallId=None, start=None, end=None, showAllColors=False):
     userDict = getAuth()
 
     fromServer = True
-    if monthNum is None and year is None and hallId is None:                    # Effectively: If API was called from the client and not from the server
-        monthNum = int(request.args.get("monthNum"))
-        year = int(request.args.get("year"))
+    if start is None and end is None and hallId is None:                    # Effectively: If API was called from the client and not from the server
         start = request.args.get("start").split("T")[0]                         # No need for the timezone in our current application
         end = request.args.get("end").split("T")[0]                             # No need for the timezone in our current application
 
         showAllColors = request.args.get("allColors") == "true"                 # Should all colors be displayed or only the current user's colors
 
         userDict = getAuth()                                                    # Get the user's info from our database
-        hallID = userDict["hall_id"]
+        hallId = userDict["hall_id"]
         fromServer = False
 
     cur = conn.cursor()
@@ -1629,7 +1627,7 @@ def getBreakDuties(hallId=None,monthNum=None,year=None):
         WHERE break_duties.hall_id = {}
         AND month.year >= TO_DATE('{}','YYYY-MM')
         AND month.year <= TO_DATE('{}','YYYY-MM')
-    """.format(hallID,start,end))
+    """.format(hallId,start,end))
 
     res = []
 
@@ -2143,15 +2141,20 @@ def exportToGCal():
 
     logging.debug("Retrieving schedule information for MonthNum: {} and Year: {}".format(monthNum, year))
 
-    # Get the appropriate schedule from the DB
+    # Get the appropriate regular-duty schedule from the DB
     #  Should be able to leverage existing RADSA API
-    sched = getSchedule2(start=start, end=end,
-                         hallId=userDict["hall_id"], showAllColors=True)
+    regSched = getSchedule2(start=start, end=end,
+                            hallId=userDict["hall_id"], showAllColors=True)
+
+    # Get the appropriate break-duty schedule from the DB
+    #  Should be able to leverage existing RADSA API
+    breakSched = getBreakDuties(start=start, end=end,
+                                hallId=userDict["hall_id"], showAllColors=True)
 
     logging.debug("Exporting schedule to Google Calendar.")
 
-    # Pass the schedule to the Integratinator to be exported.
-    status = gCalInterface.exportScheduleToGoogleCalendar(token, gCalId, sched)
+    # Pass the combined regular and break duty schedule to the Integratinator to be exported.
+    status = gCalInterface.exportScheduleToGoogleCalendar(token, gCalId, regSched + breakSched)
 
     # If the export failed
     if status < 0:
