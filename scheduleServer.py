@@ -19,6 +19,8 @@ import logging
 import pickle
 import os
 
+# from blueprints.staff.__init__ import manage_staff
+
 # Configure the logger immediately per Flask recommendation
 
 # Get the logging level from the environment
@@ -46,7 +48,7 @@ HOST_URL = os.environ["HOST_URL"]
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ["DATABASE_URL"]
-app.config["EXPLAIN_TEMPLATE_LOADING"] = os.environ["EXPLAIN_TEMPLATE_LOADING"]
+app.config["EXPLAIN_TEMPLATE_LOADING"] = True  #os.environ["EXPLAIN_TEMPLATE_LOADING"]
 Bootstrap(app)
 # Setup for flask_dance with oauth
 app.secret_key = os.environ["SECRET_KEY"]
@@ -56,7 +58,10 @@ gBlueprint = make_google_blueprint(
     scope=["profile", "email"],
     redirect_to="index"
 )
+
+# Register Flask Blueprints
 app.register_blueprint(gBlueprint, url_prefix="/login")
+# app.register_blueprint(manage_staff)
 
 # Establish DB connection
 conn = psycopg2.connect(os.environ["DATABASE_URL"])
@@ -375,26 +380,26 @@ def editCons():
     return render_template("editCons.html", raList=cur.fetchall(), auth_level=userDict["auth_level"], \
                             curView=3, opts=baseOpts, hall_name=userDict["hall_name"])
 
-@app.route("/staff")
-@login_required
-def manStaff():
-    userDict = getAuth()                                                        # Get the user's info from our database
-
-    if userDict["auth_level"] < 3:
-        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
-        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
-
-    start, end = getCurSchoolYear()
-
-    cur = conn.cursor()
-    cur.execute("SELECT ra.id, first_name, last_name, email, date_started, res_hall.name, color, auth_level \
-                 FROM ra JOIN res_hall ON (ra.hall_id = res_hall.id) \
-                 WHERE hall_id = {} ORDER BY ra.id ASC;".format(userDict["hall_id"]))
-
-    ptStats = getRAStats(userDict["hall_id"], start, end)
-
-    return render_template("staff.html",raList=cur.fetchall(),auth_level=userDict["auth_level"], \
-                            opts=baseOpts,curView=4, hall_name=userDict["hall_name"], pts=ptStats)
+# @app.route("/staff")
+# @login_required
+# def manStaff():
+#     userDict = getAuth()                                                        # Get the user's info from our database
+#
+#     if userDict["auth_level"] < 3:
+#         logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
+#         return jsonify(stdRet(-1,"NOT AUTHORIZED"))
+#
+#     start, end = getCurSchoolYear()
+#
+#     cur = conn.cursor()
+#     cur.execute("SELECT ra.id, first_name, last_name, email, date_started, res_hall.name, color, auth_level \
+#                  FROM ra JOIN res_hall ON (ra.hall_id = res_hall.id) \
+#                  WHERE hall_id = {} ORDER BY ra.id ASC;".format(userDict["hall_id"]))
+#
+#     ptStats = getRAStats(userDict["hall_id"], start, end)
+#
+#     return render_template("staff.html",raList=cur.fetchall(),auth_level=userDict["auth_level"], \
+#                             opts=baseOpts,curView=4, hall_name=userDict["hall_name"], pts=ptStats)
 
 @app.route("/hall")
 @login_required
