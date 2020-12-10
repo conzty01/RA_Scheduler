@@ -8,7 +8,6 @@
 # The DATABASE_URL should be configured as it is in the example below.
 # DATABASE_URL='postgres://{role_name}:{password}@{host}/{database_name}'
 
-#export DATABASE_URL='postgres://gykyhiptiuxzhl:88d6f49f0d4b766573ce54ff683fb96763a4cf72310b3183b2cac6606965ccf8@ec2-23-21-204-166.compute-1.amazonaws.com:5432/d9rvq40vj0if0a'
 export DATABASE_URL='postgres:///ra_sched'
 export HOST_URL='https://localhost:5000'
 
@@ -18,18 +17,18 @@ export OAUTHLIB_RELAX_TOKEN_SCOPE=1
 export OAUTHLIB_INSECURE_TRANSPORT=1
 
 # The following needs to be set with the appropriate oAuth2 information.
-export SECRET_KEY='IstillDontRealLYKnowWHATthiSiS4ButIWiLLLLYetAGAINMakeitAlong111'
-export CLIENT_ID='711064522557-q22qehg86ek1shc795e21398baslghcl.apps.googleusercontent.com'
-export CLIENT_SECRET='zChQo6s8zYO_5XaelGcLGiBv'
+export SECRET_KEY=''
+export CLIENT_ID=''
+export CLIENT_SECRET=''
 
 # The following needs to be set with the appropriate Google Calendar API information.
-export GCAL_APIKEY='AIzaSyCyo9Q8H5HQPH92ousr_xM02ET0bcSpfzg'
-export PROJECT_ID='ra-scheduler'
-export AUTH_URI='https://accounts.google.com/o/oauth2/auth'
-export TOKEN_URI='https://oauth2.googleapis.com/token'
-export AUTH_PROVIDER_X509_CERT_URL='https://www.googleapis.com/oauth2/v1/certs'
-export REDIRECT_URIS='https://ra-scheduler.herokuapp.com/login/google/authorized,https://localhost:5000/login/google/authorized,https://localhost:5000/test/gcalint/response/,https://localhost:5000/int/GCalAuth/,https://b03bb12e8ff3.ngrok.io/test/gcalint/response/'
-export JAVASCRIPT_ORIGINS='https://localhost:5000,https://ra-scheduler.herokuapp.com'
+export GCAL_APIKEY=''
+export PROJECT_ID=''
+export AUTH_URI=''
+export TOKEN_URI=''
+export AUTH_PROVIDER_X509_CERT_URL=''
+export REDIRECT_URIS=''
+export JAVASCRIPT_ORIGINS=''
 
 # The USE_ADHOC boolean is for setting the ssl_context of the flask
 #  this is only to be used for development purposes.
@@ -43,4 +42,4 @@ export LOG_LEVEL='DEBUG'
 # Enabling EXPLAIN_TEMPLATE_LOADING will instruct Flask to print out the steps
 #  it goes through to locate templates on every render_template call. This is
 #  used for debugging
-export EXPLAIN_TEMPLATE_LOADING = false
+export EXPLAIN_TEMPLATE_LOADING=false
