@@ -46,6 +46,7 @@ HOST_URL = os.environ["HOST_URL"]
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ["DATABASE_URL"]
+app.config["EXPLAIN_TEMPLATE_LOADING"] = os.environ["EXPLAIN_TEMPLATE_LOADING"]
 Bootstrap(app)
 # Setup for flask_dance with oauth
 app.secret_key = os.environ["SECRET_KEY"]
