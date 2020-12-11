@@ -94,11 +94,17 @@ def fileAllowed(filename):
     return ('.' in filename) and (filename.rsplit('.', 1)[1].lower() in ag.ALLOWED_EXTENSIONS)
 
 
-
-
-
 def getSchoolYear(month, year):
-    # Figure out what school year we are looking for
+    # Return a tuple of 2 strings that denote the start and end date of the school year that
+    #  the provided month and year belong to.
+    #
+    #  This function accepts the following parameters:
+    #
+    #     month  <int>  -  the integer value representing the month following the standard
+    #                       gregorian calendar convention.
+    #     year   <str>  -  the integer value representing the calendar year following the
+    #                       standard gregorian calendar convention.
+
     logging.debug("Calculate School Year: {} {}".format(month, year))
 
     if int(month) >= 8:
@@ -116,11 +122,12 @@ def getSchoolYear(month, year):
     # TODO: Currently, a school year is considered from August to August.
     #        Perhaps this should be configurable by the AHD/HDs?
 
+    # Concatenate the calculated years to the start and end date strings
     start = str(startYear) + '-08-01'
     end = str(endYear) + '-07-31'
 
-    logging.debug("Start: "+ start)
-    logging.debug("End: "+ end)
+    logging.debug("Start: " + start)
+    logging.debug("End: " + end)
 
     return start, end
 
