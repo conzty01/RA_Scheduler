@@ -94,48 +94,7 @@ def fileAllowed(filename):
     return ('.' in filename) and (filename.rsplit('.', 1)[1].lower() in ag.ALLOWED_EXTENSIONS)
 
 
-def validateUpload(partList):
-    logging.debug("Validating Upload")
-    pl = []
-    for i in partList:
-        i.replace("%","")
-        i.replace(";","")
-        i.replace("\\","")
 
-        pl.append(i)
-
-    valid = True
-    reasons = []
-
-    if len(partList) != 6:
-        valid = False
-        reasons.append("Expected 5 Parameters, Received: {}".format(len(partList)))
-        logging.debug("PartList: "+str(partList))
-
-    else:
-        fName, lName, email, start, color, role = pl
-
-        # Check Email Address
-        if "@" not in email and "." not in email:
-            valid = False
-            reasons.append(fName+" "+lName+" - Invalid Email Address: "+email)
-            logging.debug("RA Email: "+email)
-
-        # Check Start Date
-        splitDate = start.split("/")
-        if len(splitDate) != 3 or "-" in start or int(splitDate[0]) > 12 or \
-            int(splitDate[1]) > 31 or int(splitDate[2]) < 1:
-            valid = False
-            reasons.append(fName+" "+lName+" - Invalid Start Date: "+start)
-            logging.debug("RA Start Date: "+start)
-
-        # Check Color
-        if len(color) != 7:
-            valid = False
-            reasons.append(fName+" "+lName+" - Invalid Color Format: {} Must be in 6-digit, hex format preceeded by a '#'".format(color))
-            logging.debug("RA Color: "+color)
-
-    return pl, valid, reasons
 
 
 def getSchoolYear(month, year):
