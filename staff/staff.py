@@ -1,20 +1,17 @@
-from flask_login import UserMixin, current_user, LoginManager, login_required, login_user, logout_user
-from flask import Flask, render_template, request, jsonify, redirect, url_for, Blueprint
-import logging
+from flask import render_template, request, jsonify, redirect, url_for, Blueprint
+from flask_login import login_required
 import psycopg2
+import logging
 import os
 
-from helperFunctions.helperFunctions import getAuth, stdRet, getCurSchoolYear, fileAllowed, validateUpload
+# Import the needed functions from other parts of the application
+from helperFunctions.helperFunctions import getAuth, stdRet, getCurSchoolYear, fileAllowed
 
 staff_bp = Blueprint("staff_bp", __name__,
                      template_folder="templates",
                      static_folder="static")
 
-baseOpts = {
-    "HOST_URL": os.environ["HOST_URL"]
-}
-# Establish DB connection
-conn = psycopg2.connect(os.environ["DATABASE_URL"])
+
 
 
 @staff_bp.route("/")
@@ -304,7 +301,7 @@ def importStaff():
 
                 # Do some validation checking
 
-                pl, valid, reasons = validateUpload(pl)
+                pl, valid, reasons = validateImportStaffUpload(pl)
 
                 if not valid:
                     ret = stdRet("0","Invalid Formatting")
@@ -342,3 +339,116 @@ def importStaff():
     else:
         logging.info("Unable to Import Staff")
         return redirect(url_for(".err",msg="Unable to Import Staff"))
+
+def validateImportStaffUpload(partList):
+    # Helper function designed for the staff_bp.importStaff endpoint that
+    #  ensures that the provided row parts fit our expected schema.
+    #
+    #  This function accepts the following parameters:
+    #
+    #     partList  <lst<str>>  -  a list containing string values that have
+    #                               been pulled from a row in the file provided
+    #                               in the import staff process.
+    #
+    #  This function returns a tuple containing the following in order:
+    #
+    #     pl       <lst<str>>  -  a list containing string values that have
+    #                              been derived and cleaned from the provided
+    #                              partList input parameter.
+    #     valid    <bool>      -  a boolean representing whether the parts in
+    #                              the provided partList input parameter fits
+    #                              the expected schema.
+    #     reasons  <lst<str>>  -  a list containing string values that inform
+    #                              the user what, if anything is incorrectly
+    #                              formatted about this row.
+
+    logging.debug("Validating Import Staff Upload")
+
+    # Create the pl list that is to be returned
+    pl = []
+
+    # Iterate through the partList and remove any problematic characters
+    for i in partList:
+        i.replace("%", "")
+        i.replace(";", "")
+        i.replace("\\", "")
+
+        # Append the cleaned string to pl
+        pl.append(i)
+
+    # Set the default state of valid to be True
+    valid = True
+
+    # Create the reasons list that is to be returned
+    reasons = []
+
+    # If the partList does not have only 6 items in it
+    if len(partList) != 6:
+        # Set the state to be invalid
+        valid = False
+
+        # Append the reason for the invalidation to the reasons list
+        reasons.append("Expected 5 Parameters, Received: {}".format(len(partList)))
+
+        logging.debug("PartList: {}".format(str(partList)))
+
+    else:
+        # If the partList has exactly 6 items, continue validation
+
+        # Extract the individual parts from the partList
+        fName, lName, email, start, color, role = pl
+
+        # Validate the Email Address
+        #  An email address is considered valid if it has an "@" and "." in it
+        #  example: "test@email.com"
+        if "@" not in email and "." not in email:
+            # Set the state to be invalid
+            valid = False
+
+            # Append the reason for the invalidation to the reasons list
+            reasons.append(fName+" "+lName+" - Invalid Email Address: "+email)
+
+            logging.debug("RA Email: {}".format(str(email)))
+
+        # Validate the Start Date
+        #  A start date is considered valid if it is ordered as Month, Day, Year
+        #  with the separator character being a "/".
+        #  example: 12/09/2020
+
+        # Attempt to split the date string on the "/" character
+        splitDate = start.split("/")
+
+        # If the splitDate does not contain exactly three parts, OR
+        # If the start string contains an "-" OR
+        # If the integer value of the first item in splitDate is greater than 12 or less than 1 OR
+        # If the integer value of the second item in splitDate is greater than 31 or less than 1 OR
+        # If the integer value of the third item in splitDate is less than 1970
+        if len(splitDate) != 3 or \
+                "-" in start or \
+                int(splitDate[0]) > 12 or int(splitDate[0]) < 1 or \
+                int(splitDate[1]) > 31 or int(splitDate[1]) < 1 or \
+                int(splitDate[2]) < 1970:
+
+            # Set the state to be invalid
+            valid = False
+
+            # Append the reason for the invalidation to the reasons list
+            reasons.append(fName+" "+lName+" - Invalid Start Date: "+start)
+
+            logging.debug("RA Start Date: {}".format(start))
+
+        # Validate the Check Color
+        # If the color is not exactly 7 digits or the color does not contain the "#" character
+        if len(color) != 7 or "#" not in color:
+
+            # Set the state to be invalid
+            valid = False
+
+            # Append the reason for the invalidation to the reasons list
+            reasons.append(fName + " " + lName + " - " +
+                           "Invalid Color Format: {} Must be in 6-digit, hex format preceded by a '#'".format(color))
+
+            logging.debug("RA Color: {}".format(color))
+
+    # Return the pl, valid, and reasons variables
+    return pl, valid, reasons
