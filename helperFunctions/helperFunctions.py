@@ -1,12 +1,14 @@
 from flask_login import current_user
 from flask import redirect, url_for
-import logging
 import datetime
-import os
+import logging
 
-import psycopg2
-
+# import the appGlobals for these functions to use
 import appGlobals as ag
+
+# --------------------------
+# --   Helper Functions   --
+# --------------------------
 
 
 def getAuth():
@@ -58,16 +60,19 @@ def getAuth():
         "hall_name": res[6]
     }
 
+
 def stdRet(status, msg):
     # Helper function to create a standard return object to help simplify code
     #  going back to the client when no additional data is to be sent.
     logging.debug("Generate Standard Return")
     return {"status":status,"msg":msg}
 
+
 def fileAllowed(filename):
     logging.debug("Checking if file is allowed")
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 
 def validateUpload(partList):
     logging.debug("Validating Upload")
@@ -112,6 +117,7 @@ def validateUpload(partList):
 
     return pl, valid, reasons
 
+
 def getSchoolYear(month, year):
     # Figure out what school year we are looking for
     logging.debug("Calculate School Year: {} {}".format(month, year))
@@ -139,6 +145,7 @@ def getSchoolYear(month, year):
 
     return start, end
 
+
 def getCurSchoolYear():
     # Figure out what school year we are looking for
     logging.debug("Calculate Current School Year")
@@ -146,6 +153,7 @@ def getCurSchoolYear():
     year = datetime.date.today().year
 
     return getSchoolYear(month, year)
+
 
 def formatDateStr(day, month, year, format="YYYY-MM-DD", divider="-"):
     # Generate a date string so that it follows the provided format.
