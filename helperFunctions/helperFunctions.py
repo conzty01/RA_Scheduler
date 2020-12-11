@@ -65,7 +65,8 @@ def stdRet(status, msg):
     # Create a standard return object to help simplify/unify API responses
     #  going back to the client when no additional data is to be sent.
     #
-    #  This function accepts the following parameters:
+    #  This function accepts the following parameters and packages them into
+    #  a dictionary object with the same keys:
     #
     #     status  <int>  -  the status of the message which indicates whether an operation
     #                        was successful or if it encountered an error.
@@ -78,9 +79,19 @@ def stdRet(status, msg):
 
 
 def fileAllowed(filename):
+    # Return a boolean denoting whether a particular file should be allowed to be
+    #  uploaded based on its filename. Only files with extensions that are in the
+    #  ALLOWED_EXTENSIONS global variable will be accepted.
+    #
+    #  This function accepts the following parameters:
+    #
+    #     filename  <str>  -  the full name of a file that is to be checked
+
     logging.debug("Checking if file is allowed")
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+    # Ensure that the filename has an extension in it and ensure that that extension
+    #  is in the ALLOWED_EXTENSIONS global variable.
+    return ('.' in filename) and (filename.rsplit('.', 1)[1].lower() in ag.ALLOWED_EXTENSIONS)
 
 
 def validateUpload(partList):
