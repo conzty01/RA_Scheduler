@@ -13,6 +13,9 @@ hall_bp = Blueprint("hall_bp", __name__,
                     template_folder="templates",
                     static_folder="static")
 
+# ---------------------
+# --      Views      --
+# ---------------------
 
 @hall_bp.route("/")
 @login_required
@@ -39,20 +42,56 @@ def manHall():
                            auth_level=userDict["auth_level"], hall_name=userDict["hall_name"])
 
 
+# ---------------------
+# --   API Methods   --
+# ---------------------
+
 @hall_bp.route("/api/getHallSettings", methods=["GET"])
 @login_required
 def getHallSettings(hallId=None):
-    # Return an object containing the list of Hall Settings for the desired Hall
+    # API Method used to return an object containing the list of hall settings
+    #  for the desired hall.
+    #
+    #  If called from the server, this function accepts the following parameters:
+    #
+    #     hallId  <int>  -  an integer representing the id of the desired residence
+    #                        hall in the res_hall table.
+    #
+    #  If called from a client, this function does not accept any parameters, but
+    #  rather, uses the hall id that is associated with the user.
+    #
+    #  This method returns an object with the following specifications:
+    #
+    #     [
+    #        {
+    #           "settingName": ""
+    #           "settingDesc": ""
+    #           "settingVal": ""
+    #        },
+    #        ...
+    #     ]
 
+    # Assume this API was called from the server and verify that this is true.
     fromServer = True
-    if hallId is None:          # Effectively: If API was called from the client and not from the server
-        userDict = getAuth()                                                    # Get the user's info from our database
+    if hallId is None:
+        # If hallId is None, then this method was called from a remote client.
+
+        # Get the user's information from the database
+        userDict = getAuth()
+        # Set the value of hallId from the userDict
         hallId = userDict["hall_id"]
+        # Mark that this method was not called from the server
         fromServer = False
 
         # Check to see if the user is authorized to view these settings
+        # If the user is not at least an HD
         if userDict["auth_level"] < 3:
+            # Then they are not permitted to see this view.
+
+            # Log the occurrence.
             logging.info("User Not Authorized - RA: {} attempted to get Hall Settings".format(userDict["ra_id"]))
+
+            # Notify the user that they are not authorized.
             return jsonify(stdRet(-1, "NOT AUTHORIZED"))
 
     logging.debug("Retrieving Hall Setting information for Hall: {}, From Server: {}".format(hallId, fromServer))
@@ -60,16 +99,18 @@ def getHallSettings(hallId=None):
     # Create the setting list that will be returned
     settingList = []
 
+    # Create a DB cursor
     cur = ag.conn.cursor()
 
     # Get the hall name
     cur.execute("SELECT name FROM res_hall WHERE id = %s", (hallId,))
 
+    # Assemble the Residence Hall Name Setting information in a temporary dict
     tmp = {"settingName": "Residence Hall Name",
            "settingDesc": "The name of the Residence Hall.",
            "settingVal": cur.fetchone()[0]}
 
-    # Add the hall settings to the settingList
+    # Add the Hall Name settings to the settingList
     settingList.append(tmp)
 
     # Get the Google Calendar Information
@@ -78,15 +119,22 @@ def getHallSettings(hallId=None):
                        FROM google_calendar_info
                        WHERE res_hall_id = %s)""", (hallId,))
 
+    # Assemble the Google Calendar Integration information in a temporary dict
     tmp = {"settingName": "Google Calendar Integration",
-           "settingDesc": "Connecting a Google Calendar account allows AHDs and HDs to export a given month's duty schedule to Google Calendar.",
+           "settingDesc": "Connecting a Google Calendar account allows AHDs and " +
+                          "HDs to export a given month's duty schedule to Google Calendar.",
            "settingVal": "Connected" if cur.fetchone()[0] else "Not Connected"}
 
+    # Add the Google Calendar Integration settings to the settingList
     settingList.append(tmp)
 
+    # If this API method was called from the server
     if fromServer:
+        # Then return the settingList as-is
         return settingList
+
     else:
+        # Otherwise return a JSON version of the settingList
         return jsonify(settingList)
 
 
