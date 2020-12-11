@@ -149,17 +149,38 @@ def getCurSchoolYear():
 
 
 def formatDateStr(day, month, year, format="YYYY-MM-DD", divider="-"):
-    # Generate a date string so that it follows the provided format.
+    # Generate a date string using the provided day, month, and year values
+    #  that adheres to the provided format.
+    #
+    #  This function accepts the following parameters:
+    #
+    #     day      <int>  -  the integer value representing the day following the standard
+    #                         gregorian calendar convention.
+    #     month    <int>  -  the integer value representing the month following the
+    #                         standard gregorian calendar convention.
+    #     year     <int>  -  the integer value representing the calendar year following the
+    #                         standard gregorian calendar convention.
+    #     format   <str>  -  a string denoting the expected desired format for the date string.
+    #                         In this format, Y denotes year, M denotes month, and D denotes day.
+    #                         By default, this value is "YYYY-MM-DD".
+    #     divider  <str>  -  a string denoting the character that divides the parts of the format
+    #                         input string. By default, this value is "-".
 
-    # Make sure the day is two digits
+    # Make sure the day consists of two digits
     if day < 10:
+        # If the value of the day is less than 10, then python only represents it
+        #  with a single digit.
         dayStr = "0" + str(day)
+
     else:
         dayStr = str(day)
 
-    # Make sure the month is two digits
+    # Make sure the month consists of two digits
     if month < 10:
+        # If the value of the month is less than 10, then python only represents it
+        #  with a single digit.
         monthStr = "0" + str(month)
+
     else:
         monthStr = str(month)
 
@@ -168,20 +189,32 @@ def formatDateStr(day, month, year, format="YYYY-MM-DD", divider="-"):
     #  by the divider and checking each part to see
     #  if it contains a "Y", "M", or "D"
 
+    # split the format string into parts using the divider
     partList = format.split(divider)
 
+    # Create the result string that will be returned
     result = ""
+    # Iterate through the format string parts
     for part in partList:
+
+        # If the current part contains a "Y"
         if "Y" in part.upper():
+            # Then add the year to the date string
             result += str(year)
 
         elif "M" in part.upper():
+            # Else if the current part contains an "M"
+            # Then add the month to the date string
             result += monthStr
 
         elif "D" in part.upper():
+            # Else if the current part contains a "D"
+            # Then add the day to the date string
             result += dayStr
 
         # Add the divider to the result
         result += divider
 
+    # Return the resulting date string excluding the lingering divider symbol
+    #  at the end.
     return result[:-1]
