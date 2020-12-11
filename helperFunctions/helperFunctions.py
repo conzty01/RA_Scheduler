@@ -133,11 +133,18 @@ def getSchoolYear(month, year):
 
 
 def getCurSchoolYear():
-    # Figure out what school year we are looking for
+    # Calculate what school year it is based on the current date and return a tuple
+    #  of strings that represent the start and end date of the school year.
+
     logging.debug("Calculate Current School Year")
+
+    # Get the integer value for the current month.
     month = datetime.date.today().month
+
+    # Get the integer value for the current year.
     year = datetime.date.today().year
 
+    # Call getSchoolYear, passing it the current month and year and return the value
     return getSchoolYear(month, year)
 
 
