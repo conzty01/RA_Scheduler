@@ -62,10 +62,19 @@ def getAuth():
 
 
 def stdRet(status, msg):
-    # Helper function to create a standard return object to help simplify code
+    # Create a standard return object to help simplify/unify API responses
     #  going back to the client when no additional data is to be sent.
+    #
+    #  This function accepts the following parameters:
+    #
+    #     status  <int>  -  the status of the message which indicates whether an operation
+    #                        was successful or if it encountered an error.
+    #     msg     <str>  -  the message that should be associated with the provided status
+
     logging.debug("Generate Standard Return")
-    return {"status":status,"msg":msg}
+
+    # Return standard return object back with the provided configuration.
+    return {"status": status, "msg": msg}
 
 
 def fileAllowed(filename):
