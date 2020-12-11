@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% block styles %}
 {{ super() }}
-<link rel="stylesheet" href="{{url_for('.static', filename='calendar.css')}}">
-<link rel="stylesheet" href="{{url_for('.static', filename='manStaff.css')}}">
+<link rel="stylesheet" href="{{url_for('static', filename='calendar.css')}}">
+<link rel="stylesheet" href="{{url_for('staff_bp.static', filename='manStaff.css')}}">
 {% endblock %}
 
 {% block contentRows %}
@@ -11,7 +11,7 @@
   <div class="modal-dialog modal-dialog" role="document">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 class="modal-title"><span id="modalTitle">Add Staff Member<span></h3>
+        <h3 class="modal-title"><span id="modalTitle">Add Staff Member</span></h3>
       </div>
       <form id="addStafferForm" class="modal-body">
           <div class="form-group form-row">
@@ -70,7 +70,7 @@
       <div class="modal-header">
         <h3 class="modal-title"><span id="modalTitle">Import Staff Members<span></h3>
       </div>
-      <form id="importStaffForm" class="modal-body" action="/api/importStaff" method="POST" enctype="multipart/form-data">
+      <form id="importStaffForm" class="modal-body" action="{{url_for('staff_bp.importStaff')}}" method="POST" enctype="multipart/form-data">
           <div class="form-group form-row">
               <div class="col">
                   Use this tool to import multiple staff members at once by uploading a
@@ -137,7 +137,11 @@
 </div>
 {% endblock %}
 
+{%- block setBlueprintAPIPrefix %}
+var bpAPIPrefix = '/staff';
+{%- endblock %}
+
 {% block scripts %}
 {{ super() }}
-<script src="{{url_for('.static', filename='manStaff.js')}}"></script>
+<script src="{{url_for('staff_bp.static', filename='manStaff.js')}}"></script>
 {% endblock %}
