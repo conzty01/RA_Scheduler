@@ -141,15 +141,36 @@ def getHallSettings(hallId=None):
 @hall_bp.route("/api/saveHallSettings", methods=["POST"])
 @login_required
 def saveHallSettings():
-    # Save the hall settings received
+    # API Method used to save changes made to the Hall Settings for the user's hall.
+    #
+    #  This method is currently unable to be called from the server.
+    #
+    #  If called from a client, the following parameters are required:
+    #
+    #     name   <str>  -  The name of the Hall Setting that has been changed.
+    #     value  <ukn>  -  The new value for the setting that has been altered.
+    #
+    #  This method returns a standard return object whose status is one of the
+    #  following:
+    #
+    #      1 : the save was successful
+    #      0 : the user does not belong to the provided hall
+    #     -1 : the save was unsuccessful
 
+
+    # Get the user's information from the database
     userDict = getAuth()
 
-    # Ensure that the user is at least an AHD
+    # Check to see if the user is authorized to alter these settings
+    # If the user is not at least an HD
     if userDict["auth_level"] < 3:
+        # Then they are not permitted to see this view.
+
+        # Log the occurrence.
         logging.info("User Not Authorized - RA: {} attempted to overwrite Hall Settings for : {}"
                      .format(userDict["ra_id"], userDict["hall_id"]))
 
+        # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
 
     # Get the name and value of the setting that was changed.
@@ -183,18 +204,25 @@ def saveHallSettings():
             logging.info("User Not Authorized - RA: {} attempted to overwrite Hall Settings for : {}"
                          .format(userDict["ra_id"], userDict["hall_id"]))
 
+            # Close the DB cursor
+            cur.close()
+
+            # Indicate to the client that the user does not belong to the provided hall
             return jsonify(stdRet(0, "NOT AUTHORIZED"))
 
         else:
             # Otherwise go ahead and update the value.
 
+            # log that the user is updating the provided setting for the given hall
             logging.info("User: {} is updating Hall Setting: '{}' for Hall: {}".format(userDict["ra_id"],
                                                                                        setName, userDict["hall_id"]))
 
+            # Update the setting
             cur.execute("UPDATE res_hall SET name = %s WHERE id = %s", (setVal, userDict["hall_id"]))
-
+            # Commit the change to the DB
             ag.conn.commit()
 
+            # Close the DB cursor
             cur.close()
 
             # set the return value to successful
@@ -207,7 +235,8 @@ def saveHallSettings():
         #  for future implementation.
         pass
 
+    # Close the DB cursor
     cur.close()
 
-    # Return the result back to the client.
+    # Indicate to the client that the save was successful
     return jsonify(stdRet(1, "successful"))
