@@ -292,30 +292,89 @@ def getStaffStats():
 @staff_bp.route("/api/changeStaffInfo", methods=["POST"])
 @login_required
 def changeStaffInfo():
-    userDict = getAuth()                                                        # Get the user's info from our database
+    # API Method updates an RA record with the provided information
+    #
+    #  Required Auth Level: >= HD
+    #
+    #  This method is currently unable to be called from the server.
+    #
+    #  If called from a client, the following parameters are required:
+    #
+    #     fName      <str>  -  The new value for the RA's first name (ra.first_name)
+    #     lName      <str>  -  The new value for the RA's last name (ra.last_name)
+    #     startDate  <str>  -  The new date string value for the RA's start date
+    #                           (ra.start_date). Must be provided in YYYY-MM-DD format.
+    #     color      <str>  -  The new value for the RA's color (ra.color)
+    #     email      <str>  -  The new value for the RA's email (ra.email)
+    #     authLevel  <int>  -  An integer denoting the authorization level for the RA.
+    #                           Must be an integer value in the range: 1-3.
+    #     raID       <int>  -  An integer denoting the row id for the desired RA in the
+    #                           ra table.
+    #
+    #  This method returns a standard return object whose status is one of the
+    #  following:
+    #
+    #      1 : the save was successful
+    #      0 : the client does not belong to the same hall as the provided RA
+    #     -1 : the save was unsuccessful
 
-    hallId = userDict["hall_id"]
+    # Get the user's information from the database
+    userDict = getAuth()
 
-    if userDict["auth_level"] < 3:                                              # If the user is not at least an AHD
+    # Check to see if the user is authorized to view these settings
+    # If the user is not at least an HD
+    if userDict["auth_level"] < 3:
+        # Then they are not permitted to see this view.
+
+        # Log the occurrence.
         logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
-        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
 
+        # Notify the user that they are not authorized.
+        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+
+    # Load the data provided by the client
     data = request.json
 
+    # Create a DB cursor
     cur = ag.conn.cursor()
-    cur.execute("""UPDATE ra
-                   SET first_name = '{}', last_name = '{}',
-                       date_started = TO_DATE('{}', 'YYYY-MM-DD'),
-                       color = '{}', email = '{}', auth_level = {}
-                   WHERE id = {};
-                """.format(data["fName"],data["lName"], \
-                        data["startDate"],data["color"], \
-                        data["email"],data["authLevel"], \
-                        data["raID"]))
 
-    ag.conn.commit()
-    cur.close()
-    return jsonify(stdRet(1,"successful"))
+    # Check to ensure that the client belongs on the same staff as the
+    #  RA whose information is being altered.
+    cur.execute("SELECT hall_id = %s FROM ra WHERE ra.id = %s;", (userDict["hall_id"], data["raID"]))
+
+    if not cur.fetchone()[0]:
+        # If the client does not belong to the same hall, then something fishy is going on.
+        #  Simply return a not authorized message and stop processing.
+
+        logging.info("User Not Authorized - RA: {} attempted to overwrite RA Info for : {}"
+                     .format(userDict["ra_id"], data["raID"]))
+
+        # Close the DB cursor
+        cur.close()
+
+        # Indicate to the client that the user does not belong to the provided hall
+        return jsonify(stdRet(0, "NOT AUTHORIZED"))
+
+    else:
+        # Otherwise go ahead and update the RA's information
+
+        cur.execute("""UPDATE ra
+                       SET first_name = %s, last_name = %s,
+                           date_started = TO_DATE(%s, 'YYYY-MM-DD'),
+                           color = %s, email = %s, auth_level = %s
+                       WHERE id = %s;
+                    """, (data["fName"], data["lName"], data["startDate"], data["color"],
+                          data["email"], data["authLevel"], data["raID"]))
+
+        # Commit the changes to the DB
+        ag.conn.commit()
+
+        # Close the DB cursor
+        cur.close()
+
+    # Indicate to the client that the save was successful
+    return jsonify(stdRet(1, "successful"))
+
 
 @staff_bp.route("/api/removeStaffer", methods=["POST"])
 @login_required
