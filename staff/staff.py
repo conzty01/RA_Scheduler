@@ -23,6 +23,9 @@ def manStaff():
     # The landing page for this blueprint that will display the list of
     #  staff members to the user and provide a way for them to edit individual
     #  staff members' information and add or remove staff as well.
+    #
+    #  Required Auth Level: >= HD
+    #
 
     # Get the user's info from our database
     userDict = getAuth()
@@ -66,6 +69,8 @@ def manStaff():
 @login_required
 def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None):
     # API Method that will calculate and return the RA duty statistics for a given month.
+    #
+    #  Required Auth Level: None
     #
     #  If called from the server, this function accepts the following parameters:
     #
@@ -205,35 +210,84 @@ def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None
 
     # If this API method was called from the server
     if fromServer:
-        # Then return the settingList as-is
+        # Then return the result as-is
         return res
 
     else:
-        # Otherwise return a JSON version of the settingList
+        # Otherwise return a JSON version of the result
         return jsonify(res)
 
 
 @staff_bp.route("/api/getStaffInfo", methods=["GET"])
 @login_required
 def getStaffStats():
+    # API Method that will calculate and return the RA duty statistics as for the
+    #  user's staff for the current school year.
+    #
+    #  Required Auth Level: >= HD
+    #
+    #  This method is currently unable to be called from the server.
+    #
+    #  If called from a client, this function does not accept any parameters, but
+    #  rather, uses the hall id that is associated with the user.
+    #
+    #  This method returns an object with the following specifications:
+    #
+    #     {
+    #        raList : [
+    #           [<ra.id 1>,<ra.first_name 1>,<ra.last_name 1>,<ra.email 1>,
+    #            <ra.date_started 1>,<res_hall.name>,<ra.color 1>,<ra.auth_level 1>],
+    #           [...],
+    #           ...
+    #        ],
+    #        pts : {
+    #           <ra.id 1> : {
+    #              "name": ra.first_name + " " + ra.last_name,
+    #              "pts": <number of duty points for RA 1>
+    #           },
+    #           <ra.id 2> : {
+    #              "name": ra.first_name + " " + ra.last_name,
+    #              "pts": <number of duty points for RA 2>
+    #           },
+    #           ...
+    #        }
+    #     }
+
+    # Get the user's information from the database
     userDict = getAuth()
 
-    if userDict["auth_level"] < 3:                                              # If the user is not at least an AHD
-        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
-        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
+    # Check to see if the user is authorized to view these settings
+    # If the user is not at least an HD
+    if userDict["auth_level"] < 3:
+        # Then they are not permitted to see this view.
 
+        # Log the occurrence.
+        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
+
+        # Notify the user that they are not authorized.
+        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+
+    # Create a DB cursor
     cur = ag.conn.cursor()
 
+    # Query the DB for the list of RAs for the given res hall.
     cur.execute("""SELECT ra.id, first_name, last_name, email, date_started, res_hall.name, color, auth_level
                  FROM ra JOIN res_hall ON (ra.hall_id = res_hall.id)
-                 WHERE hall_id = {} ORDER BY ra.id DESC;""".format(userDict["hall_id"]))
+                 WHERE hall_id = %s ORDER BY ra.id DESC;""", (userDict["hall_id"],))
 
+    # Get the information for the current school year.
+    #  This will be used to calculate duty points for the RAs.
     start, end = getCurSchoolYear()
+
+    # Get each of the RA's duty statistics for the current school year.
     pts = getRAStats(userDict["hall_id"], start, end)
 
-    ret = {"raList": cur.fetchall(), "pts":pts}
+    # Assemble the return result object.
+    ret = {"raList": cur.fetchall(), "pts": pts}
 
+    # return a JSON version of the return result
     return jsonify(ret)
+
 
 @staff_bp.route("/api/changeStaffInfo", methods=["POST"])
 @login_required
