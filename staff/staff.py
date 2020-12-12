@@ -256,7 +256,7 @@ def getStaffStats():
     # Get the user's information from the database
     userDict = getAuth()
 
-    # Check to see if the user is authorized to view these settings
+    # Check to see if the user is authorized to view this information
     # If the user is not at least an HD
     if userDict["auth_level"] < 3:
         # Then they are not permitted to see this view.
@@ -292,7 +292,7 @@ def getStaffStats():
 @staff_bp.route("/api/changeStaffInfo", methods=["POST"])
 @login_required
 def changeStaffInfo():
-    # API Method updates an RA record with the provided information
+    # API Method that updates an RA record with the provided information.
     #
     #  Required Auth Level: >= HD
     #
@@ -321,7 +321,7 @@ def changeStaffInfo():
     # Get the user's information from the database
     userDict = getAuth()
 
-    # Check to see if the user is authorized to view these settings
+    # Check to see if the user is authorized to alter RA information
     # If the user is not at least an HD
     if userDict["auth_level"] < 3:
         # Then they are not permitted to see this view.
@@ -379,29 +379,78 @@ def changeStaffInfo():
 @staff_bp.route("/api/removeStaffer", methods=["POST"])
 @login_required
 def removeStaffer():
+    # API Method that removes a staff member from the client's res hall. The staff
+    #  member that is removed is then associated with the 'Not Assigned' record in
+    #  the res_hall table.
+    #
+    #  Required Auth Level: >= HD
+    #
+    #  This method is currently unable to be called from the server.
+    #
+    #  If called from a client, the following parameters are required:
+    #
+    #     raID  <int>  -  An integer denoting the row id for the desired RA in the
+    #                      ra table.
+    #
+    #  This method returns a standard return object whose status is one of the
+    #  following:
+    #
+    #      1 : the removal was successful
+    #      0 : the client does not belong to the same hall as the provided RA
+    #     -1 : the removal was unsuccessful
+
+    # Get the user's information from the database
     userDict = getAuth()
 
-    if userDict["auth_level"] < 3:                                              # If the user is not at least an AHD
-        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
-        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
+    # Check to see if the user is authorized to remove the staff member
+    # If the user is not at least an HD
+    if userDict["auth_level"] < 3:
+        # Then they are not permitted to see this view.
 
+        # Log the occurrence.
+        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
+
+        # Notify the user that they are not authorized.
+        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+
+    # Load the raID from the request's JSON
     raID = request.json
 
-    checkCur = ag.conn.cursor()
-    checkCur.execute("SELECT hall_id FROM ra WHERE id = {};".format(raID))
+    # Check to ensure that the client belongs on the same staff as the
+    #  RA whose information is being altered.
 
-    if userDict["hall_id"] != checkCur.fetchone()[0]:
-        return jsonify("NOT AUTHORIZED")
-
-    checkCur.close()
-
+    # Create a DB cursor
     cur = ag.conn.cursor()
 
-    cur.execute("UPDATE ra SET hall_id = 0 WHERE id = {};".format(raID))
-    ag.conn.commit()
-    cur.close()
+    # Query the DB for the provided RA
+    cur.execute("SELECT hall_id = %s FROM ra WHERE ra.id = %s;", (userDict["hall_id"], raID))
 
-    return jsonify(raID)
+    if not cur.fetchone()[0]:
+        # If the client does not belong to the same hall, then something fishy is going on.
+        #  Simply return a not authorized message and stop processing.
+
+        logging.info("User Not Authorized - RA: {} attempted to overwrite RA Info for : {}"
+                     .format(userDict["ra_id"], raID))
+
+        # Close the DB cursor
+        cur.close()
+
+        # Indicate to the client that the user does not belong to the provided hall
+        return jsonify(stdRet(0, "NOT AUTHORIZED"))
+
+    else:
+        # Otherwise go ahead and remove the RA from the hall
+        cur.execute("UPDATE ra SET hall_id = 0 WHERE id = %s;", (raID,))
+
+        # Commit the change to the DB
+        ag.conn.commit()
+
+        # Close the DB cursor
+        cur.close()
+
+    # Indicate to the client that the save was successful
+    return jsonify(stdRet(1, "successful"))
+
 
 @staff_bp.route("/api/addStaffer", methods=["POST"])
 @login_required
