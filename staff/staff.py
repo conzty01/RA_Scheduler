@@ -1,8 +1,10 @@
 from flask import render_template, request, jsonify, redirect, url_for, Blueprint
 from flask_login import login_required
-import psycopg2
+from psycopg2 import IntegrityError
 import logging
-import os
+
+# Import the appGlobals for this blueprint to use
+import appGlobals as ag
 
 # Import the needed functions from other parts of the application
 from helperFunctions.helperFunctions import getAuth, stdRet, getCurSchoolYear, fileAllowed
@@ -11,32 +13,49 @@ staff_bp = Blueprint("staff_bp", __name__,
                      template_folder="templates",
                      static_folder="static")
 
-
-
+# ---------------------
+# --      Views      --
+# ---------------------
 
 @staff_bp.route("/")
 @login_required
 def manStaff():
-    # Establish DB connection
-    conn = psycopg2.connect(os.environ["DATABASE_URL"])
+    # The landing page for this blueprint that will display the list of
+    #  staff members to the user and provide a way for them to edit individual
+    #  staff members' information and add or remove staff as well.
 
-    userDict = getAuth()                                                        # Get the user's info from our database
+    # Get the user's info from our database
+    userDict = getAuth()
 
+    # If the user is not at least an HD
     if userDict["auth_level"] < 3:
-        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
-        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
+        # Then they are not permitted to see this view.
 
+        # Log the occurrence.
+        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
+
+        # Notify the user that they are not authorized.
+        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+
+    # Get the information for the current school year.
+    #  This will be used to calculate duty points for the RAs.
     start, end = getCurSchoolYear()
 
-    cur = conn.cursor()
-    cur.execute("SELECT ra.id, first_name, last_name, email, date_started, res_hall.name, color, auth_level \
-                 FROM ra JOIN res_hall ON (ra.hall_id = res_hall.id) \
-                 WHERE hall_id = {} ORDER BY ra.id ASC;".format(userDict["hall_id"]))
+    # Create a DB cursor
+    cur = ag.conn.cursor()
 
+    # Query the DB for a list of all of the RAs for the hall and their information.
+    cur.execute("""SELECT ra.id, first_name, last_name, email, date_started, res_hall.name, color, auth_level 
+                   FROM ra JOIN res_hall ON (ra.hall_id = res_hall.id) 
+                   WHERE hall_id = %s ORDER BY ra.id ASC;
+                """, (userDict["hall_id"],))
+
+    # Get each of the RA's duty statistics for the current school year.
     ptStats = getRAStats(userDict["hall_id"], start, end)
 
+    # Render and return the appropriate template.
     return render_template("staff/staff.html", raList=cur.fetchall(), auth_level=userDict["auth_level"],
-                           opts=baseOpts, curView=4, hall_name=userDict["hall_name"], pts=ptStats)
+                           opts=ag.baseOpts, curView=4, hall_name=userDict["hall_name"], pts=ptStats)
 
 @staff_bp.route("/api/getStats", methods=["GET"])
 @login_required
@@ -60,7 +79,7 @@ def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None
 
     res = {}
 
-    cur = conn.cursor()
+    cur = ag.conn.cursor()
 
     breakDutyStart = startDateStr
 
@@ -147,7 +166,7 @@ def getStaffStats():
         logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
         return jsonify(stdRet(-1,"NOT AUTHORIZED"))
 
-    cur = conn.cursor()
+    cur = ag.conn.cursor()
 
     cur.execute("""SELECT ra.id, first_name, last_name, email, date_started, res_hall.name, color, auth_level
                  FROM ra JOIN res_hall ON (ra.hall_id = res_hall.id)
@@ -156,7 +175,7 @@ def getStaffStats():
     start, end = getCurSchoolYear()
     pts = getRAStats(userDict["hall_id"], start, end)
 
-    ret = {"raList":cur.fetchall(), "pts":pts}
+    ret = {"raList": cur.fetchall(), "pts":pts}
 
     return jsonify(ret)
 
@@ -173,7 +192,7 @@ def changeStaffInfo():
 
     data = request.json
 
-    cur = conn.cursor()
+    cur = ag.conn.cursor()
     cur.execute("""UPDATE ra
                    SET first_name = '{}', last_name = '{}',
                        date_started = TO_DATE('{}', 'YYYY-MM-DD'),
@@ -184,7 +203,7 @@ def changeStaffInfo():
                         data["email"],data["authLevel"], \
                         data["raID"]))
 
-    conn.commit()
+    ag.conn.commit()
     cur.close()
     return jsonify(stdRet(1,"successful"))
 
@@ -199,7 +218,7 @@ def removeStaffer():
 
     raID = request.json
 
-    checkCur = conn.cursor()
+    checkCur = ag.conn.cursor()
     checkCur.execute("SELECT hall_id FROM ra WHERE id = {};".format(raID))
 
     if userDict["hall_id"] != checkCur.fetchone()[0]:
@@ -207,10 +226,10 @@ def removeStaffer():
 
     checkCur.close()
 
-    cur = conn.cursor()
+    cur = ag.conn.cursor()
 
     cur.execute("UPDATE ra SET hall_id = 0 WHERE id = {};".format(raID))
-    conn.commit()
+    ag.conn.commit()
     cur.close()
 
     return jsonify(raID)
@@ -226,21 +245,21 @@ def addStaffer():
 
     data = request.json
 
-    checkCur = conn.cursor()
+    checkCur = ag.conn.cursor()
     checkCur.execute("SELECT * FROM ra WHERE email = '{}';".format(data["email"]))
     checkRes = checkCur.fetchone()
 
     if checkRes is not None:
-        cur = conn.cursor()
+        cur = ag.conn.cursor()
         cur.execute("UPDATE ra SET hall_id = {} WHERE email = '{}';".format(userDict["hall_id"], data["email"]))
-        conn.commit()
+        ag.conn.commit()
 
         cur.execute("SELECT * FROM ra WHERE email = '{}';".format(data["email"]))
         ret = cur.fetchone()
         cur.close()
         return jsonify(ret)
 
-    cur = conn.cursor()
+    cur = ag.conn.cursor()
 
     cur.execute("""
     INSERT INTO ra (first_name,last_name,hall_id,date_started,color,email,auth_level)
@@ -249,7 +268,7 @@ def addStaffer():
     """.format(data["fName"],data["lName"],userDict["hall_id"],data["color"], \
                 data["email"],data["authLevel"]))
 
-    conn.commit()
+    ag.conn.commit()
     newId = cur.fetchone()[0]
 
     cur.execute("""SELECT ra.id, first_name, last_name, email, date_started, res_hall.name, color, auth_level
@@ -293,7 +312,7 @@ def importStaff():
         #  Example:
         #  FName, LName-Hyphen, example@email.com, 05/28/2020, #OD1E76, RA
         logging.debug(dataStr)
-        cur = conn.cursor()
+        cur = ag.conn.cursor()
         for row in dataStr.split("\n")[1:]:
             if row != "":
                 pl = [ part.strip() for part in row.split(",") ]
@@ -324,13 +343,13 @@ def importStaff():
                         VALUES ('{}','{}',{},TO_DATE('{}','MM/DD/YYYY'),'{}','{}',{});
                         """.format(pl[0],pl[1],userDict["hall_id"],pl[3],pl[4],pl[2],auth))
 
-                    conn.commit()
+                    ag.conn.commit()
 
-                except psycopg2.IntegrityError:                                         # If the conflict entry already exists
+                except IntegrityError:                                         # If the conflict entry already exists
                     logging.debug("Duplicate RA: {}, rolling back DB changes".format(pl))
-                    conn.rollback()                                                     # Rollback last commit so that Internal Error doesn't occur
+                    ag.conn.rollback()                                                     # Rollback last commit so that Internal Error doesn't occur
                     cur.close()
-                    cur = conn.cursor()
+                    cur = ag.conn.cursor()
 
         cur.close()
 
