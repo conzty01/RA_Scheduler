@@ -167,10 +167,7 @@ function delStaff(id) {
     // Hide the modal
     $('#addStafferModal').modal('toggle');
 
-    appConfig.base.callAPI("removeStaffer",id,function(i) {
-        let row = document.getElementById(i);
-        row.parentNode.removeChild(row);
-    },"POST");
+    appConfig.base.callAPI("removeStaffer",id,getStaffInfo,"POST");
 }
 
 function addStaff() {
