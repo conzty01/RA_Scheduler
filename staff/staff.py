@@ -57,49 +57,98 @@ def manStaff():
     return render_template("staff/staff.html", raList=cur.fetchall(), auth_level=userDict["auth_level"],
                            opts=ag.baseOpts, curView=4, hall_name=userDict["hall_name"], pts=ptStats)
 
+
+# ---------------------
+# --   API Methods   --
+# ---------------------
+
 @staff_bp.route("/api/getStats", methods=["GET"])
 @login_required
 def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None):
-    # API Hook that will get the RA stats for a given month.
-    #  The month will be given via request.args as 'monthNum' and 'year'.
-    #  The server will then query the database for the appropriate statistics
-    #  and send back a json object.
+    # API Method that will calculate and return the RA duty statistics for a given month.
+    #
+    #  If called from the server, this function accepts the following parameters:
+    #
+    #     hallId        <int>  -  an integer representing the id of the desired residence
+    #                              hall in the res_hall table.
+    #     startDateStr  <str>  -  a string representing the first day that should be included
+    #                              for the duty points calculation.
+    #     endDateStr    <str>  -  a string representing the last day that should be included
+    #                              for the duty points calculation.
+    #     maxBreakDay   <str>  -  a string representing the latest break duty that should be
+    #                              included for the duty points calculation.
+    #
+    #  If called from a client, the following parameters are required:
+    #
+    #     start  <str>  -  a string representing the first day that should be included
+    #                       for the duty points calculation.
+    #     end    <str>  -  a string representing the last day that should be included
+    #                       for the duty points calculation.
+    #
+    #  This method returns an object with the following specifications:
+    #
+    #     {
+    #        <ra.id 1> : {
+    #           "name": ra.first_name + " " + ra.last_name,
+    #           "pts": <number of duty points for RA 1>
+    #        },
+    #        <ra.id 2> : {
+    #           "name": ra.first_name + " " + ra.last_name,
+    #           "pts": <number of duty points for RA 2>
+    #        },
+    #        ...
+    #     }
 
+    # Assume this API was called from the server and verify that this is true.
     fromServer = True
     if hallId is None and startDateStr is None \
-        and endDateStr is None and maxBreakDay is None:                         # Effectively: If API was called from the client and not from the server
+            and endDateStr is None and maxBreakDay is None:
+        # If the HallId, startDateStr, endDateStr and MaxBreakDay are None, then
+        #  this method was called from a remote client.
 
-        userDict = getAuth()                                                    # Get the user's info from our database
+        # Get the user's information from the database
+        userDict = getAuth()
+        # Set the value of hallId from the userDict
         hallId = userDict["hall_id"]
-        fromServer = False
+        # Get the startDateStr and endDateStr from the request arguments
         startDateStr = request.args.get("start")
         endDateStr = request.args.get("end")
+        # Mark that this method was not called from the server
+        fromServer = False
 
     logging.debug("Get RA Stats - FromServer: {}".format(fromServer))
 
+    # Create the result object to be returned
     res = {}
 
+    # Create a DB cursor
     cur = ag.conn.cursor()
 
+    # This method assumes that the first break duty that should be included in this
+    #  calculation is the same date as the one indicated in the startDateStr.
     breakDutyStart = startDateStr
 
+    # Check to see if the maxBreakDay has been assigned.
     if maxBreakDay is None:
         # If maxBreakDay is None, then we should calculate the TOTAL number of points
         #  that each RA has for the course of the period specified (including
         #  all break duties).
 
+        # Set the breakDutyEnd date to be the same as the endDateStr
         breakDutyEnd = endDateStr
 
     else:
         # If maxBreakDay is NOT None, then we should calculate the number of REGULAR
         #  duty points plus the number of BREAK duty points for the specified month.
 
+        # Set the breakDutyEnd date to tbe the same as the maxBreakDay
         breakDutyEnd = maxBreakDay
 
     logging.debug("breakDutyStart: {}".format(breakDutyStart))
     logging.debug("breakDutyEnd: {}".format(breakDutyEnd))
 
-
+    # Query the DB for all of the duties within the provided timeframe and add up the points
+    #  for each RA.
     cur.execute("""SELECT ra.id, ra.first_name, ra.last_name, COALESCE(ptQuery.pts,0)
                FROM
                (
@@ -109,18 +158,18 @@ def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None
                       SELECT ra.id AS rid, SUM(duties.point_val) AS pts
                       FROM duties JOIN day ON (day.id=duties.day_id)
                                   JOIN ra ON (ra.id=duties.ra_id)
-                      WHERE duties.hall_id = {}
+                      WHERE duties.hall_id = %s
                       AND duties.sched_id IN
                       (
                          SELECT DISTINCT ON (schedule.month_id) schedule.id
                          FROM schedule
-                         WHERE schedule.hall_id = {}
+                         WHERE schedule.hall_id = %s
                          AND schedule.month_id IN
                          (
                              SELECT month.id
                              FROM month
-                             WHERE month.year >= TO_DATE('{}', 'YYYY-MM-DD')
-                             AND month.year <= TO_DATE('{}', 'YYYY-MM-DD')
+                             WHERE month.year >= TO_DATE(%s, 'YYYY-MM-DD')
+                             AND month.year <= TO_DATE(%s, 'YYYY-MM-DD')
                          )
                          ORDER BY schedule.month_id, schedule.created DESC, schedule.id DESC
                       )
@@ -131,31 +180,38 @@ def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None
                       SELECT ra.id AS rid, SUM(break_duties.point_val) AS pts
                       FROM break_duties JOIN day ON (day.id=break_duties.day_id)
                                         JOIN ra ON (ra.id=break_duties.ra_id)
-                      WHERE break_duties.hall_id = {}
-                      AND day.date BETWEEN TO_DATE('{}', 'YYYY-MM-DD')
-                                       AND TO_DATE('{}', 'YYYY-MM-DD')
+                      WHERE break_duties.hall_id = %s
+                      AND day.date BETWEEN TO_DATE(%s, 'YYYY-MM-DD')
+                                       AND TO_DATE(%s, 'YYYY-MM-DD')
                       GROUP BY rid
                    ) AS combined_res
                    GROUP BY combined_res.rid
                ) ptQuery
                RIGHT JOIN ra ON (ptQuery.rid = ra.id)
-               WHERE ra.hall_id = {};""".format(hallId, hallId, startDateStr, \
-                                                endDateStr, hallId, breakDutyStart, \
-                                                breakDutyEnd, hallId))
+               WHERE ra.hall_id = %s;""", (hallId, hallId, startDateStr,
+                                           endDateStr, hallId, breakDutyStart,
+                                           breakDutyEnd, hallId))
 
+    # Get the result from the DB
     raList = cur.fetchall()
 
+    # Iterate through the raList from the DB and assembled the return result
+    #  in the format outlined in the comments at the top of this method.
     for ra in raList:
-        res[ra[0]] = { "name": ra[1] + " " + ra[2], "pts": ra[3] }
+        res[ra[0]] = {"name": ra[1] + " " + ra[2], "pts": ra[3]}
 
+    # Close the DB cursor
     cur.close()
+
+    # If this API method was called from the server
     if fromServer:
-        # If this function call is from the server, simply return the results
+        # Then return the settingList as-is
         return res
+
     else:
-        # Otherwise, if this function call is from the client, return the
-        #  results as a JSON response object.
+        # Otherwise return a JSON version of the settingList
         return jsonify(res)
+
 
 @staff_bp.route("/api/getStaffInfo", methods=["GET"])
 @login_required
