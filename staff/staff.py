@@ -473,9 +473,9 @@ def addStaffer():
     #  This method returns a standard return object whose status is one of the
     #  following:
     #
-    #      1 : the removal was successful
+    #      1 : the addition was successful
     #      0 : the client does not belong to the same hall as the provided RA
-    #     -1 : the removal was unsuccessful
+    #     -1 : the addition was unsuccessful
 
     # Get the user's information from the database
     userDict = getAuth()
@@ -512,15 +512,6 @@ def addStaffer():
         # Commit the changes to the DB
         ag.conn.commit()
 
-        # Retrieve the updated RA from the DB
-        cur.execute("SELECT * FROM ra WHERE email = '{}';".format(data["email"]))
-
-        # Load the data from the DB
-        ret = cur.fetchone()
-
-        # Close the cursor
-        cur.close()
-
         # Notify the user that the change was successful
         return jsonify(stdRet(1, "successful"))
 
@@ -540,82 +531,179 @@ def addStaffer():
 @staff_bp.route("/api/importStaff", methods=["POST"])
 @login_required
 def importStaff():
+    # API Method that uses an uploaded file to import multiple staff members into
+    #  the client's staff. The file must be either a .csv or .txt file that is in
+    #  a specific format. An example of this format can be seen in the
+    #  'importExample.csv' file located in this blueprint's static folder.
+    #
+    #  Required Auth Level: >= HD
+    #
+    #  This method is currently unable to be called from the server.
+    #
+    #  If called from a client, the following parameters are required:
+    #
+    #     file  <TextIOWrapper>  -  an uploaded file that will be used to
+    #                                import multiple staff members into the
+    #                                client's staff.
+    #
+    #  This method returns a standard return object whose status is one of the
+    #  following:
+    #
+    #      1 : the import was successful
+    #      0 : there was an error transmitting the file to the server
+    #     -1 : the import was unsuccessful
+
+    # Get the user's information from the database
     userDict = getAuth()
 
-    if userDict["auth_level"] < 3:                                              # If the user is not at least an AHD
-        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
-        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
+    # Check to see if the user is authorized to import staff members
+    # If the user is not at least an HD
+    if userDict["auth_level"] < 3:
+        # Then they are not permitted to see this view.
 
-    logging.info("Import File: {}".format(request.files))
+        # Log the occurrence.
+        logging.info("User Not Authorized - RA: {} attempted to import staff to Hall: {}"
+                     .format(userDict["ra_id"], userDict["hall_id"]))
+
+        # Notify the user that they are not authorized.
+        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+
+    logging.info("Import File: {} for Hall: {}".format(request.files, userDict["hall_id"]))
+
+    # If the key 'file' is not in the request.files object
     if 'file' not in request.files:
+        # Then there was an issue uploading the file to the server
         logging.info("No file part found")
-        return jsonify(stdRet(0,"No File Part"))
 
+        # Notify the client that there was a transmission issue.
+        return jsonify(stdRet(0, "There appears to have been an issue uploading the file. - No File Part Found"))
+
+    # Otherwise load the file
     file = request.files['file']
-    # if user does not select file, browser also
-    # submit an empty part without filename
+    # NOTE: If the user does not select a file, the browser
+    #        can submit an empty part without a filename.
 
+    # Check to see if the browser uploaded an empty part
+    #  without a filename.
     if file.filename == '':
+        # If so, log the occurrence
         logging.info("No File Selected")
-        return jsonify(stdRet(0,"No File Selected"))
 
+        # Notify the client that this issue occurred.
+        return jsonify(stdRet(0, "No File Selected"))
+
+    # Check to ensure that 1) we have a file and 2) the file type is allowed
     if file and fileAllowed(file.filename):
+
+        # If so, decode and read the file into a string
         dataStr = file.read().decode("utf-8")
 
-        # Iterate through the rows of the dataStr
-        #  The expected format for the csv contains
-        #  a header row and is as follows:
-        #  First Name, Last Name, Email, Date Started (MM/DD/YYYY), Color, Role
+        logging.debug(dataStr)
 
+        # Create a DB cursor
+        cur = ag.conn.cursor()
+
+        # Iterate through the rows of the dataStr and process them.
+        #  The expected format for the csv contains a header row and is as follows:
+        #  First Name, Last Name, Email, Date Started (MM/DD/YYYY), Color, Role
+        #
         #  Example:
         #  FName, LName-Hyphen, example@email.com, 05/28/2020, #OD1E76, RA
-        logging.debug(dataStr)
-        cur = ag.conn.cursor()
+
+        # Split the dataStr on the newline character and, since we expect a header
+        #  row, skip the first item in the list.
         for row in dataStr.split("\n")[1:]:
+            # If the row is not empty
             if row != "":
-                pl = [ part.strip() for part in row.split(",") ]
+                # Then break out its parts splitting on the "," character
+                #  and strip any excess whitespace off of the individual parts.
+                pl = [part.strip() for part in row.split(",")]
+
                 logging.debug("PL: {}".format(pl))
 
-                # Do some validation checking
-
+                # Do some validation checking of the parts to ensure that
+                #  we have received the correct number of items, that each
+                #  part doesn't contain any mischievous characters, and
+                #  that each part is formatted as we would expect
                 pl, valid, reasons = validateImportStaffUpload(pl)
 
+                # Check to see if the parts list is valid.
                 if not valid:
-                    ret = stdRet("0","Invalid Formatting")
+                    # If not, then create a standard return object informing
+                    #  the client of this issue.
+                    ret = stdRet(0, "Invalid File Formatting")
+
+                    # Add an "except" key with the reasons provided by the
+                    #  validateImportStaffUpload functions.
                     ret["except"] = reasons
-                    logging.info("Invalid Formatting")
+
+                    # Log the instance
+                    logging.info("Invalid Import Staff Formatting for Hall: {}"
+                                 .format(userDict["hall_id"]))
+
+                    # Notify the client of this issue.
                     return jsonify(ret)
 
-                if pl[-1] == "HD" and userDict["auth_level"] >= 3:
+                # Check the authorization level indicated by the row
+                #  and translate the human-readable text into the values
+                #  that will be stored in the DB.
+                if pl[-1] == "HD":
+                    # If the role is "HD", then set the auth to 3
                     auth = 3
+
                 elif pl[-1] == "AHD":
+                    # If the role is "AHD", then set the auth to 2
                     auth = 2
+
                 else:
+                    # Otherwise set the role to 1
+                    # NOTE: This would include "RA" roles as well
+                    #        as any strange roles that the user enters.
                     auth = 1
 
-                logging.debug(auth)
+                logging.debug(str(auth))
 
                 try:
+                    # Attempt to add insert the new staff member into the RA table.
                     cur.execute("""
                         INSERT INTO ra (first_name,last_name,hall_id,date_started,color,email,auth_level)
-                        VALUES ('{}','{}',{},TO_DATE('{}','MM/DD/YYYY'),'{}','{}',{});
-                        """.format(pl[0],pl[1],userDict["hall_id"],pl[3],pl[4],pl[2],auth))
+                        VALUES (%s, %s, %s,TO_DATE(%s, 'MM/DD/YYYY'), %s, %s, %s);
+                        """, (pl[0], pl[1], userDict["hall_id"], pl[3], pl[4], pl[2], auth))
 
+                    # Commit the changes to the DB
                     ag.conn.commit()
 
-                except IntegrityError:                                         # If the conflict entry already exists
-                    logging.debug("Duplicate RA: {}, rolling back DB changes".format(pl))
-                    ag.conn.rollback()                                                     # Rollback last commit so that Internal Error doesn't occur
+                except IntegrityError:
+                    # If the ra already exists in the DB
+                    # Log the instance
+                    logging.warning("Duplicate RA: {}, rolling back DB changes".format(pl))
+
+                    # Roll back the DB prior to the inserting the duplicate
+                    ag.conn.rollback()
+
+                    # Close the cursor
                     cur.close()
+
+                    # Create a new cursor to get a fresh start
                     cur = ag.conn.cursor()
 
+        # When we are done iterating through all of the rows...
+        # Close the DB cursor
         cur.close()
 
-        return redirect(url_for(".manStaff"))
+        # Redirect the user back to the Manage Staff page.
+        return redirect(url_for("staff_bp.manStaff"))
 
     else:
+        # If we do not have a file or the file type is not allowed,
+        # Log the instance
         logging.info("Unable to Import Staff")
-        return redirect(url_for(".err",msg="Unable to Import Staff"))
+
+        # Redirect the user to an error page that will describe the issue
+        return redirect(url_for(".err", msg="Unable to Import Staff\n\nAn error has occurred during the "
+                                            "import process. Either a file was not received by the server "
+                                            "or the file extension that was received was not allowed."))
+
 
 def validateImportStaffUpload(partList):
     # Helper function designed for the staff_bp.importStaff endpoint that
