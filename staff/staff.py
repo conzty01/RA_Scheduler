@@ -455,47 +455,87 @@ def removeStaffer():
 @staff_bp.route("/api/addStaffer", methods=["POST"])
 @login_required
 def addStaffer():
+    # API Method that adds a new staff member to the same res hall as the client.
+    #
+    #  Required Auth Level: >= HD
+    #
+    #  This method is currently unable to be called from the server.
+    #
+    #  If called from a client, the following parameters are required:
+    #
+    #     fName      <str>  -  The value for the RA's first name (ra.first_name)
+    #     lName      <str>  -  The value for the RA's last name (ra.last_name)
+    #     color      <str>  -  The value for the RA's color (ra.color)
+    #     email      <str>  -  The value for the RA's email (ra.email)
+    #     authLevel  <int>  -  An integer denoting the authorization level for the RA.
+    #                           Must be an integer value in the range: 1-3.
+    #
+    #  This method returns a standard return object whose status is one of the
+    #  following:
+    #
+    #      1 : the removal was successful
+    #      0 : the client does not belong to the same hall as the provided RA
+    #     -1 : the removal was unsuccessful
+
+    # Get the user's information from the database
     userDict = getAuth()
 
-    if userDict["auth_level"] < 3:                                              # If the user is not at least an AHD
-        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
-        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
+    # Check to see if the user is authorized to add a staffer
+    # If the user is not at least an HD
+    if userDict["auth_level"] < 3:
+        # Then they are not permitted to see this view.
 
+        # Log the occurrence.
+        logging.info("User Not Authorized - RA: {} attempted to add Staff Member for Hall: {}"
+                     .format(userDict["ra_id"], userDict["hall_id"]))
+
+        # Notify the user that they are not authorized.
+        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+
+    # Load the data from the request's JSON
     data = request.json
 
-    checkCur = ag.conn.cursor()
-    checkCur.execute("SELECT * FROM ra WHERE email = '{}';".format(data["email"]))
-    checkRes = checkCur.fetchone()
-
-    if checkRes is not None:
-        cur = ag.conn.cursor()
-        cur.execute("UPDATE ra SET hall_id = {} WHERE email = '{}';".format(userDict["hall_id"], data["email"]))
-        ag.conn.commit()
-
-        cur.execute("SELECT * FROM ra WHERE email = '{}';".format(data["email"]))
-        ret = cur.fetchone()
-        cur.close()
-        return jsonify(ret)
-
+    # Create a DB cursor
     cur = ag.conn.cursor()
 
-    cur.execute("""
-    INSERT INTO ra (first_name,last_name,hall_id,date_started,color,email,auth_level)
-    VALUES ('{}','{}',{},NOW(),'{}','{}','{}')
-    RETURNING id;
-    """.format(data["fName"],data["lName"],userDict["hall_id"],data["color"], \
-                data["email"],data["authLevel"]))
+    # Query the DB to see if there is already an RA associated with the provided email.
+    cur.execute("SELECT id FROM ra WHERE email = %s;", (data["email"],))
 
+    # Load the result from the DB
+    checkRes = cur.fetchone()
+
+    # If there is a user with the provided email already
+    if checkRes is not None:
+        # Then update RA record to be associated with the new hall
+        cur.execute("UPDATE ra SET hall_id = %s WHERE email = %s;", (userDict["hall_id"], data["email"]))
+
+        # Commit the changes to the DB
+        ag.conn.commit()
+
+        # Retrieve the updated RA from the DB
+        cur.execute("SELECT * FROM ra WHERE email = '{}';".format(data["email"]))
+
+        # Load the data from the DB
+        ret = cur.fetchone()
+
+        # Close the cursor
+        cur.close()
+
+        # Notify the user that the change was successful
+        return jsonify(stdRet(1, "successful"))
+
+    # Otherwise create a new RA record in the ra table with the provided information.
+    cur.execute("""INSERT INTO ra (first_name, last_name, hall_id, date_started, color, email, auth_level)
+                   VALUES (%s, %s, %s, NOW(), %s, %s, %s)
+                """, (data["fName"], data["lName"], userDict["hall_id"], data["color"],
+                      data["email"], data["authLevel"]))
+
+    # Commit the changes to the DB
     ag.conn.commit()
-    newId = cur.fetchone()[0]
 
-    cur.execute("""SELECT ra.id, first_name, last_name, email, date_started, res_hall.name, color, auth_level
-     FROM ra JOIN res_hall ON (ra.hall_id = res_hall.id)
-     WHERE ra.id = {};""".format(newId))
-    raData = cur.fetchone()
-    cur.close()
+    # Notify the client that the save was successful
+    return jsonify(stdRet(1, "successful"))
 
-    return jsonify(raData)
 
 @staff_bp.route("/api/importStaff", methods=["POST"])
 @login_required
