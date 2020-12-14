@@ -473,50 +473,97 @@ def deleteBreakDuty():
     #      1 : the save was successful
     #      0 : the client does not belong to the same hall as the provided RA
     #     -1 : the save was unsuccessful
+
+    # Get the user's information from the database
     userDict = getAuth()
 
+    # Load the data provided by the client
     data = request.json
+
+    # Set the values of the fName, lName, and dateStr with the
+    #  data passed from the client. fName and lName are parsed
+    #  from the raName splitting on the " " character.
     fName, lName = data["raName"].split()
-    hallId = userDict["hall_id"]
     dateStr = data["dateStr"]
 
-    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
-        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
-        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
+    # Set the hallId from the hall associated with the requesting user.
+    hallId = userDict["hall_id"]
 
-    logging.debug("Deleted Break Duty RA Name: {}".format(fName + " " + lName))
-    logging.debug("HallID: {}".format(hallId))
-    # Expected as x-x-xxxx
+    # Check to see if the user is authorized to remove the staff member
+    # If the user is not at least an AHD
+    if userDict["auth_level"] < 2:
+        # Then they are not permitted to see this view.
+
+        # Log the occurrence.
+        logging.info("User Not Authorized - RA: {}attempted to add Break Duty for Hall: {}"
+                     .format(userDict["ra_id"], userDict["hall_id"]))
+
+        # Notify the user that they are not authorized.
+        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+
+    logging.debug("Delete Break Duty - RA Name: {}".format(fName + " " + lName))
+    logging.debug("Delete Break Duty - HallID: {}".format(hallId))
+
+    # The dateStr is expected to be in the following format: x-x-xxxx
     logging.debug("DateStr: {}".format(dateStr))
 
+    # Create a DB cursor
     cur = ag.conn.cursor()
 
-    cur.execute("SELECT id FROM ra WHERE first_name LIKE '{}' AND last_name LIKE '{}' AND hall_id = {};".format(fName,lName,userDict["hall_id"]))
+    # Query the DB for the RA that was provided and ensure that the RA is in the same hall as
+    #  the requesting user.
+    cur.execute("SELECT id FROM ra WHERE first_name LIKE %s AND last_name LIKE %s AND hall_id = %s;",
+                (fName, lName, userDict["hall_id"]))
+
+    # Load the result from the DB
     raId = cur.fetchone()
 
-    cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE('{}', 'MM/DD/YYYY');".format(data["dateStr"]))
+    # Query the DB for the day and month ids for the break duty on the provided day.
+    cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE(%s, 'MM/DD/YYYY');",
+                (data["dateStr"],))
+
+    # Load the results from the DB
     dayID, monthId = cur.fetchone()
 
+    # Check to ensure that we have received id values from our previous queries.
     if raId is not None and dayID is not None and monthId is not None:
-        cur.execute("""DELETE FROM break_duties
-                        WHERE ra_id = {}
-                        AND hall_id = {}
-                        AND day_id = {}
-                        AND month_id = {}""".format(raId[0], hallId, dayID, monthId))
+        # If the raId, dayID, and monthId are all not None, then
+        #  we have found the desired ra, day and month in the DB
+        #  and can delete it.
 
+        # Delete the break duty from the DB
+        cur.execute("""DELETE FROM break_duties
+                        WHERE ra_id = %s
+                        AND hall_id = %s
+                        AND day_id = %s
+                        AND month_id = %s""",
+                    (raId[0], hallId, dayID, monthId))
+
+        # Commit the changes to the DB
         ag.conn.commit()
 
+        # Close the DB cursor
         cur.close()
 
+        # Log the occurrence
         logging.info("Successfully deleted duty")
-        return jsonify(stdRet(1,"successful"))
+
+        # Indicate to the client that the delete was successful
+        return jsonify(stdRet(1, "successful"))
 
     else:
+        # Otherwise if any of the raId, dayID and monthIds are None,
+        #  then we are missing a key component to delete this break duty.
 
+        # Close the DB cursor
         cur.close()
 
-        logging.info("Unable to locate beak duty to delete: RA {}, Date {}".format(fName + " " + lName, dateStr))
-        return jsonify({"status":0,"error":"Unable to find parameters in DB"})
+        # Log the occurrence
+        logging.info("Unable to locate beak duty to delete: RA {}, Date {}"
+                     .format(fName + " " + lName, dateStr))
+
+        # Indicate to the client that the delete was unsuccessful
+        return jsonify(stdRet(-1,"Unable to find parameters in DB")
 
 
 @breaks_bp.route("/api/changeBreakDuty", methods=["POST"])
