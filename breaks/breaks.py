@@ -662,7 +662,7 @@ def changeBreakDuty():
                    AND day_id = %s
                    AND month_id = %s
                    AND ra_id = %s
-                """.format(raParams[0], userDict["hall_id"], dayID, monthId, oldRA[0]))
+                """, (raParams[0], userDict["hall_id"], dayID, monthId, oldRA[0]))
 
     # Commit the changes to the DB
     ag.conn.commit()
