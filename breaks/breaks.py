@@ -563,10 +563,126 @@ def deleteBreakDuty():
                      .format(fName + " " + lName, dateStr))
 
         # Indicate to the client that the delete was unsuccessful
-        return jsonify(stdRet(-1,"Unable to find parameters in DB"))
+        return jsonify(stdRet(-1, "Unable to find parameters in DB"))
 
 
 @breaks_bp.route("/api/changeBreakDuty", methods=["POST"])
 @login_required
 def changeBreakDuty():
-    pass
+    # API Method that changes the RA assigned to a given break duty
+    #  in the client's Res Hall's schedule from one RA on the staff
+    #  to another.
+    #
+    #  Required Auth Level: >=AHD
+    #
+    #  This method is currently unable to be called from the server.
+    #
+    #  If called from a client, the following parameters are required:
+    #
+    #     raName   <str> -  a string denoting the full name of the RA associated with
+    #                        the break duty that should be removed.
+    #     dateStr  <str> -  a string representing the date that the break duty should
+    #                        occur on.
+    #
+    #     NOTE: Regardless of what value is specified for allColors, the if the ra.id
+    #            that is associated with the user appears in the break schedule, the
+    #            ra.color associated with the user will be displayed. This is so that
+    #            the user can more easily identify when they are on duty.
+    #
+    #  This method returns a standard return object whose status is one of the
+    #  following:
+    #
+    #      1 : the save was successful
+    #      0 : the client does not belong to the same hall as the provided RA
+    #     -1 : the save was unsuccessful
+
+    # Get the user's information from the database
+    userDict = getAuth()
+
+    # Check to see if the user is authorized to change break duty assignments
+    # If the user is not at least an AHD
+    if userDict["auth_level"] < 2:
+        # Then they are not permitted to see this view.
+
+        # Log the occurrence.
+        logging.info("User Not Authorized - RA: {} attempted to alter break duty for Hall: {}"
+                     .format(userDict["ra_id"], userDict["hall_id"]))
+
+        # Notify the user that they are not authorized.
+        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+
+    # Load the provided data from the request's JSON
+    data = request.json
+
+    logging.debug("New RA id: {}".format(data["newId"]))
+    logging.debug("Old RA Name: {}".format(data["oldName"]))
+    logging.debug("HallID: {}".format(userDict["hall_id"]))
+
+    # The dateStr is expected to be in the following format: x/x/xxxx
+    logging.debug("DateStr: {}".format(data["dateStr"]))
+
+    # Set the values of the fName, lName, and dateStr with the
+    #  data passed from the client. fName and lName are parsed
+    #  from the raName splitting on the " " character.
+    fName, lName = data["oldName"].split()
+
+    # Create a DB cursor
+    cur = ag.conn.cursor()
+
+    # Query the DB for the RA that is desired to be on the duty. This query also helps
+    #  to ensure that the requested RA is on the same staff as the client.
+    cur.execute("SELECT id, first_name, last_name, color FROM ra WHERE id = %s AND hall_id = %s;",
+                (data["newId"], userDict["hall_id"]))
+
+    # Load the results from the DB
+    raParams = cur.fetchone()
+
+    # Query the DB for the RA that is currently assigned to the duty. This query also helps
+    #  to ensure that the currently assigned RA is on the same staff as the client.
+    cur.execute("SELECT id FROM ra WHERE first_name LIKE %s AND last_name LIKE %s AND hall_id = %s",
+                (fName, lName, userDict["hall_id"]))
+
+    # Load the results from the DB
+    oldRA = cur.fetchone()
+
+    # Query the DB for the day and month ids for the break duty on the provided day.
+    cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE(%s, 'MM/DD/YYYY');",
+                (data["dateStr"],))
+
+    # Load the results from the DB
+    dayID, monthId = cur.fetchone()
+
+    # Check to ensure that we have received valid results from our previous
+    #  three queries.
+    if raParams is None or dayID is None or monthId is None or oldRA is None:
+        # If raParams, dayID, monthId, or oldRA are None,
+        #  then that means we are missing a key part of the
+        #  puzzle to locate the exact break duty to alter.
+
+        # Close the DB cursor
+        cur.close()
+
+        # Log the occurrence
+        logging.warning("Unable to find all necessary Break Duty parameters for in database.")
+
+        # Notify the client of the issue
+        return jsonify(stdRet(0, "Unable to find all necessary Break Duty parameters for in database."))
+
+    # Otherwise, if we have all the necessary pieces,
+    #  go ahead and update the appropriate break duty
+    cur.execute("""UPDATE break_duties
+                   SET ra_id = %s
+                   WHERE hall_id = %s
+                   AND day_id = %s
+                   AND month_id = %s
+                   AND ra_id = %s
+                """.format(raParams[0], userDict["hall_id"], dayID, monthId, oldRA[0]))
+
+    # Commit the changes to the DB
+    ag.conn.commit()
+
+    # Close the DB cursor
+    cur.close()
+
+    # Indicate to the client that the delete was unsuccessful
+    return jsonify(stdRet(1, "successful"))
