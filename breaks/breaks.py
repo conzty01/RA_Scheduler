@@ -172,63 +172,147 @@ def getRABreakStats(hallId=None, startDateStr=None, endDateStr=None):
 
 @breaks_bp.route("/api/getBreakDuties", methods=["GET"])
 @login_required
-def getBreakDuties(hallId=None, start=None, end=None, showAllColors=False):
-    userDict = getAuth()
+def getBreakDuties(hallId=None, start=None, end=None, showAllColors=False, raId=-1):
+    # API Method that will calculate a staff's RA Break Duty statistics for the given
+    #  time period. This method does not calculate the number of points an RA has
+    #  due to breaks, but rather counts the number of break duties the RA has been
+    #  assigned to for the given time period.
+    #
+    #  Required Auth Level: None
+    #
+    #  If called from the server, this function accepts the following parameters:
+    #
+    #     hallId         <int>  -  an integer representing the id of the desired residence
+    #                               hall in the res_hall table.
+    #     start          <str>  -  a string representing the first day that should be included
+    #                               for the returned duty schedule.
+    #     end            <str>  -  a string representing the last day that should be included
+    #                               for the returned duty schedule.
+    #     showAllColors  <bool> -  a boolean value representing whether the returned duty
+    #                               schedule should include the RA's ra.color value or if
+    #                               the generic value '#2C3E50' should be returned. Setting
+    #                               this value to True will return the RA's ra.color value.
+    #                               By default this parameter is set to False.
+    #
+    #     raId           <int>  -  an integer representing the id of the RA that should be
+    #                               considered the requesting user. By default this value is
+    #                               set to -1 which indicates that no RA should be considered
+    #                               the requesting user.
+    #
+    #  If called from a client, the following parameters are required:
+    #
+    #     start      <str>  -  a string representing the first day that should be included
+    #                           for the returned duty schedule.
+    #     end        <str>  -  a string representing the last day that should be included
+    #                           for the returned duty schedule.
+    #     allColors  <bool> -  a boolean value representing whether the returned duty
+    #                           schedule should include the RA's ra.color value or if
+    #                           the generic value '#2C3E50' should be returned. Setting
+    #                           this value to True will return the RA's ra.color value.
+    #
+    #     NOTE: Regardless of what value is specified for allColors, the if the ra.id
+    #            that is associated with the user appears in the break schedule, the
+    #            ra.color associated with the user will be displayed. This is so that
+    #            the user can more easily identify when they are on duty.
+    #
+    #  This method returns an object with the following specifications:
+    #
+    #     [
+    #        {
+    #             "id": <ra.id>,
+    #             "title": <ra.first_name + " " + ra.last_name>,
+    #             "start": <string value of day.date associated with the scheduled duty>,
+    #             "color": <ra.color OR #2C3E50 if allColors/showAllColors is False>,
+    #             "extendedProps": {"dutyType":"brk"}
+    #         },
+    #         ...
+    #     ]
+    #
 
+    # Assume this API was called from the server and verify that this is true.
     fromServer = True
-    if start is None and end is None and hallId is None:                    # Effectively: If API was called from the client and not from the server
-        start = request.args.get("start").split("T")[0]                         # No need for the timezone in our current application
-        end = request.args.get("end").split("T")[0]                             # No need for the timezone in our current application
+    if start is None and end is None and hallId is None:
+        # If the HallId, start and end are None, then
+        #  this method was called from a remote client.
 
-        showAllColors = request.args.get("allColors") == "true"                 # Should all colors be displayed or only the current user's colors
+        # Get the start and end string values from the request arguments.
+        #  Since we utilize the fullCal.js library, we know that the request
+        #  also contains timezone information that we do not care about in
+        #  this method. As a result, the timezone information is split out
+        #  immediately.
+        start = request.args.get("start").split("T")[0]
+        end = request.args.get("end").split("T")[0]
 
-        userDict = getAuth()                                                    # Get the user's info from our database
+        # Get the value for allColors from the request arguments.
+        showAllColors = request.args.get("allColors") == "true"
+
+        # Get the user's information from the database
+        userDict = getAuth()
+        # Set the value of the hallId from the userDict
         hallId = userDict["hall_id"]
+        # Set the value of the raId from the userDict
+        raId = userDict["ra_id"]
+        # Mark that this method was not called from the server
         fromServer = False
 
+    # Create a DB cursor
     cur = ag.conn.cursor()
 
+    # Query the DB for the break duty schedule for the given hall and timeframe.
     cur.execute("""
         SELECT ra.first_name, ra.last_name, ra.color, ra.id, TO_CHAR(day.date, 'YYYY-MM-DD')
         FROM break_duties JOIN day ON (day.id=break_duties.day_id)
                           JOIN month ON (month.id=break_duties.month_id)
                           JOIN ra ON (ra.id=break_duties.ra_id)
-        WHERE break_duties.hall_id = {}
-        AND month.year >= TO_DATE('{}','YYYY-MM')
-        AND month.year <= TO_DATE('{}','YYYY-MM')
-    """.format(hallId,start,end))
+        WHERE break_duties.hall_id = %s
+        AND month.year >= TO_DATE(%s,'YYYY-MM')
+        AND month.year <= TO_DATE(%s,'YYYY-MM')
+    """, (hallId, start, end))
 
+    # Create the result object to be returned
     res = []
 
+    # Iterate through the query result (each day of the break schedule) and assemble
+    #  the return result in the format outlined in the comments at the top of this method.
     for row in cur.fetchall():
 
+        # If showAllColors is False, then the desired behavior is to NOT show all of
+        # the unique RA colors.
         if not(showAllColors):
-            # If the desired behavior is to not show all of the unique RA colors
-            #  then check to see if the current user is the ra on the duty being
-            #  added. If it is the ra, show their unique color, if not, show the
-            #  same color.
-            if userDict["ra_id"] == row[3]:
+            # Check to see if the current user is the RA on the duty being added
+            #  to the result list.
+            if raId == row[3]:
+                # If it is the RA, then use their color value
                 c = row[2]
+
             else:
+                # Otherwise use the generic color value
                 c = "#2C3E50"
 
-        # If the desired behavior is to show all of the unique RA colors, then
-        #  simply set their color.
         else:
+            # Otherwise, if the desired behavior is to show all of the unique RA colors,
+            #  then simply set their color.
             c = row[2]
 
+        # Append the assigned break duty to the result list using the values returned
+        #  from the query and the color calculated above.
         res.append({
             "id": row[3],
             "title": row[0] + " " + row[1],
             "start": row[4],
             "color": c,
-            "extendedProps": {"dutyType":"brk"}
+            "extendedProps": {"dutyType": "brk"}
         })
 
+    # If this API method was called from the server
     if fromServer:
+        # Then return the result as-is
         return res
+
     else:
+        # Otherwise return a JSON version of the result
         return jsonify(res)
+
 
 @breaks_bp.route("/api/addBreakDuty", methods=["POST"])
 def addBreakDuty():
