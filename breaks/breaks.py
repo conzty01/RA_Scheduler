@@ -563,7 +563,7 @@ def deleteBreakDuty():
                      .format(fName + " " + lName, dateStr))
 
         # Indicate to the client that the delete was unsuccessful
-        return jsonify(stdRet(-1,"Unable to find parameters in DB")
+        return jsonify(stdRet(-1,"Unable to find parameters in DB"))
 
 
 @breaks_bp.route("/api/changeBreakDuty", methods=["POST"])
