@@ -75,47 +75,108 @@ def editCons():
 
 @conflicts_bp.route("/api/getConflicts", methods=["GET"])
 @login_required
-def getConflicts(monthNum=None,raID=None,year=None,hallId=None):
-    # API Hook that will get the requested conflicts for a given user and month.
-    #  The month will be given via request.args as 'monthNum' and 'year'.
+def getConflicts(monthNum=None, raID=None, year=None, hallId=None):
+    # API Method used to return the requested conflicts for a given user and month.
+    #
+    #  Required Auth Level: None
+    #
+    #  If called from the server, this function accepts the following parameters:
+    #
+    #     monthNum  <int>  -  an integer representing the numeric month number for
+    #                          the desired month using the standard gregorian
+    #                          calendar convention.
+    #     raID      <int>  -  an integer denoting the row id for the desired RA in the
+    #                          ra table.
+    #     year      <int>  -  an integer denoting the year for the desired time period
+    #                          using the standard gregorian calendar convention.
+    #     hallId    <int>  -  an integer representing the id of the desired residence
+    #                          hall in the res_hall table.
+    #
+    #  If called from a client, the following parameters are required:
+    #
+    #     monthNum  <int>  -  an integer representing the numeric month number for
+    #                          the desired month using the standard gregorian
+    #                          calendar convention.
+    #     year      <int>  -  an integer denoting the year for the desired time period
+    #                          using the standard gregorian calendar convention.
+    #
+    #  This method returns an object with the following specifications:
+    #
+    #     {
+    #        conflicts: [
+    #           <Datetime object 1 for which the RA has a conflict>,
+    #           <Datetime object 2 for which the RA has a conflict>,
+    #           ...
+    #        ]
+    #     }
 
+    # Assume this API was called from the server and verify that this is true.
     fromServer = True
-    if monthNum is None and year is None and hallId is None and raID is None:                    # Effectively: If API was called from the client and not from the server
+    if monthNum is None and year is None and hallId is None and raID is None:
+        # If monthNum, year, HallId and raID are None, then this method
+        #  was called from a remote client.
+
+        # Get the user's information from the database
+        userDict = getAuth()
+
+        # Get the monthNum and year from the request arguments
         monthNum = int(request.args.get("monthNum"))
         year = int(request.args.get("year"))
 
-        userDict = getAuth()                                                    # Get the user's info from our database
-        hallID = userDict["hall_id"]
+        # Set the value of hallId and raID from the userDict
+        hallId = userDict["hall_id"]
         raID = userDict["ra_id"]
+
+        # Mark that this method was not called from the server
         fromServer = False
 
     logging.debug("Get Conflicts - From Server: {}".format(fromServer))
 
-    logging.debug("MonthNum: {}, Year: {}, HallID: {}, raID: {}".format(monthNum, year, hallID, raID))
+    logging.debug("MonthNum: {}, Year: {}, HallID: {}, raID: {}".format(monthNum, year, hallId, raID))
 
+    # Create a DB cursor
     cur = ag.conn.cursor()
 
-    cur.execute("SELECT id FROM month WHERE num = {} AND EXTRACT(YEAR FROM year) = {}".format(monthNum, year))
+    # Query the DB for the month that matches the provided monthNum and year
+    cur.execute("SELECT id FROM month WHERE num = %s AND EXTRACT(YEAR FROM year) = %s", (monthNum, year))
+
+    # Load the result from the DB
     monthID = cur.fetchone()
 
+    # Check to see if we did not find a result
     if monthID is None:
-        logging.warning("No month found with Num = {}".format(monthNum))
-        return jsonify(stdRet(-1,"No month found with Num = {}".format(monthNum)))
+        # If monthID is None, then we were unable to locate the desired month in the DB
+
+        # Log the occurrence.
+        logging.warning("No month found with Num = {} and Year = {}".format(monthNum, year))
+
+        # Simply return an empty list
+        return jsonify({"conflicts": []})
 
     else:
+        # Otherwise extract the monthID from the query result
         monthID = monthID[0]
 
+    # Query the DB to find all of the user's duty conflicts.
     cur.execute("""SELECT TO_CHAR(day.date, 'YYYY-MM-DD')
                    FROM conflicts JOIN day ON (conflicts.day_id = day.id)
-                   WHERE conflicts.ra_id = {}
-                   AND day.month_id = {}""".format(raID, monthID, hallID))
+                   WHERE conflicts.ra_id = %s
+                   AND day.month_id = %s""", (raID, monthID))
 
-    ret = [ d[0] for d in cur.fetchall() ]
+    # Iterate through the query result and begin for form
+    #  the return object in the format specified in the
+    #  comment at the top of this method.
+    ret = [d[0] for d in cur.fetchall()]
 
+    # If this API method was called from the server
     if fromServer:
+        # Then return the result as-is
         return ret
+
     else:
-        return jsonify({"conflicts":ret})
+        # Otherwise return a JSON version of the result
+        return jsonify({"conflicts": ret})
+
 
 @conflicts_bp.route("/api/getRAConflicts", methods=["GET"])
 @login_required
