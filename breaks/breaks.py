@@ -324,14 +324,12 @@ def addBreakDuty():
     #
     #  If called from a client, the following parameters are required:
     #
-    #     start      <str>  -  a string representing the first day that should be included
-    #                           for the returned duty schedule.
-    #     end        <str>  -  a string representing the last day that should be included
-    #                           for the returned duty schedule.
-    #     allColors  <bool> -  a boolean value representing whether the returned duty
-    #                           schedule should include the RA's ra.color value or if
-    #                           the generic value '#2C3E50' should be returned. Setting
-    #                           this value to True will return the RA's ra.color value.
+    #     id       <int> -  an integer representing the ra.id for the RA that should
+    #                        be assigned to the break duty.
+    #     pts      <int> -  an integer represnting how many points the new break duty
+    #                        should be worth.
+    #     dateStr  <str> -  a string representing the date that the break duty should
+    #                        occur on.
     #
     #     NOTE: Regardless of what value is specified for allColors, the if the ra.id
     #            that is associated with the user appears in the break schedule, the
