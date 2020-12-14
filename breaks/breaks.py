@@ -178,7 +178,7 @@ def getBreakDuties(hallId=None, start=None, end=None, showAllColors=False, raId=
     #  due to breaks, but rather counts the number of break duties the RA has been
     #  assigned to for the given time period.
     #
-    #  Required Auth Level: None
+    #  Required Auth Level: >= AHD
     #
     #  If called from the server, this function accepts the following parameters:
     #
@@ -316,60 +316,137 @@ def getBreakDuties(hallId=None, start=None, end=None, showAllColors=False, raId=
 
 @breaks_bp.route("/api/addBreakDuty", methods=["POST"])
 def addBreakDuty():
+    # API Method that add a break duty into the client's Res Hall's schedule.
+    #
+    #  Required Auth Level: AHD
+    #
+    #  This method is currently unable to be called from the server.
+    #
+    #  If called from a client, the following parameters are required:
+    #
+    #     start      <str>  -  a string representing the first day that should be included
+    #                           for the returned duty schedule.
+    #     end        <str>  -  a string representing the last day that should be included
+    #                           for the returned duty schedule.
+    #     allColors  <bool> -  a boolean value representing whether the returned duty
+    #                           schedule should include the RA's ra.color value or if
+    #                           the generic value '#2C3E50' should be returned. Setting
+    #                           this value to True will return the RA's ra.color value.
+    #
+    #     NOTE: Regardless of what value is specified for allColors, the if the ra.id
+    #            that is associated with the user appears in the break schedule, the
+    #            ra.color associated with the user will be displayed. This is so that
+    #            the user can more easily identify when they are on duty.
+    #
+    #  This method returns a standard return object whose status is one of the
+    #  following:
+    #
+    #      1 : the save was successful
+    #      0 : the client does not belong to the same hall as the provided RA
+    #     -1 : the save was unsuccessful
+
+    # Get the user's information from the database
     userDict = getAuth()
 
+    # Check to see if the user is authorized to alter RA information
+    # If the user is not at least an AHD
+    if userDict["auth_level"] < 2:
+        # Then they are not permitted to see this view.
+
+        # Log the occurrence.
+        logging.info("User Not Authorized - RA: {} attempted to add Break Duty for Hall: {}"
+                     .format(userDict["ra_id"], userDict["hall_id"]))
+
+        # Notify the user that they are not authorized.
+        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+
+    # Load the data provided by the client
     data = request.json
 
-    selID = data["id"]
-    hallId = userDict["hall_id"]
+    # Set the values of the selID, ptVal, and dateStr with the
+    #  data passed from the client.
+    selRAID = data["id"]
     ptVal = data["pts"]
     dateStr = data["dateStr"]
 
-    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
-        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
-        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
+    # Set the hallId from the hall associated with the requesting user.
+    hallId = userDict["hall_id"]
 
+    # Create a DB cursor
     cur = ag.conn.cursor()
 
     # Validate that the RA desired exists and belongs to the same hall
-    cur.execute("SELECT id FROM ra WHERE id = {} AND hall_id = {};".format(selID, hallId))
+    cur.execute("SELECT id FROM ra WHERE id = %s AND hall_id = %s;", (selRAID, hallId))
+
+    # Load the result from the DB
     raId = cur.fetchone()
 
+
     if raId is None:
+        # If the result is None, then the desired RA is not associated with
+        #  the user's hall.
+
+        # Close the DB cursor
         cur.close()
-        logging.warning("Unable to find RA {} in hall {}".format(selID,hallId))
-        ret = stdRet(-1,"Unable to find RA {} in hall {}".format(selID,hallId))
+
+        # Log the occurrence
+        logging.warning("Unable to find RA {} in hall {}".format(selRAID, hallId))
+
+        # Notify the client of the issue.
+        return jsonify(stdRet(0, "Unable to find RA: {} in Hall: {}".format(selRAID, hallId)))
 
     else:
-        # Extract the id from the tuple
+        # Otherwise, since psycopg2 returns DB results as a tuple,
+        #  extract the id from the resulting tuple.
         raId = raId[0]
 
-    # Get the month and day IDs necessary to associate a record in break_duties
-    cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE('{}', 'YYYY-MM-DD');".format(dateStr))
+    # Query the DB for the month and day IDs necessary to associate a record in break_duties
+    cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE(%s, 'YYYY-MM-DD');", (dateStr,))
+
+    # Load the result from the DB and unpack it into the dayID and monthId variables.
     dayID, monthId = cur.fetchone()
 
-    # No Day found
+    # Validate our query results
     if dayID is None:
+        # If the dayID is None, then there is not a day in the DB for the desired dateStr.
+
+        # Close the DB cursor
         cur.close()
+
+        # Log the occurrence
         logging.warning("Unable to find day {} in database".format(data["dateStr"]))
-        return stdRet(-1,"Unable to find day {} in database".format(data["dateStr"]))
 
-    # No month found
+        # Notify the client of the issue
+        return jsonify(stdRet(-1, "Unable to find day {} in database".format(data["dateStr"])))
+
     if monthId is None:
+        # If the monthId is None, then there is not a month in the DB for the desired dateStr.
+
+        # Close the DB cursor
         cur.close()
+
+        # Log the occurrence
         logging.warning("Unable to find month for {} in database".format(data["dateStr"]))
-        return stdRet(-1,"Unable to find month for {} in database".format(data["dateStr"]))
 
+        # Notify the client of the issue
+        return jsonify(stdRet(-1, "Unable to find month for {} in database".format(data["dateStr"])))
+
+    # After we have a dayID and monthId for the date, insert the new break duty into the DB
     cur.execute("""INSERT INTO break_duties (ra_id, hall_id, month_id, day_id, point_val)
-                    VALUES ({}, {}, {}, {}, {});""".format(raId, hallId, monthId, dayID, ptVal))
+                    VALUES (%s, %s, %s, %s, %s);""", (raId, hallId, monthId, dayID, ptVal))
 
+    # Commit the changes to the DB
     ag.conn.commit()
 
+    # Close the DB cursor
     cur.close()
 
-    logging.info("Successfully added new Break Duty for Hall {} and Month {}".format(hallId, monthId))
+    # Log the successful addition of the new break duty
+    logging.info("Successfully added new Break Duty for Hall: {} and Month: {}".format(hallId, monthId))
 
-    return jsonify(stdRet(1,"successful"))
+    # Indicate to the client that the save was successful
+    return jsonify(stdRet(1, "successful"))
+
 
 @breaks_bp.route("/api/deleteBreakDuty", methods=["POST"])
 @login_required
