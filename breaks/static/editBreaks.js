@@ -35,7 +35,7 @@ function initEditSchedCal() {
             right: 'addEventButton'
         },
         events: {
-            url: '/api/getBreakDuties',
+            url: 'api/getBreakDuties',
             failure: function () {
                 alert('there was an error while fetching events!');
             },
