@@ -331,11 +331,6 @@ def addBreakDuty():
     #     dateStr  <str> -  a string representing the date that the break duty should
     #                        occur on.
     #
-    #     NOTE: Regardless of what value is specified for allColors, the if the ra.id
-    #            that is associated with the user appears in the break schedule, the
-    #            ra.color associated with the user will be displayed. This is so that
-    #            the user can more easily identify when they are on duty.
-    #
     #  This method returns a standard return object whose status is one of the
     #  following:
     #
@@ -462,11 +457,6 @@ def deleteBreakDuty():
     #     dateStr  <str> -  a string representing the date that the break duty should
     #                        occur on.
     #
-    #     NOTE: Regardless of what value is specified for allColors, the if the ra.id
-    #            that is associated with the user appears in the break schedule, the
-    #            ra.color associated with the user will be displayed. This is so that
-    #            the user can more easily identify when they are on duty.
-    #
     #  This method returns a standard return object whose status is one of the
     #  following:
     #
@@ -579,15 +569,11 @@ def changeBreakDuty():
     #
     #  If called from a client, the following parameters are required:
     #
-    #     raName   <str> -  a string denoting the full name of the RA associated with
-    #                        the break duty that should be removed.
-    #     dateStr  <str> -  a string representing the date that the break duty should
-    #                        occur on.
-    #
-    #     NOTE: Regardless of what value is specified for allColors, the if the ra.id
-    #            that is associated with the user appears in the break schedule, the
-    #            ra.color associated with the user will be displayed. This is so that
-    #            the user can more easily identify when they are on duty.
+    #     oldName  <str> -  a string denoting the full name of the RA associated with
+    #                        the break duty that should be changed.
+    #     newId    <int> -  an integer representing the ra.id for the RA that should be
+    #                        assigned for the break duty.
+    #     dateStr  <str> -  a string representing the date of the break duty.
     #
     #  This method returns a standard return object whose status is one of the
     #  following:
