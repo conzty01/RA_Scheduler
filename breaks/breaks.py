@@ -72,51 +72,103 @@ def editBreaks():
 
 @breaks_bp.route("/api/getRABreakStats", methods=["GET"])
 @login_required
-def getRABreakStats(hallId=None,startDateStr=None,endDateStr=None):
-    # API Hook that will get the RA stats for a given month.
-    #  The month will be given via request.args as 'monthNum' and 'year'.
-    #  The server will then query the database for the appropriate statistics
-    #  and send back a json object.
+def getRABreakStats(hallId=None, startDateStr=None, endDateStr=None):
+    # API Method that will calculate a staff's RA Break Duty statistics for the given
+    #  time period. This method does not calculate the number of points an RA has
+    #  due to breaks, but rather counts the number of break duties the RA has been
+    #  assigned to for the given time period.
+    #
+    #  Required Auth Level: None
+    #
+    #  If called from the server, this function accepts the following parameters:
+    #
+    #     hallId        <int>  -  an integer representing the id of the desired residence
+    #                              hall in the res_hall table.
+    #     startDateStr  <str>  -  a string representing the first day that should be included
+    #                              for the duty points calculation.
+    #     endDateStr    <str>  -  a string representing the last day that should be included
+    #                              for the duty points calculation.
+    #
+    #  If called from a client, the following parameters are required:
+    #
+    #     start  <str>  -  a string representing the first day that should be included
+    #                       for the break duty count calculation.
+    #     end    <str>  -  a string representing the last day that should be included
+    #                       for the duty count calculation.
+    #
+    #  This method returns an object with the following specifications:
+    #
+    #     {
+    #        <ra.id 1> : {
+    #           "name": ra.first_name + " " + ra.last_name,
+    #           "count": <number of break duties RA 1 has>
+    #        },
+    #        <ra.id 2> : {
+    #           "name": ra.first_name + " " + ra.last_name,
+    #           "count": <number of break duties RA 2 has>
+    #        },
+    #        ...
+    #     }
 
+    # Assume this API was called from the server and verify that this is true.
     fromServer = True
-    if hallId is None and startDateStr is None and endDateStr is None:          # Effectively: If API was called from the client and not from the server
-        userDict = getAuth()                                                    # Get the user's info from our database
+    if hallId is None and startDateStr is None and endDateStr is None:
+        # If the hallId, startDateStr, and endDateStr are None, then
+        #  this method was called from a remote client.
+
+        # Get the user's information from the database
+        userDict = getAuth()
+        # Set the value of hallId from the userDict
         hallId = userDict["hall_id"]
-        fromServer = False
+
+        # Get the startDateStr and endDateStr from the request arguments
         startDateStr = request.args.get("start")
         endDateStr = request.args.get("end")
 
+        # Mark that this method was not called from the server.
+        fromServer = False
+
     logging.debug("Get RA Break Duty Stats - FromServer: {}".format(fromServer))
 
+    # Create the result object to be returned
     res = {}
 
+    # Create a DB cursor
     cur = ag.conn.cursor()
 
+    # Query the DB for the list of RAs on the provided staff and the count of break
+    #  duties that they have been assigned to for the given time period.
     cur.execute("""SELECT ra.id, ra.first_name, ra.last_name, COALESCE(numQuery.count, 0)
                    FROM (SELECT ra.id AS rid, COUNT(break_duties.id) AS count
                          FROM break_duties JOIN day ON (day.id=break_duties.day_id)
                                            JOIN ra ON (ra.id=break_duties.ra_id)
-                         WHERE break_duties.hall_id = {}
-                         AND day.date BETWEEN TO_DATE('{}', 'YYYY-MM-DD')
-                                          AND TO_DATE('{}', 'YYYY-MM-DD')
+                         WHERE break_duties.hall_id = %s
+                         AND day.date BETWEEN TO_DATE(%s, 'YYYY-MM-DD')
+                                          AND TO_DATE(%s, 'YYYY-MM-DD')
                         GROUP BY rid) AS numQuery
                    RIGHT JOIN ra ON (numQuery.rid = ra.id)
-                   WHERE ra.hall_id = {};""".format(hallId, startDateStr, \
-                        endDateStr, hallId))
+                   WHERE ra.hall_id = %s;""", (hallId, startDateStr, endDateStr, hallId))
 
+    # Load the results from the DB
     raList = cur.fetchall()
 
+    # Iterate through the raList from the DB and assemble the return result
+    #  in the format outlined in the comments at the top of this method.
     for ra in raList:
-        res[ra[0]] = { "name": ra[1] + " " + ra[2], "count": ra[3] }
+        res[ra[0]] = {"name": ra[1] + " " + ra[2], "count": ra[3]}
 
+    # Close the DB cursor
     cur.close()
+
+    # If this API method was called from the server
     if fromServer:
-        # If this function call is from the server, simply return the results
+        # Then return the result as-is
         return res
+
     else:
-        # Otherwise, if this function call is from the client, return the
-        #  results as a JSON response object.
+        # Otherwise, return a JSON version of the result
         return jsonify(res)
+
 
 @breaks_bp.route("/api/getBreakDuties", methods=["GET"])
 @login_required
