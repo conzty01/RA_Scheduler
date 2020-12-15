@@ -27,46 +27,73 @@ gCalInterface = gCalIntegratinator()
 # ------------------------------------
 
 def createGoogleCalendar(calInfoId):
-    # Create a Secondary Google Calendar for the provided hall
+    # Create a Secondary Google Calendar for the provided hall using the Google
+    #  Calendar Account information stored in the DB.
+    #
+    #  This function accepts the following parameters and packages them into
+    #  a dictionary object with the same keys:
+    #
+    #     calInfoId  <int>  -  integer representing the google_calendar_info.id
+    #                           field in the DB that should be used to find the
+    #                           appropriate account credentials.
+    #
+    #  This method returns a standard return object whose status is one of the
+    #  following:
+    #
+    #      1 : the calendar creation was successful
+    #     -1 : the calendar creation was unsuccessful
 
-    # Get the hall's credentials
+    # Create a DB cursor
     cur = ag.conn.cursor()
 
     logging.debug("Searching for the Hall's Calendar Information")
-    cur.execute("SELECT token FROM google_calendar_info WHERE id = %s",
-                (calInfoId,))
 
+    # Query the DB for the hall's credentials
+    cur.execute("SELECT token FROM google_calendar_info WHERE id = %s", (calInfoId,))
+
+    # Load the result from the DB
     memview = cur.fetchone()
 
-    # Check to see if we got a result
+    # Check the query result to see if we were able to locate the desired credentials
     if memview is None:
+        # If we were NOT able to locate the desired credentials
+
+        # Log the occurrence.
         logging.info("No Google Calendar token found for Id: {}".format(calInfoId))
 
+        # Return a failed standard return
         return jsonify(stdRet(-1, "No Token Found"))
 
-    # If there is a token in the DB it will be returned as a MemoryView
+    # If there is a token in the DB it will be returned as a MemoryView Object
 
     logging.debug("Converting Google Calendar Token to pickle")
 
-    # Convert the memview object to BytesIO object
+    # Convert the MemoryView object to BytesIO object that we can use more easily.
     tmp = BytesIO(memview[0])
 
     # Convert the BytesIO object to a google.oauth2.credentials.Credentials object
-    #  This is done by unpickling the object
+    #  This is done by unpickling the BytesIO
     token = pickle.load(tmp)
 
     logging.debug("Creating Google Calendar")
+
+    # Call the gCalInterface's createGoogleCalendar method to create the calendar
+    #  on Google's side of things. This method will return the calId associated
+    #  with the new Google Calendar.
     calId = gCalInterface.createGoogleCalendar(token)
 
     logging.debug("Updating Google Calendar Information")
+
     # Add the calendar_id into the Google Calendar Info table
     cur.execute("""UPDATE google_calendar_info
                    SET calendar_id = %s
                    WHERE id = %s""", (calId, calInfoId))
 
+    # Commit the changes to the DB
     ag.conn.commit()
 
-    return stdRet(1, "Successful")
+    # Return a successful standard return
+    return stdRet(1, "successful")
 
 
 # ---------------------------------
