@@ -86,7 +86,7 @@ function generateGoogleRow(alreadyConnected) {
         disconnButton.innerHTML = "Disconnect Account";
         disconnButton.setAttribute("type", "button");
         disconnButton.setAttribute("class", "btn btn-danger");
-        disconnButton.setAttribute("onclick", "location.href='../int/disconnectGCal'");
+        disconnButton.setAttribute("onclick", "location.href='../integration/int/disconnectGCal'");
 
         // Add the disconnect button to the div
         valDiv.appendChild(disconnButton);
@@ -95,7 +95,7 @@ function generateGoogleRow(alreadyConnected) {
     // Set the Connect/Reconnect Attributes
     connectButton.setAttribute("type", "button");
     connectButton.setAttribute("class", "btn btn-primary");
-    connectButton.setAttribute("onclick", "location.href='../int/GCalRedirect'");
+    connectButton.setAttribute("onclick", "location.href='../integration/int/GCalRedirect'");
     connectButton.innerHTML = alreadyConnected ? "Reconnect Account" : "Connect Account";
 
     // Assemble the valDiv
