@@ -528,67 +528,112 @@ def getNumberConflicts(hallId=None, monthNum=None, year=None):
 @conflicts_bp.route("/api/enterConflicts/", methods=['POST'])
 @login_required
 def processConflicts():
+    # API Method used to process and save the client's submitted duty conflicts.
+    #
+    #  Required Auth Level: None
+    #
+    #  This method is currently unable to be called from the server.
+    #
+    #  If called from a client, the following parameters are required:
+    #
+    #     monthNum   <int>       -  an integer representing the numeric month number for
+    #                                the desired month using the standard gregorian
+    #                                calendar convention.
+    #     year       <int>       -  an integer denoting the year for the desired time period
+    #                                using the standard gregorian calendar convention.
+    #     conflicts  <lst<str>>  -  a list containing strings representing dates that the
+    #                                user has a duty conflict with.
+    #
+    #  This method returns a standard return object whose status is one of the
+    #  following:
+    #
+    #      1 : the save was successful
+    #     -1 : the save was unsuccessful
+
     logging.debug("Process Conflicts")
-    userDict = getAuth()                                                        # Get the user's info from our database
 
-    ra_id = userDict["ra_id"]
-    hallId = userDict["hall_id"]
+    # Get the user's information from the database
+    userDict = getAuth()
 
-    logging.debug(request.json)
+    logging.debug(str(request.json))
+
+    # Get the value for monthNum, year, and conflicts from the request arguments.
     monthNum = request.json["monthNum"]
     year = request.json["year"]
     conflicts = request.json["conflicts"]
 
+    # Create a DB cursor
     cur = ag.conn.cursor()
 
+    # Query the DB for all of the previously entered conflicts for the
+    #  remote user.
     cur.execute("""SELECT TO_CHAR(day.date, 'YYYY-MM-DD')
                    FROM conflicts JOIN day ON (conflicts.day_id = day.id)
                                   JOIN ra ON (ra.id = conflicts.ra_id)
                                   JOIN month ON (month.id = day.month_id)
-                   WHERE num = {}
-                   AND EXTRACT(YEAR from year) = {}
-                   AND hall_id = {}
-                   AND ra.id = {};""".format(monthNum,year, \
-                                             userDict["hall_id"],userDict["ra_id"]))
+                   WHERE num = %s
+                   AND EXTRACT(YEAR from year) = %s
+                   AND hall_id = %s
+                   AND ra.id = %s;""",
+                (monthNum, year, userDict["hall_id"], userDict["ra_id"]))
 
+    # Load the results from the DB
     prevConflicts = cur.fetchall()
-    prevSet = set([ i[0] for i in prevConflicts ])
 
+    # Create a set object of all of the conflicts returned from the
+    #  previous query.
+    prevSet = set([i[0] for i in prevConflicts])
+
+    # Create a set object of all of the conflicts provided by the
+    #  remote user.
     newSet = set(conflicts)
 
-    # Get a set of dates that were previously entered but are not in the latest
-    #  These items should be removed from the DB
+    # Get a set of dates that were previously entered but are not in the latest.
+    # These items should be removed from the DB.
     deleteSet = prevSet.difference(newSet)
 
-    # Get a set of dates that have been submitted that were not previously
-    #  These items shoudl be inserted into the DB
+    # Get a set of dates that have been submitted that were not previously.
+    # These items should be inserted into the DB.
     addSet = newSet.difference(prevSet)
 
-    cur = ag.conn.cursor()
     logging.debug("DataConflicts: {}".format(conflicts))
     logging.debug("PrevSet: {}".format(prevSet))
     logging.debug("NewSet: {}".format(newSet))
     logging.debug("DeleteSet: {}, {}".format(deleteSet, str(deleteSet)[1:-1]))
     logging.debug("AddSet: {}, {}".format(addSet, str(addSet)[1:-1]))
 
+    # If there are conflicts that should be removed from the DB
     if len(deleteSet) > 0:
+        # Then remove them from the DB
 
+        # Execute a DELETE statement to remove the previously entered conflicts
+        #  that are no longer needed.
         cur.execute("""DELETE FROM conflicts
                        WHERE conflicts.day_id IN (
                             SELECT conflicts.day_id
                             FROM conflicts
                                 JOIN day ON (conflicts.day_id = day.id)
-                            WHERE TO_CHAR(day.date, 'YYYY-MM-DD') IN ({})
-                            AND conflicts.ra_id = {}
-                        );""".format(str(deleteSet)[1:-1],userDict["ra_id"]))
+                            WHERE TO_CHAR(day.date, 'YYYY-MM-DD') IN (%s)
+                            AND conflicts.ra_id = %s
+                        );""", (tuple(deleteSet), userDict["ra_id"]))
 
+    # If there are conflicts that should be added to the DB
     if len(addSet) > 0:
 
-        cur.execute("""INSERT INTO conflicts (ra_id, day_id)
-                        SELECT {}, day.id FROM day
-                        WHERE TO_CHAR(day.date, 'YYYY-MM-DD') IN ({})
-                        """.format(userDict["ra_id"], str(addSet)[1:-1]))
+        # Then add them to the DB
 
+        # Execute an INSERT statement to add conflicts that were not
+        #  previously entered in the DB.
+        cur.execute("""INSERT INTO conflicts (ra_id, day_id)
+                        SELECT %s, day.id FROM day
+                        WHERE TO_CHAR(day.date, 'YYYY-MM-DD') IN (%s)
+                        """, (userDict["ra_id"], tuple(addSet)))
+
+    # Commit the changes to the DB
     ag.conn.commit()
+
+    # Close the DB cursor
     cur.close()
-    return jsonify(stdRet(1,"successful"))                                          # Send the user back to the main page (Not utilized by client currently)
+
+    # Indicate to the client that the save was successful
+    return jsonify(stdRet(1, "successful"))
