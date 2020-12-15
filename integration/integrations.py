@@ -337,43 +337,79 @@ def disconnectGoogleCalendar():
 @integration_bp.route("/api/exportToGCal", methods=["GET"])
 @login_required
 def exportToGCal():
+    # API Method that exports the given schedule to the Google
+    #  Calendar associated with the user's Res Hall.
+    #
+    #  Required Auth Level: >= AHD
+    #
+    #  This method is currently unable to be called from the server.
+    #
+    #  If called from a client, the following parameters are required:
+    #
+    #     monthNum   <int>       -  an integer representing the numeric month number for
+    #                                the desired month using the standard gregorian
+    #                                calendar convention.
+    #     year       <int>       -  an integer denoting the year for the desired time period
+    #                                using the standard gregorian calendar convention.
+    #
+    #  This method returns a standard return object whose status is one of the
+    #  following:
+    #
+    #      1 : the export was successful
+    #      0 : the user's Res Hall must reconnect the Google Calendar Account
+    #     -1 : the export was unsuccessful
 
     # Get the user's information
     userDict = getAuth()
 
-    # Ensure that the user is at least an AHD
+    # Check to see if the user is authorized to export to Google Calendar
+    # If the user is not at least an AHD
     if userDict["auth_level"] < 2:
+        # Then they are not permitted to see this view.
+
+        # Log the occurrence.
         logging.info("User Not Authorized - RA: {} attempted to export schedule to Google Calendar"
                      .format(userDict["ra_id"]))
 
+        # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
 
     logging.info("Attempting to export Schedule to Google Calendar")
 
-    # Get the Google Calendar credentials from the DB
+    # First up, get the Google Calendar credentials from the DB
+
     logging.debug("Retrieving Google Calendar info from DB for Hall: {}".format(userDict["hall_id"]))
+
+    # Create a DB cursor
     cur = ag.conn.cursor()
 
+    # Query the DB for the calendar_id and token associated with the user's Res Hall
     cur.execute("SELECT calendar_id, token FROM google_calendar_info WHERE res_hall_id = %s",
                 (userDict["hall_id"], ))
 
+    # Load the data from the query
     res = cur.fetchone()
 
     # Check to see if we got a result
     if res is None:
+        # If we returned no values, the Res Hall has not completed the
+        #  authorization process.
+
         logging.info("No Google Calendar token found for Hall: {}".format(userDict["hall_id"]))
 
-        return jsonify(stdRet(-1, "No Token Found"))
+        # We will need to let the user know that they will need
+        #  to connect/reconnect their Google Calendar Account.
+        return jsonify(stdRet(0, "No Token Found"))
 
     else:
-        # Split the result into its components
+        # Otherwise, if we have a result, then split the data into its components
         gCalId, memview = res
 
     logging.debug("GCalId: {}".format(gCalId))
 
-    # If there is a token in the DB it will be returned as a MemoryView
+    # If there is a token in the DB it will be returned as a MemoryView object
 
-    # Convert the memview object to BytesIO object
+    # Convert the MemoryView object object to BytesIO object
     tmp = BytesIO(memview)
 
     # Convert the BytesIO object to a google.oauth2.credentials.Credentials object
@@ -382,11 +418,12 @@ def exportToGCal():
 
     logging.debug("Google Calendar information found.")
 
-    # Get the month/schedule information from the request args
+    # Load the month/schedule information from the request args
     #  and create the start and end strings
     monthNum = int(request.args.get("monthNum"))
     year = int(request.args.get("year"))
 
+    # Format the start and end date strings
     start = formatDateStr(1, monthNum, year)
     end = formatDateStr(monthrange(year, monthNum)[-1], monthNum, year)
 
@@ -413,8 +450,9 @@ def exportToGCal():
         logging.warning("Error: {} encountered while exporting to Google Calendar for Hall: {}".format(status, userDict["hall_id"]))
 
         # Then we will need to let the user know that they will need
-        #  to connect/reconnect their Google Calendar Account.
-
+        #  to connect/reconnect their Google Calendar Account. This is
+        #  a default suggestion as there currently is no implementation
+        #  that gives us a more granular look at what went wrong.
         return jsonify(stdRet(0, "Reconnect Google Calendar Account"))
 
     # Otherwise report that it was a success!
