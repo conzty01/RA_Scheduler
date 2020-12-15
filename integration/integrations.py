@@ -103,14 +103,30 @@ def createGoogleCalendar(calInfoId):
 @integration_bp.route("/int/GCalRedirect", methods=["GET"])
 @login_required
 def returnGCalRedirect():
-    # Redirect the user to the Google Calendar Authorization Page
+    # API Method that initializes the process for connecting a Google
+    #  Calendar Account to the hall associated with the user.
+    #
+    #  This method is currently unable to be called from the server.
+    #
+    #  If called from a client, no parameters are required:
+    #
+    #  This method returns Flask redirect to redirect the user to
+    #  the Google Authorization URL to take the next steps for
+    #  connecting a Google Calendar Account on Google's side of things.
+
+    # Get the user's information from the database
     userDict = getAuth()
 
-    # Make sure the user is at least a Hall Director
+    # Check to see if the user is authorized to view these settings
+    # If the user is not at least an HD
     if userDict["auth_level"] < 3:
-        logging.info("User Not Authorized - RA: {} attempted to connect Google Calendar for Hall: {} -G"
-                     .format(userDict["ra_id"],userDict["hall_id"]))
+        # Then they are not permitted to see this view.
 
+        # Log the occurrence.
+        logging.info("User Not Authorized - RA: {} attempted to connect Google Calendar for Hall: {} -G"
+                     .format(userDict["ra_id"], userDict["hall_id"]))
+
+        # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
 
     # Get the authorization url and state from the Google Calendar Interface
@@ -126,13 +142,17 @@ def returnGCalRedirect():
     cur.execute("SELECT id FROM google_calendar_info WHERE res_hall_id = %s",
                 (userDict["hall_id"], ))
 
+    # Load the result from the DB
     res = cur.fetchone()
 
-    # If there is not a calendar associated with the hall
+    # If there is not a calendar already associated with the hall
     if res is None:
-        # Then insert a new row
+        # Then insert a new row with the authorization state so that
+        #  we can find it again later when the Authorization Response
+        #  comes in.
         logging.debug("Insert new row into Google Calendar Info table")
 
+        # Execute the INSERT statement to add the new row into the DB
         cur.execute("""INSERT INTO google_calendar_info (res_hall_id, auth_state) 
                         VALUES (%s, %s)""", (userDict["hall_id"], state))
 
@@ -144,10 +164,13 @@ def returnGCalRedirect():
                     (state, res[0]))
 
     logging.debug("Committing auth state to DB for Hall: {}".format(userDict["hall_id"]))
+
+    # Commit the changes to the DB
     ag.conn.commit()
 
     # Redirect the user to the Google Authorization URL
     return redirect(authURL)
+
 
 @integration_bp.route("/int/GCalAuth", methods=["GET"])
 @login_required
