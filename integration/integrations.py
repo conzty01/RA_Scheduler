@@ -98,9 +98,9 @@ def createGoogleCalendar(calInfoId):
     return stdRet(1, "successful")
 
 
-# ---------------------------------
-# --   Integration API Methods   --
-# ---------------------------------
+# -------------------------------------
+# --   Integration Process Methods   --
+# -------------------------------------
 
 @integration_bp.route("/int/GCalRedirect", methods=["GET"])
 @login_required
@@ -186,7 +186,7 @@ def handleGCalAuthResponse():
     #
     #  This method is currently unable to be called from the server.
     #
-    #  If called from a client, no parameters are required:
+    #  If called from a client, the following parameters are required:
     #
     #     state  <str>  -  a string denoting the authorization
     #                       state associated with this authorization
@@ -198,7 +198,8 @@ def handleGCalAuthResponse():
     # Get the user's information
     userDict = getAuth()
 
-    # Check to see if the user is authorized to view these settings
+    # Check to see if the user is authorized to add Google Calendar
+    #  Integration.
     # If the user is not at least an HD
     if userDict["auth_level"] < 3:
         # Then they are not permitted to see this view.
@@ -291,15 +292,32 @@ def handleGCalAuthResponse():
 @integration_bp.route("/int/disconnectGCal", methods=["GET"])
 @login_required
 def disconnectGoogleCalendar():
-    # Disconnect the Google Calendar for the given hall/user
+    # API Method that disconnect the Google Calendar for the requesting
+    #  user's Res Hall.
+    #
+    #  Required Auth Level: >= HD
+    #
+    #  This method is currently unable to be called from the server.
+    #
+    #  If called from a client, no parameters are required.
+    #
+    #  This method returns a Flask redirect to redirect the user to
+    #  the hall_bp.manHall page.
 
+    # Get the user's information from the database
     userDict = getAuth()
 
-    # Make sure the user is at least a Hall Director
+    # Check to see if the user is authorized to disconnect Google
+    #  Calendar Integration.
+    # If the user is not at least an HD
     if userDict["auth_level"] < 3:
-        logging.info("User Not Authorized - RA: {} attempted to disconnect Google Calendar for Hall: {} -G"
+        # Then they are not permitted to see this view.
+
+        # Log the occurrence.
+        logging.info("User Not Authorized - RA: {} attempted to disconnect Google Calendar for Hall: {}"
                      .format(userDict["ra_id"], userDict["hall_id"]))
 
+        # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
 
     # Create the cursor
@@ -310,6 +328,11 @@ def disconnectGoogleCalendar():
 
     # Redirect user back to Manage Hall page
     return redirect(url_for("manHall"))
+
+
+# ---------------------
+# --   API Methods   --
+# ---------------------
 
 @integration_bp.route("/api/exportToGCal", methods=["GET"])
 @login_required
