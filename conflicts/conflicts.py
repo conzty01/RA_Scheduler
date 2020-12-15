@@ -185,7 +185,7 @@ def getRAConflicts():
     #  is specified, then the result will include conflicts for all RA's on the
     #  user's staff.
     #
-    #  Required Auth Level: >= AHD
+    #  Required Auth Level: None
     #
     #  This method is currently unable to be called from the server.
     #
@@ -216,16 +216,17 @@ def getRAConflicts():
     # Get the user's info from our database
     userDict = getAuth()
 
-    # If the user is not at least an AHD
-    if userDict["auth_level"] < 2:
-        # Then they are not permitted to see this view.
-
-        # Log the occurrence.
-        logging.info("User Not Authorized - RA: {} attempted to view staff conflicts for Hall: {}"
-                     .format(userDict["ra_id"], userDict["hall_id"]))
-
-        # Notify the user that they are not authorized.
-        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+    # Currently, there is no auth_level requirement for this method.
+    # # If the user is not at least an AHD
+    # if userDict["auth_level"] < 2:
+    #     # Then they are not permitted to see this view.
+    #
+    #     # Log the occurrence.
+    #     logging.info("User Not Authorized - RA: {} attempted to view staff conflicts for Hall: {}"
+    #                  .format(userDict["ra_id"], userDict["hall_id"]))
+    #
+    #     # Notify the user that they are not authorized.
+    #     return jsonify(stdRet(-1, "NOT AUTHORIZED"))
 
     # Set the value of hallId from the userDict
     hallId = userDict["hall_id"]
@@ -329,11 +330,10 @@ def getRACons(hallId=None, startDateStr=None, endDateStr=None):
     #
     #  If called from a client, the following parameters are required:
     #
-    #     monthNum  <int>  -  an integer representing the numeric month number for
-    #                          the desired month using the standard gregorian
-    #                          calendar convention.
-    #     year      <int>  -  an integer denoting the year for the desired time period
-    #                          using the standard gregorian calendar convention.
+    #     start      <str>  -  a string representing the first day that should be included
+    #                           for the returned RA conflicts.
+    #     end        <str>  -  a string representing the last day that should be included
+    #                           for the returned RA conflicts.
     #
     #  This method returns an object with the following specifications:
     #
@@ -424,44 +424,106 @@ def getRACons(hallId=None, startDateStr=None, endDateStr=None):
 
 @conflicts_bp.route("/api/getConflictNums", methods=["GET"])
 @login_required
-def getNumberConflicts(hallId=None,monthNum=None,year=None):
+def getNumberConflicts(hallId=None, monthNum=None, year=None):
+    # API Method used to return a count of the number of conflicts each RA
+    #  has submitted for a given month and Res Hall.
+    #
+    #  Required Auth Level: >= AHD
+    #
+    #  If called from the server, this function accepts the following parameters:
+    #
+    #     hallId    <int>  -  an integer representing the id of the desired residence
+    #                          hall in the res_hall table.
+    #     monthNum  <int>  -  an integer representing the numeric month number for
+    #                          the desired month using the standard gregorian
+    #                          calendar convention.
+    #     year      <int>  -  an integer denoting the year for the desired time period
+    #                          using the standard gregorian calendar convention.
+    #
+    #  If called from a client, the following parameters are required:
+    #
+    #     monthNum  <int>  -  an integer representing the numeric month number for
+    #                          the desired month using the standard gregorian
+    #                          calendar convention.
+    #     year      <int>  -  an integer denoting the year for the desired time period
+    #                          using the standard gregorian calendar convention.
+    #
+    #  This method returns an object with the following specifications:
+    #
+    #     {
+    #        <ra.id 1> : <number of conflicts for the given timeframe>,
+    #        <ra.id 2> : <number of conflicts for the given timeframe>,
+    #        ...
+    #     }
 
+    # Assume this API was called from the server and verify that this is true.
     fromServer = True
     if hallId is None and monthNum is None and year is None:
-        userDict = getAuth()                                                    # Get the user's info from our database
+        # If the HallId, monthNum and year are None, then
+        #  this method was called from a remote client.
+
+        # Get the user's information from the database
+        userDict = getAuth()
+
+        # If the user is not at least an AHD
+        if userDict["auth_level"] < 2:
+            # Then they are not permitted to see this view.
+
+            # Log the occurrence.
+            logging.info("User Not Authorized - RA: {} attempted to view staff conflicts numbers for Hall: {}"
+                         .format(userDict["ra_id"], userDict["hall_id"]))
+
+            # Notify the user that they are not authorized.
+            return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+
+        # Set the value of the hallId from the userDict
         hallId = userDict["hall_id"]
+
+        # Get the value for monthNum and year from the request arguments.
         monthNum = request.args.get("monthNum")
         year = request.args.get("year")
 
+        # Mark that this method was not called from the server
         fromServer = False
 
-    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
-        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
-        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
-
+    # Create a DB cursor
     cur = ag.conn.cursor()
 
+    # Query the DB to retrieve the counts of duty conflicts for each
+    #  staff member associated with the provided Res Hall.
     cur.execute("""
         SELECT ra.id, COUNT(cons.id)
         FROM ra LEFT JOIN (
             SELECT conflicts.id, ra_id
             FROM conflicts JOIN day ON (conflicts.day_id = day.id)
                            JOIN month ON (month.id = day.month_id)
-            WHERE month.num = {}
-            AND EXTRACT(YEAR FROM month.year) = {}
+            WHERE month.num = %s
+            AND EXTRACT(YEAR FROM month.year) = %s
         ) AS cons ON (cons.ra_id = ra.id)
-        WHERE ra.hall_id = {}
+        WHERE ra.hall_id = %s
         GROUP BY ra.id;
-    """.format(monthNum, year, hallId))
+    """, (monthNum, year, hallId))
 
+    # Create the result object to be returned
     res = {}
+
+    # Iterate through the query result and assemble the return result
+    #  in the format outlined in the comments at the top of this method.
     for row in cur.fetchall():
         res[row[0]] = row[1]
 
+    # Close the DB cursor
+    cur.close()
+
+    # If this API method was called from the server
     if fromServer:
+        # Then return the result as-is
         return res
+
     else:
+        # Otherwise, return a JSON version of the result
         return jsonify(res)
+
 
 @conflicts_bp.route("/api/enterConflicts/", methods=['POST'])
 @login_required
