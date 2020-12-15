@@ -30,6 +30,8 @@ def createGoogleCalendar(calInfoId):
     # Create a Secondary Google Calendar for the provided hall using the Google
     #  Calendar Account information stored in the DB.
     #
+    #  Required Auth Level: None
+    #
     #  This function accepts the following parameters and packages them into
     #  a dictionary object with the same keys:
     #
@@ -106,9 +108,11 @@ def returnGCalRedirect():
     # API Method that initializes the process for connecting a Google
     #  Calendar Account to the hall associated with the user.
     #
+    #  Required Auth Level: >= HD
+    #
     #  This method is currently unable to be called from the server.
     #
-    #  If called from a client, no parameters are required:
+    #  If called from a client, no parameters are required.
     #
     #  This method returns Flask redirect to redirect the user to
     #  the Google Authorization URL to take the next steps for
@@ -175,16 +179,35 @@ def returnGCalRedirect():
 @integration_bp.route("/int/GCalAuth", methods=["GET"])
 @login_required
 def handleGCalAuthResponse():
-    # Generate Google Calendar credentials and save in DB
+    # API Method that handles the Google Calendar authorization response
+    #  and generates Google Calendar credentials that are saved in the DB.
+    #
+    #  Required Auth Level: >= HD
+    #
+    #  This method is currently unable to be called from the server.
+    #
+    #  If called from a client, no parameters are required:
+    #
+    #     state  <str>  -  a string denoting the authorization
+    #                       state associated with this authorization
+    #                       response.
+    #
+    #  This method returns a Flask redirect to redirect the user to
+    #  the hall_bp.manHall page.
 
     # Get the user's information
     userDict = getAuth()
 
-    # Ensure that the user is at least a Hall Director
+    # Check to see if the user is authorized to view these settings
+    # If the user is not at least an HD
     if userDict["auth_level"] < 3:
-        logging.info("User Not Authorized - RA: {} attempted to connect Google Calendar for Hall: {} -R"
-                     .format(userDict["ra_id"],userDict["hall_id"]))
+        # Then they are not permitted to see this view.
 
+        # Log the occurrence.
+        logging.info("User Not Authorized - RA: {} attempted to connect Google Calendar for Hall: {} -R"
+                     .format(userDict["ra_id"], userDict["hall_id"]))
+
+        # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
 
     # Get the state that was passed back by the authorization response.
@@ -196,11 +219,12 @@ def handleGCalAuthResponse():
     # Create DB cursor object
     cur = ag.conn.cursor()
 
-    # Identify which hall maps to the state
     logging.debug("Searching for hall associated with state")
 
+    # Query the DB to identify which hall maps to the given auth state
     cur.execute("SELECT id FROM google_calendar_info WHERE auth_state = %s", (state,))
 
+    # Load the result from the query
     calInfoId = cur.fetchone()
 
     # Check to see if we have a result
@@ -208,10 +232,12 @@ def handleGCalAuthResponse():
         # If not, stop processing
         logging.debug("Associated hall not found")
 
+        # Notify the user of this issue.
         return jsonify(stdRet(-1, "Invalid State Received"))
 
     # Get the credentials from the Google Calendar Interface
-    creds = gCalInterface.handleAuthResponse(request.url, ag.baseOpts["HOST_URL"] + "/int/GCalAuth")
+    creds = gCalInterface.handleAuthResponse(request.url,
+                                             ag.baseOpts["HOST_URL"] + "integration/int/GCalAuth")
 
     logging.debug("Received user credentials from interface")
 
@@ -234,25 +260,33 @@ def handleGCalAuthResponse():
                    WHERE id = %s;""",
                 (tmp.getvalue(), calInfoId[0]))
 
-    logging.debug("Committing credentials to DB for Google Calendar Info: {}".format(calInfoId[0]))
-
+    # Create a Secondary Google Calendar with Google that we can export
+    #  the schedule to.
     res = createGoogleCalendar(calInfoId[0])
 
     # If the calendar creation failed...
     if res["status"] < 0:
-        # Then rollback the Google Calendar Connection
-        logging.warning("Unable to Create Google Calendar- Rolling back changes")
+        # Then log the occurrence
+        logging.warning("Unable to Create Google Calendar for Hall: {} - Rolling back changes"
+                        .format(userDict["hall_id"]))
+
+        # And rollback the Google Calendar Account Connection creation
         ag.conn.rollback()
 
-    else:
-        # Otherwise add the calendar id to the DB.
-        logging.debug("Adding newly created Calendar Id to DB")
+        # TODO: I suspect that this rollback statement is unnecessary and possibly cumbersome
+        #        in an environment where multiple DB changes are made in short proximity to
+        #        each other. At this time, however, I do not have any evidence of this and will
+        #        leave the result as-is.
 
-        logging.info("Google Calendar Creation complete for Hall: {}".format(userDict["hall_id"]))
+    else:
+        # Otherwise commit the changes made to the DB
         ag.conn.commit()
 
+    logging.info("Google Calendar Creation complete for Hall: {}".format(userDict["hall_id"]))
+
     # Return the user back to the Manage Hall page
-    return redirect(url_for("manHall"))
+    return redirect(url_for("hall_bp.manHall"))
+
 
 @integration_bp.route("/int/disconnectGCal", methods=["GET"])
 @login_required
