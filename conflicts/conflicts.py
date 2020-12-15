@@ -181,13 +181,54 @@ def getConflicts(monthNum=None, raID=None, year=None, hallId=None):
 @conflicts_bp.route("/api/getRAConflicts", methods=["GET"])
 @login_required
 def getRAConflicts():
+    # API Method used to return all conflicts for a given user's staff.
+    #
+    #  Required Auth Level: >= AHD
+    #
+    #  This method is currently unable to be called from the server.
+    #
+    #  If called from a client, the following parameters are required:
+    #
+    #     monthNum  <int>  -  an integer representing the numeric month number for
+    #                          the desired month using the standard gregorian
+    #                          calendar convention.
+    #     year      <int>  -  an integer denoting the year for the desired time period
+    #                          using the standard gregorian calendar convention.
+    #     raID      <int>  -  an integer denoting the row id for the RA in the
+    #                          ra table whose conflicts should be returned.
+    #                          If a value of -1 is passed, then all conflicts for the
+    #                          user's staff will be returned.
+    #
+    #  This method returns an object with the following specifications:
+    #
+    #     [
+    #        {
+    #           "id": <conflict.id>,
+    #           "title": <ra.first_name + " " + ra.last_name>,
+    #           "start": <string value of day.date associated with the scheduled duty>,
+    #           "color": <ra.color>
+    #        },
+    #        ...
+    #     ]
+
+    # Get the user's info from our database
     userDict = getAuth()
 
-    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
-        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
-        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
+    # If the user is not at least an AHD
+    if userDict["auth_level"] < 2:
+        # Then they are not permitted to see this view.
 
+        # Log the occurrence.
+        logging.info("User Not Authorized - RA: {} attempted to view staff conflicts for Hall: {}"
+                     .format(userDict["ra_id"], userDict["hall_id"]))
+
+        # Notify the user that they are not authorized.
+        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+
+    # Set the value of hallId from the userDict
     hallId = userDict["hall_id"]
+
+    # Get the raID, monthNum, and year from the request arguments
     raId = request.args.get("raID")
     monthNum = request.args.get("monthNum")
     year = request.args.get("year")
@@ -198,37 +239,60 @@ def getRAConflicts():
     logging.debug("Year: {}".format(year))
     logging.debug("RaId == -1? {}".format(int(raId) != -1))
 
+    # Check to see if the raId has been specified
     if int(raId) != -1:
+        # If an raId has been provided, then create an additional
+        #  clause that will be appended to a later PSQL statement
         addStr = "AND conflicts.ra_id = {};".format(raId)
+
     else:
+        # Otherwise, create an empty string to replace the additional
+        #  PSQL clause.
         addStr = ""
 
     logging.debug(addStr)
 
+    # Create a DB cursor
     cur = ag.conn.cursor()
 
-    cur.execute("SELECT id FROM month WHERE num = {} AND EXTRACT(YEAR FROM year) = {}".format(monthNum, year))
+    # Query the DB to retrieve the month.id associated with the provided monthNum and year
+    cur.execute("SELECT id FROM month WHERE num = %s AND EXTRACT(YEAR FROM year) = %s",
+                (monthNum, year))
+
+    # Load the result from the query
     monthID = cur.fetchone()
 
+    # Check to see if the query result is None
     if monthID is None:
-        logging.info("No month found with Num = {}".format(monthNum))
-        return jsonify(stdRet(-1,"No month found with Num = {}".format(monthNum)))
+        # If the monthID is None, then we were unable to find a month in the DB
+        #  that had the provided monthNum and year.
+        logging.warning("No month found with Num = {} and Year = {}".format(monthNum, year))
+
+        # Notify the client of this issue.
+        return jsonify(stdRet(-1, "No month found with Num = {} and Year = {}".format(monthNum, year)))
 
     else:
+        # Otherwise extract the month id value from the query result.
         monthID = monthID[0]
 
+    # Query the DB for the conflicts for the given month and append the additional clause generated above.
     cur.execute("""SELECT conflicts.id, ra.first_name, ra.last_name, TO_CHAR(day.date, 'YYYY-MM-DD'), ra.color
                    FROM conflicts JOIN day ON (conflicts.day_id = day.id)
                                   JOIN ra ON (ra.id = conflicts.ra_id)
-                   WHERE day.month_id = {}
-                   AND ra.hall_id = {}
-                   {};""".format(monthID, hallId, addStr))
+                   WHERE day.month_id = %s
+                   AND ra.hall_id = %s
+                   {};""".format(addStr), (monthID, hallId))
 
+    # Load the results from the query.
     conDates = cur.fetchall()
+
     logging.debug("ConDates: {}".format(conDates))
 
+    # Create the result object to be returned
     res = []
 
+    # Iterate through the conDates from the DB and assemble the return result
+    #  in the format outlined in the comments at the top of this method.
     for d in conDates:
         res.append({
             "id": d[0],
@@ -237,7 +301,9 @@ def getRAConflicts():
             "color": d[4]
         })
 
+    # Return the conflict result to the client
     return jsonify(res)
+
 
 @conflicts_bp.route("/api/getStaffConflicts", methods=["GET"])
 @login_required
