@@ -21,12 +21,14 @@ import os
 
 from helperFunctions.helperFunctions import getAuth
 
+from breaks.breaks import breaks_bp
+from conflicts.conflicts import conflicts_bp
 from hall.hall import hall_bp
 from integration.integrations import integration_bp
 from schedule.schedule import schedule_bp
 from staff.staff import staff_bp
-from conflicts.conflicts import conflicts_bp
-from breaks.breaks import breaks_bp
+
+
 
 
 # Configure the logger immediately per Flask recommendation
