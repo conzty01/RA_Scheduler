@@ -1,8 +1,10 @@
+from pythonds import Graph, Vertex, Stack
+from schedule.ra_sched import Schedule, Day
+from datetime import datetime
+import random
+
 class Scheduler:
-    from pythonds import Graph, Vertex, Stack
-    from ra_sched import Schedule, Day
-    from datetime import datetime
-    import random
+
 
     # The scheduler uses a dfs traversal of a graph to
     # generate a ra_sched Schedule according to the

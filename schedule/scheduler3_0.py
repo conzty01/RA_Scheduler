@@ -1,4 +1,4 @@
-from ra_sched import Schedule, Day, RA
+from schedule.ra_sched import Schedule, Day, RA
 from calendar import Calendar
 from datetime import datetime
 from pythonds import Stack

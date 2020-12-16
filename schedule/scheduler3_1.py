@@ -1,4 +1,4 @@
-from ra_sched import Schedule, Day, RA
+from schedule.ra_sched import Schedule, Day, RA
 from calendar import Calendar
 from datetime import datetime
 from pythonds import Stack
@@ -19,7 +19,7 @@ class State:
     #                          number of double days an RA has already been
     #                          assigned.
     #     editable          = Boolean denoting if this state can is allowed to
-    #                          be changed/reevalutated. This is used to denote
+    #                          be changed/reevaluated. This is used to denote
     #                          whether this particular date/duty was preset.
 
     def __init__(self, day, raList, lastDateAssigned, numDoubleDays, \
