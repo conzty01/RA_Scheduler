@@ -1,9 +1,9 @@
 from flask import render_template, request, jsonify, Blueprint
 from flask_login import login_required
+from psycopg2 import IntegrityError
 from schedule.ra_sched import RA
 import scheduler4_0
 import copy as cp
-import psycopg2
 import calendar
 import logging
 
@@ -230,69 +230,143 @@ def getSchedule2(start=None, end=None, hallId=None, showAllColors=None):
 
 
 @schedule_bp.route("/api/runScheduler", methods=["POST"])
-def runScheduler(hallId=None, monthNum=None, year=None):
+def runScheduler():
+    # API Method that runs the duty scheduler for the given
+    #  Res Hall and month. Any users associated with the staff
+    #  that have an auth_level of HD will not be scheduled.
+    #
+    #  Required Auth Level: >= AHD
+    #
+    #  This method is currently unable to be called from the server.
+    #
+    #  If called from a client, the following parameters are required:
+    #
+    #     monthNum     <int>  -  an integer representing the numeric month number for
+    #                             the desired month using the standard gregorian
+    #                             calendar convention.
+    #     year         <int>  -  an integer denoting the year for the desired time period
+    #                             using the standard gregorian calendar convention.
+    #     noDuty       <str>  -  a string containing comma separated integers that represent
+    #                             a date in the month in which no duty should be scheduled.
+    #                             If set to an empty string, then all days in the month will
+    #                             be scheduled.
+    #     eligibleRAs  <str>  -  a string containing comma separated integers that represent
+    #                             the ra.id for all RAs that should be considered for duties.
+    #                             If set to an empty string, then all ras with an auth_level
+    #                             of less than HD will be scheduled.
+    #
+    #  This method returns a standard return object whose status is one of the
+    #  following:
+    #
+    #      1 : the duty scheduling was successful
+    #      0 : the duty scheduling was unsuccessful
+    #     -1 : an error occurred while scheduling
 
-    # API Hook that will run the scheduler for a given month.
-    #  The month will be given via request.args as 'monthNum' and 'year'.
-    #  Additionally, the dates that should no have duties are also sent via
-    #  request.args and can either be a string of comma separated integers
-    #  ("1,2,3,4") or an empty string ("").
+    # Get the user's information from the database
+    userDict = getAuth()
 
-    # -- Check authorization --
-    userDict = getAuth()                                                        # Get the user's info from our database
-    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
-        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
-        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
+    # Check to see if the user is authorized to run the scheduler
+    # If the user is not at least an AHD
+    if userDict["auth_level"] < 2:
+        # Then they are not permitted to see this view.
+
+        # Log the occurrence.
+        logging.info("User Not Authorized - RA: {} attempted to run scheduler."
+                     .format(userDict["ra_id"]))
+
+        # Notify the user that they are not authorized.
+        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
 
     logging.debug("Request.json: {}".format(request.json))
 
-    # -- Begin parsing provided parameters --
-    fromServer = True
-    if monthNum == None and year == None and hallId == None:                    # Effectively: If API was called from the client and not from the server
+    # Attempt to load the needed data from the request.json object
+    try:
+        # Set the values of the monthNum, and year with the
+        #  data passed from the client.
         monthNum = int(request.json["monthNum"])
         year = int(request.json["year"])
-        userDict = getAuth()                                                    # Get the user's info from our database
-        hallId = userDict["hall_id"]
-        fromServer = False
 
-    logging.debug("Run Scheduler - From Server: {}".format(fromServer))
-    res = {}
-
-    try:
+        # Check to see if values have been passed through the
+        #  noDuty parameter
         if request.json["noDuty"] != "":
+            # If noDuty is not "", then attempt to parse out the values
             noDutyList = [int(d) for d in request.json["noDuty"].split(",")]
 
         else:
+            # Otherwise if there are no values passed in noDuty, set
+            #  noDutyList to an empty list
             noDutyList = []
 
+        # Check to see if values have been passed through the
+        #  eligibeRAs parameter
         if request.json["eligibleRAs"] != "":
+            # If eligibleRAs is not "", then attempt to parse out the values
             eligibleRAs = [int(i) for i in request.json["eligibleRAs"]]
+
+            # Also create a formatted psql string to add to the query that loads
+            #  the necessary information from the DB
             eligibleRAStr = "AND ra.id IN ({});".format(str(eligibleRAs)[1:-1])
 
         else:
+            # Otherwise if there are no values passed in eligibleRAs, then
+            # set eligibleRAStr to ";" to end the query string
             eligibleRAStr = ";"
 
-    except:                                                                     # If error, send back an error message
-        return jsonify(stdRet(-1,"Error parsing No Duty Days and Eligible RAs"))
+    except ValueError as ve:
+        # If a ValueError occurs, then there was an issue parsing out the
+        #  monthNum, year, noDuty-dates or the ra.ids from the request json.
 
+        # Log the occurrence
+        logging.warning("Error Parsing Request Values for Scheduler: {}"
+                        .format(ve))
+
+        # Notify the user of the error
+        return jsonify(stdRet(-1, "Error Parsing Scheduler Parameters"))
+
+    except KeyError as ke:
+        # If a KeyError occurs, then there was an expected value in the
+        #  request json that was missing.
+
+        # Log the occurrence
+        logging.warning("Error Loading Request Values for Scheduler: {}"
+                        .format(ke))
+
+        # Notify the user of the error
+        return jsonify(stdRet(-1, "Missing Scheduler Parameters"))
+
+    # Set the value of the hallId from the userDict
     hallId = userDict["hall_id"]
+
+    # Create a DB cursor
     cur = ag.conn.cursor()
 
-    # -- Find the month in the Database
-    cur.execute("SELECT id, year FROM month WHERE num = {} AND EXTRACT(YEAR FROM year) = {}".format(monthNum,year))
-    monthId, date = cur.fetchone()                                              # Get the month_id from the database
+    # Query the DB for the given month
+    cur.execute("SELECT id, year FROM month WHERE num = %s AND EXTRACT(YEAR FROM year) = %s",
+                (monthNum, year))
+
+    # Load the results from the DB
+    monthRes = cur.fetchone()
+
+    # Check to see if the query returned a result
+    if monthRes is None:
+        # If not, then log the occurrence
+        logging.warning("Unable to find month {}/{} in DB".format(monthNum, year))
+
+        # And notify the user
+        return jsonify(stdRet(-1, "Unable to find month {}/{} in DB".format(monthNum, year)))
+
+    else:
+        # Otherwise, unpack the monthRes into monthId and year
+        monthId, date = monthRes
+
     logging.debug("MonthId: {}".format(monthId))
-
-    if monthId == None:                                                         # If the database does not have the correct month
-        logging.warning("Unable to find month {}/{} in DB".format(monthNum,year))
-        return jsonify(stdRet(-1,"Unable to find month {}/{} in DB".format(monthNum,year)))
-
 
     # -- Get all eligible RAs and their conflicts --
 
-    # Select all RAs in a particular hall whose auth_level is below 3 (HD)
-    #  as well as all of their respective conflicts for a given month
-    queryStr = """
+    # Query the DB for all of the eligible RAs for a given hall, and their
+    #  conflicts for the given month excluding any ra table records with
+    #  an auth_level of 3 or higher.
+    cur.execute("""
         SELECT first_name, last_name, id, hall_id, date_started,
                COALESCE(cons.array_agg, ARRAY[]::date[])
         FROM ra LEFT OUTER JOIN (
@@ -300,108 +374,115 @@ def runScheduler(hallId=None, monthNum=None, year=None):
             FROM conflicts JOIN (
                 SELECT id, date
                 FROM day
-                WHERE month_id = {}
+                WHERE month_id = %s
                 ) AS days
             ON (conflicts.day_id = days.id)
             GROUP BY ra_id
             ) AS cons
         ON (ra.id = cons.ra_id)
-        WHERE ra.hall_id = {}
-        AND ra.auth_level < 3 {}
-    """.format(monthId, hallId, eligibleRAStr)
+        WHERE ra.hall_id = %s
+        AND ra.auth_level < 3 %s
+    """, (monthId, hallId, eligibleRAStr))
 
-    logging.debug(queryStr)
-
-    cur.execute(queryStr)       # Query the database for the appropriate RAs and their respective information
+    # Load the result from the DB
     partialRAList = cur.fetchall()
 
-
-    # -- Get the start and end date for the school year --
-
+    # Get the start and end date for the school year. This will be used
+    #  to calculate how many points each RA has for the given year.
     start, end = getSchoolYear(date.month, date.year)
 
-    # -- Get the number of points that the RAs have --
+    # Get the number of days in the given month
+    _, dateNum = calendar.monthrange(date.year, date.month)
 
-    # Calculate maxBreakDay
-    dateNum = calendar.monthrange(date.year, date.month)[1]
-    mBD = "{:04d}-{:02d}-{:02d}".format(date.year, date.month, dateNum)
+    # Calculate and format maxBreakDay which is the latest break duty that should be
+    #  included for the duty points calculation.
+    maxBreadDuty = "{:04d}-{:02d}-{:02d}".format(date.year, date.month, dateNum)
 
-    ptsDict = getRAStats(userDict["hall_id"], start, end, maxBreakDay=mBD)
+    # Get the RA statistics for the given hall
+    ptsDict = getRAStats(userDict["hall_id"], start, end, maxBreakDay=maxBreadDuty)
 
     logging.debug("ptsDict: {}".format(ptsDict))
 
-    # -- Assemble the RA List --
-
-    ra_list = [RA(res[0],res[1],res[2],res[3],res[4],res[5],ptsDict[res[2]]["pts"]) for res in partialRAList]
-
-    # logging.debug("RA_LIST_______________________")
-    # for ra in ra_list:
-    #     logging.debug("Name: {}".format(ra.getName()))
-    #     logging.debug("ID: {}".format(ra.getId()))
-    #     logging.debug("Hall: {}".format(ra.getHallId()))
-    #     logging.debug("Started: {}".format(ra.getStartDate()))
-    #     logging.debug("Hash: {}".format(hash(ra)))
-    #
-    # input()
+    # Assemble the RA list with RA objects that have the individual RAs' information
+    ra_list = [RA(res[0], res[1], res[2], res[3], res[4], res[5], ptsDict[res[2]]["pts"]) for res in partialRAList]
 
     # Set the Last Duty Assigned Tolerance based on floor dividing the number of
     #  RAs by 2 then adding 1. For example, with a staff_manager of 15, the LDA Tolerance
     #  would be 8 days.
+
+    # Calculate the last date assigned tolerance (LDAT) which is the number of days
+    #  before an RA is to be considered again for a duty. This should start as
+    #  one more than half of the number of RAs in the list. The scheduler algorithm
+    #  will adjust this as needed if the value passed in does not generate a schedule.
     ldat = (len(ra_list) // 2) + 1
 
-    # Get the last ldaTolerance number of days worth of duties from the previous month
+    # Query the DB for the last 'x' number of duties from the previous month so that we
+    #  do not schedule RAs back-to-back between months.
 
-    # If the current monthNum is 1
+    # 'x' is currently defined to be the last day assigned tolerance
+
+    # Create a startMonthStr that can be used as the earliest boundary for the duties from the
+    #  last 'x' duties from the previous month.
+    # If the monthNum is 1 (If the desired month is January)
     if monthNum == 1:
-        # Then the previous month is 12 of the previous year
-        startMonthStr = '{}-12'.format(year - 1)
+        # Then the previous month is 12 (December) of the previous year
+        startMonthStr = '{}-12'.format(date.year - 1)
 
     else:
-        startMonthStr = '{}-{}'.format(year, "{0:02d}".format(monthNum - 1))
+        # Otherwise the previous month is going to be from the same year
+        startMonthStr = '{}-{}'.format(date.year, "{0:02d}".format(monthNum - 1))
 
-    endMonthStr = '{}-{}'.format(year, "{0:02d}".format(monthNum))
+    # Generate the endMonthStr which is simply a dateStr that represents the
+    #  first day of the month in which the scheduler should run.
+    endMonthStr = '{}-{}'.format(date.year, "{0:02d}".format(monthNum))
 
+    # Log this information for the debugger!
     logging.debug("StartMonthStr: {}".format(startMonthStr))
     logging.debug("EndMonthStr: {}".format(endMonthStr))
     logging.debug("Hall Id: {}".format(userDict["hall_id"]))
-    logging.debug("Year: {}".format(year))
+    logging.debug("Year: {}".format(date.year))
     logging.debug('MonthNum: {0:02d}'.format(monthNum))
     logging.debug("LDAT: {}".format(ldat))
 
+    # Query the DB for the last 'x' number of duties from the previous month so that we
+    #  do not schedule RAs back-to-back between months.
     cur.execute("""SELECT ra.first_name, ra.last_name, ra.id, ra.hall_id,
-                          ra.date_started, day.date - TO_DATE('{}-{}-01','YYYY-MM-DD')
+                          ra.date_started, day.date - TO_DATE(%s, 'YYYY-MM-DD')
                   FROM duties JOIN day ON (day.id=duties.day_id)
                               JOIN ra ON (ra.id=duties.ra_id)
-                  WHERE duties.hall_id = {}
+                  WHERE duties.hall_id = %s
                   AND duties.sched_id IN (
                         SELECT DISTINCT ON (schedule.month_id) schedule.id
                         FROM schedule
-                        WHERE schedule.hall_id = {}
+                        WHERE schedule.hall_id = %s
                         AND schedule.month_id IN (
                             SELECT month.id
                             FROM month
-                            WHERE month.year >= TO_DATE('{}','YYYY-MM')
-                            AND month.year <= TO_DATE('{}','YYYY-MM')
+                            WHERE month.year >= TO_DATE(%s, 'YYYY-MM')
+                            AND month.year <= TO_DATE(%s, 'YYYY-MM')
                         )
                         ORDER BY schedule.month_id, schedule.created DESC, schedule.id DESC
                   )
-                  AND day.date >= TO_DATE('{}-{}-01','YYYY-MM-DD') - {}
+                  
+                  AND day.date >= TO_DATE(%s,'YYYY-MM-DD') - %s
                   AND day.date <= TO_DATE('{}-{}-01','YYYY-MM-DD') - 1
                   ORDER BY day.date ASC;
-    """.format(year,'{0:02d}'.format(monthNum), userDict["hall_id"], userDict["hall_id"], \
-               startMonthStr, endMonthStr, year, '{0:02d}'.format(monthNum), \
-               ldat, year, '{0:02d}'.format(monthNum)))
+    """, (endMonthStr + "-01", hallId, hallId, startMonthStr, endMonthStr,
+          endMonthStr + "-01", ldat, endMonthStr + "-01"))
 
+    # Load the query results from the DB
     prevDuties = cur.fetchall()
-    # Create shell RA objects that will hash to the appropriate value
-    prevRADuties = [ ( RA(d[0],d[1],d[2],d[3],d[4]), d[5] ) for d in prevDuties ]
+
+    # Create shell RA objects that will hash to the same value as their respective RA objects.
+    #  This hash is how we map the equivalent RA objects together.
+    prevRADuties = [(RA(d[0], d[1], d[2], d[3], d[4]), d[5]) for d in prevDuties]
 
     logging.debug("PREVIOUS DUTIES: {}".format(prevRADuties))
 
-    # -- Query DB for list of break duties for the month. --
-    #     In version 4.0 of the scheduler, break duties essentially are treated
-    #     like noDutyDates and are skipped in the scheduling process. As a result,
-    #     only the date is needed.
+    # Query the DB for a list of break duties for the given month.
+    #  In version 4.0 of the scheduler, break duties essentially are treated
+    #  like noDutyDates and are skipped in the scheduling process. As a result,
+    #  only the date is needed.
     cur.execute("""
         SELECT TO_CHAR(day.date, 'DD')
         FROM break_duties JOIN day ON (break_duties.day_id = day.id)
@@ -409,9 +490,9 @@ def runScheduler(hallId=None, monthNum=None, year=None):
         AND break_duties.hall_id = {}
     """.format(monthId, userDict["hall_id"]))
 
-    breakDuties = [ int(row[0]) for row in cur.fetchall() ]
+    # Load the results from the DB and convert the value to an int.
+    breakDuties = [int(row[0]) for row in cur.fetchall()]
     logging.debug("Break Duties: {}".format(breakDuties))
-
 
     # Attempt to run the scheduler using deep copies of the raList and noDutyList.
     #  This is so that if the scheduler does not resolve on the first run, we
@@ -420,97 +501,143 @@ def runScheduler(hallId=None, monthNum=None, year=None):
     copy_raList = cp.deepcopy(ra_list)
     copy_noDutyList = cp.copy(noDutyList)
 
+    # Set completed to False and successful to False by default. These values
+    #  will be manipulated in the while loop below as necessary.
     completed = False
-    successful = True
+    successful = False
     while not completed:
-        # Create the Schedule
-        sched = scheduler4_0.schedule(copy_raList, year, monthNum,\
-                noDutyDates=copy_noDutyList, ldaTolerance=ldat, \
-                prevDuties=prevRADuties, breakDuties=breakDuties)
+        # While we are not finished scheduling, create a candidate schedule
+        sched = scheduler4_0.schedule(copy_raList, year, monthNum,
+                                      noDutyDates=copy_noDutyList, ldaTolerance=ldat,
+                                      prevDuties=prevRADuties, breakDuties=breakDuties)
 
+        # If we were unable to schedule with the previous parameters,
         if len(sched) == 0:
-            # If we were unable to schedule with the previous parameters,
+            # Then we should attempt to modify the previous parameters
+            #  and try again.
 
             if ldat > 1:
-                # And the LDATolerance is greater than 1
+                # If the LDATolerance is greater than 1
                 #  then decrement the LDATolerance by 1 and try again
 
                 logging.info("DECREASE LDAT: {}".format(ldat))
                 ldat -= 1
+
+                # Create new deep copies of the ra_list and noDutyList
                 copy_raList = cp.deepcopy(ra_list)
                 copy_noDutyList = cp.copy(noDutyList)
 
             else:
-                # The LDATolerance is not greater than 1 and we were unable to schedule
+                # Otherwise the LDATolerance is not greater than 1. In this
+                #  case, we were unable to successfully generate a schedule
+                #  with the given parameters.
                 completed = True
-                successful = False
 
         else:
-            # We were able to create a schedule
+            # Otherwise, we were able to successfully create a schedule!
+            #  Mark that we have completed so we may exit the while loop
+            #  and mark that we were successful.
             completed = True
+            successful = True
 
     logging.debug("Schedule: {}".format(sched))
 
+    # If we were not successful in generating a duty schedule.
     if not successful:
-        logging.info("Unable to Generate Schedule for Hall: {} MonthNum: {} Year: {}".format(userDict["hall_id"], monthNum, year))
-        return jsonify(stdRet(0,"UNABLE TO GENERATE SCHEDULE"))
+        # Log the occurrence
+        logging.info("Unable to Generate Schedule for Hall: {} MonthNum: {} Year: {}"
+                     .format(userDict["hall_id"], monthNum, year))
 
-    # Add the schedule to the database and get its ID
-    cur.execute("INSERT INTO schedule (hall_id, month_id, created) VALUES ({},{},NOW()) RETURNING id;".format(hallId, monthId))
+        # Notify the user of this result
+        return jsonify(stdRet(0, "Unable to Generate Schedule"))
+
+    # Add a record to the schedule table in the DB get its ID
+    cur.execute("INSERT INTO schedule (hall_id, month_id, created) VALUES (%s, %s, NOW()) RETURNING id;",
+                (hallId, monthId))
+
+    # Load the query result
     schedId = cur.fetchone()[0]
+
+    # Commit the changes to the DB
     ag.conn.commit()
+
     logging.debug("Schedule ID: {}".format(schedId))
 
-    # Get the id of the schedule that was just created
-    #cur.execute("SELECT id FROM schedule WHERE hall_id = {} AND month_id = {} ORDER BY created DESC, id DESC;".format(hallId, monthId))
-    #schedId = cur.fetchone()[0]
+    # Map the day.id to the numeric date value used for the scheduling algorithm
 
-    # Map the day id to the date
+    # Create the mapping object
     days = {}
-    cur.execute("SELECT EXTRACT(DAY FROM date), id FROM day WHERE month_id = {};".format(monthId))
+
+    # Query the day table for all of the days within the given month.
+    cur.execute("SELECT EXTRACT(DAY FROM date), id FROM day WHERE month_id = %s;", (monthId,))
+
+    # Iterate through the results
     for res in cur.fetchall():
+        # Map the date to the day.id
         days[res[0]] = res[1]
 
-    # Iterate through the schedule
+    # Iterate through the schedule and generate parts of an insert query that will ultimately
+    #  add the duties to the DB
     dutyDayStr = ""
     noDutyDayStr = ""
     for d in sched:
-        # If there are RAs assigned to this day
+        # Check to see if there is at least one RA assigned for duty
+        #  on this day.
         if d.numberOnDuty() > 0:
+            # If there is at least one RA assigned for duty on this day,
+            #  then iterate over all of the RAs assigned for duty on this
+            #  day and add them to the dutyDayStr
             for r in d:
-                dutyDayStr += "({},{},{},{},{}),".format(hallId, r.getId(), days[d.getDate()], schedId, d.getPoints())
+                dutyDayStr += "({},{},{},{},{}),".format(hallId, r.getId(), days[d.getDate()],
+                                                         schedId, d.getPoints())
 
         else:
+            # Otherwise, if there are no RAs assigned for duty on this day,
+            #  then add the day to the noDutyDayStr
             noDutyDayStr += "({},{},{},{}),".format(hallId, days[d.getDate()], schedId, d.getPoints())
 
     # Attempt to save the schedule to the DB
     try:
-        # Add all of the duties that were scheduled for the month
+        # If there were days added to the dutyDayStr
         if dutyDayStr != "":
+            # Then insert all of the duties that were scheduled for the month into the DB
             cur.execute("""
                     INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val) VALUES {};
                     """.format(dutyDayStr[:-1]))
 
-        # Add all of the blank duty values for days that were not scheduled
+        # If there were days added to the noDutyDayStr
         if noDutyDayStr != "":
+            # Then insert all of the blank duty values for days that were not scheduled
             cur.execute("""
                     INSERT INTO duties (hall_id, day_id, sched_id, point_val) VALUES {};
                     """.format(noDutyDayStr[:-1]))
 
-    except psycopg2.IntegrityError:
-        logging.debug("ROLLBACK")
+    except IntegrityError:
+        # If we encounter an IntegrityError, then that means we attempted to insert a value
+        #  into the DB that was already in there.
+
+        # Log the occurrence
+        logging.warning(
+            "IntegrityError encountered when attempting to save duties for Schedule: {}. Rolling back changes."
+            .format(schedId))
+
+        # Rollback the changes to the DB
         ag.conn.rollback()
 
+        # Notify the user of this issue.
+        return jsonify(stdRet(-1, "Unable to Generate Schedule"))
+
+    # Commit changes to the DB
     ag.conn.commit()
 
+    # Close the DB cursor
     cur.close()
 
     logging.info("Successfully Generated Schedule: {}".format(schedId))
 
-    if fromServer:
-        return stdRet(1,"successful")
-    else:
-        return jsonify(stdRet(1,"successful"))
+    # Notify the user of the successful schedule generation!
+    return jsonify(stdRet(1, "successful"))
+
 
 @schedule_bp.route("/api/changeRAonDuty", methods=["POST"])
 @login_required
