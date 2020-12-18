@@ -415,7 +415,7 @@ def getRACons(hallId=None, startDateStr=None, endDateStr=None):
     # If this API method was called from the server
     if fromServer:
         # Then return the result as-is
-        return rawRes
+        return res
 
     else:
         # Otherwise return a JSON version of the result
