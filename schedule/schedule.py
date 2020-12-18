@@ -4,8 +4,8 @@ from schedule.ra_sched import RA
 import scheduler4_0
 import copy as cp
 import psycopg2
-import logging
 import calendar
+import logging
 
 # Import the appGlobals for this blueprint to use
 import appGlobals as ag
@@ -73,76 +73,144 @@ def editSched():
 
 @schedule_bp.route("/api/getSchedule", methods=["GET"])
 @login_required
-def getSchedule2(start=None,end=None,hallId=None, showAllColors=None):
-    # API Hook that will get the requested schedule for a given month.
-    #  The month will be given via request.args as 'monthNum' and 'year'.
-    #  The server will then query the database for the appropriate schedule
-    #  and send back a jsonified version of the schedule. If no month and
-    #  subsequently no schedule is found in the database, the server will
-    #  return an empty list
+def getSchedule2(start=None, end=None, hallId=None, showAllColors=None):
+    # API Method used to return the regularly scheduled duties for the given hall
+    #  and timeframe. This method also allows for specification on whether or not
+    #  the returned duties should be associated with their RA's respective colors
+    #  or a default color. Regardless of this value, any duties associated with
+    #  the user are associated with their color.
+    #
+    #  Required Auth Level: None
+    #
+    #  If called from the server, this function accepts the following parameters:
+    #
+    #     start          <str>   -  a string representing the first day that should
+    #                                be included for the returned RA conflicts.
+    #     end            <str>   -  a string representing the last day that should
+    #                                be included for the returned RA conflicts.
+    #     hallId         <int>   -  an integer representing the id of the desired
+    #                                residence hall in the res_hall table.
+    #     showAllColors  <bool>  -  a boolean that, if set to True, will associate the
+    #                                returned duties with their RA's respective color.
+    #                                Setting this to False will associate each duty
+    #                                with the default color of #2C3E50.
+    #
+    #  If called from a client, the following parameters are required:
+    #
+    #     start          <str>   -  a string representing the first day that should be included
+    #                                for the returned RA conflicts.
+    #     end            <str>   -  a string representing the last day that should be included
+    #                                for the returned RA conflicts.
+    #     showAllColors  <bool>  -  a boolean that, if set to True, will associate the
+    #                                returned duties with their RA's respective color.
+    #                                Setting this to False will associate each duty
+    #                                with the default color of #2C3E50.
+    #
+    #  This method returns an object with the following specifications:
+    #
+    #     [
+    #        {
+    #           "id": <ra.id>,
+    #           "title": <ra.first_name> + " " + <ra.last_name>,
+    #           "start": <day.date>,
+    #           "color": <ra.color or "#2C3E50">,
+    #           "extendedProps": {"dutyType": "std"}
+    #        }
+    #     ]
 
+    # Assume this API was called from the server and verify that this is true.
     fromServer = True
-    if start is None and end is None and hallId is None and showAllColors is None:                    # Effectively: If API was called from the client and not from the server
-        start = request.args.get("start").split("T")[0]                         # No need for the timezone in our current application
-        end = request.args.get("end").split("T")[0]                             # No need for the timezone in our current application
+    if start is None and end is None and hallId is None and showAllColors is None:
+        # If the hallId, start, end, and showAllColors are None, then
+        #  this method was called from a remote client.
 
-        showAllColors = request.args.get("allColors") == "true"                 # Should all colors be displayed or only the current user's colors
+        # Get the user's information from the database
+        userDict = getAuth()
 
-        userDict = getAuth()                                                    # Get the user's info from our database
+        # Set the value of hallId from the userDict
         hallId = userDict["hall_id"]
+
+        # Get the start and end string values from the request arguments.
+        #  Since we utilize the fullCal.js library, we know that the request
+        #  also contains timezone information that we do not care about in
+        #  this method. As a result, the timezone information is split out
+        #  immediately.
+        start = request.args.get("start").split("T")[0]
+        end = request.args.get("end").split("T")[0]
+
+        # Load the showAllColors from the request arguments
+        showAllColors = request.args.get("allColors") == "true"
+
+        # Mark that this method was not called from the server
         fromServer = False
 
     logging.debug("Get Schedule - From Server: {}".format(fromServer))
+
+    # Create the result object to be returned
     res = []
 
+    # Create a DB cursor
     cur = ag.conn.cursor()
 
+    # Query the DB for the regularly scheduled duties for the given Res Hall and timeframe.
     cur.execute("""
         SELECT ra.first_name, ra.last_name, ra.color, ra.id, TO_CHAR(day.date, 'YYYY-MM-DD')
         FROM duties JOIN day ON (day.id=duties.day_id)
                     JOIN RA ON (ra.id=duties.ra_id)
-        WHERE duties.hall_id = {}
+        WHERE duties.hall_id = %s
         AND duties.sched_id IN
                 (
                 SELECT DISTINCT ON (schedule.month_id) schedule.id
                 FROM schedule
-                WHERE schedule.hall_id = {}
+                WHERE schedule.hall_id = %s
                 AND schedule.month_id IN
                     (
                         SELECT month.id
                         FROM month
-                        WHERE month.year >= TO_DATE('{}','YYYY-MM')
-                        AND month.year <= TO_DATE('{}','YYYY-MM')
+                        WHERE month.year >= TO_DATE(%s,'YYYY-MM')
+                        AND month.year <= TO_DATE(%s,'YYYY-MM')
                     )
                 ORDER BY schedule.month_id, schedule.created DESC, schedule.id DESC
                 )
-        AND day.date >= TO_DATE('{}','YYYY-MM-DD')
-        AND day.date <= TO_DATE('{}','YYYY-MM-DD')
+        AND day.date >= TO_DATE(%s,'YYYY-MM-DD')
+        AND day.date <= TO_DATE(%s,'YYYY-MM-DD')
         ORDER BY day.date ASC;
-    """.format(hallId, hallId, start[:-3], end[:-3], start, end))
+    """, (hallId, hallId, start[:-3], end[:-3], start, end))
 
+    # Load the results from the DB
     rawRes = cur.fetchall()
     logging.debug("RawRes: {}".format(rawRes))
 
+    # Iterate through the rawRes from the DB and assemble the return result
+    #  in the format outlined in the comments at the top of this method.
     for row in rawRes:
-        # If the ra is the same as the user, then display their color
-        #  Otherwise, display a generic color.
+        # First check to see if the ra is the same as the user.
+        #  If so, then display their color; otherwise, display a generic color.
+
         # logging.debug("Ra is same as user? {}".format(userDict["ra_id"] == row[3]))
+
+        # If the desired behavior is to NOT show all of the unique RAs' colors...
         if not(showAllColors):
-            # If the desired behavior is to not show all of the unique RA colors
-            #  then check to see if the current user is the ra on the duty being
-            #  added. If it is the ra, show their unique color, if not, show the
-            #  same color.
-            if userDict["ra_id"] == row[3]:
+
+            # Then check to see if the current user is the RA on the duty being
+            #  added. If this method was called from the server, then there is no
+            #  concept of the current user and thus the default color should be used.
+
+            if not fromServer and userDict["ra_id"] == row[3]:
+                # If it is the RA, then show their unique color
                 c = row[2]
+
             else:
+                # If it is NOT the RA, then show the default color.
                 c = "#2C3E50"
 
-        # If the desired behavior is to show all of the unique RA colors, then
-        #  simply set their color.
         else:
+            # If the desired behavior is to show all of the unique RA colors, then
+            #  simply set their respective color.
             c = row[2]
 
+        # Append a newly created dictionary object containing the information for this
+        #  duty to the return object.
         res.append({
             "id": row[3],
             "title": row[0] + " " + row[1],
@@ -151,10 +219,15 @@ def getSchedule2(start=None,end=None,hallId=None, showAllColors=None):
             "extendedProps": {"dutyType": "std"}
         })
 
+    # If this API method was called from the server
     if fromServer:
+        # Then return the result as-is
         return res
+
     else:
+        # Otherwise return a JSON version of the result
         return jsonify(res)
+
 
 @schedule_bp.route("/api/runScheduler", methods=["POST"])
 def runScheduler(hallId=None, monthNum=None, year=None):
