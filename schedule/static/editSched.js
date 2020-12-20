@@ -44,7 +44,7 @@ function initEditSchedCal() {
         },
         eventSources: [
             {
-                url: '/api/getSchedule',
+                url: 'schedule/api/getSchedule',
                 failure: function () {
                     alert('there was an error while fetching Regular Duties!');
                 },
@@ -57,7 +57,7 @@ function initEditSchedCal() {
                 },
             },
             {
-                url: '/api/getBreakDuties',
+                url: 'breaks/api/getBreakDuties',
                 failure: function () {
                     alert('there was an error while fetching Break Duties!');
                 },
