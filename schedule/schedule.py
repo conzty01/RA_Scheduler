@@ -728,7 +728,7 @@ def changeRAforDutyDay():
         return jsonify(stdRet(0, "Unable to Locate Previously Assigned RA for Duty."))
 
     # Query the DB for the day that the duty occurs on
-    cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE(%s, 'MM/DD/YYYY');", (data["dateStr"]))
+    cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE(%s, 'MM/DD/YYYY');", (data["dateStr"],))
 
     # Load the query results
     rawDay = cur.fetchone()
@@ -785,12 +785,43 @@ def changeRAforDutyDay():
 @schedule_bp.route("/api/addNewDuty", methods=["POST"])
 @login_required
 def addNewDuty():
+    # API Method that will add a regularly scheduled duty
+    #  with the assigned RA on the given day.
+    #
+    #  Required Auth Level: >= AHD
+    #
+    #  This method is currently unable to be called from the server.
+    #
+    #  If called from a client, the following parameters are required:
+    #
+    #     dateStr  <int>  -  a string denoting the duty for the user's hall that is
+    #                         to be altered.
+    #     id       <int>  -  an integer representing the ra.id value for the RA that is
+    #                         to be assigned for the given duty.
+    #
+    #  This method returns a standard return object whose status is one of the
+    #  following:
+    #
+    #      1 : the save was successful
+    #      0 : the save was unsuccessful
+    #     -1 : an error occurred while scheduling
+
+    # Get the user's information from the database
     userDict = getAuth()
 
-    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
-        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
-        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
+    # Check to see if the user is authorized to add duties
+    # If the user is not at least an AHD
+    if userDict["auth_level"] < 2:
+        # Then they are not permitted to see this view.
 
+        # Log the occurrence.
+        logging.info("User Not Authorized - RA: {} attempted to add a duty for Hall: {}"
+                     .format(userDict["ra_id"], userDict["hall_id"]))
+
+        # Notify the user that they are not authorized.
+        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+
+    # Load the provdied data from the request json
     data = request.json
 
     logging.debug("New RA id: {}".format(data["id"]))
@@ -798,41 +829,76 @@ def addNewDuty():
     # Expected as x-x-xxxx
     logging.debug("DateStr: {}".format(data["dateStr"]))
 
+    # Create a DB cursor
     cur = ag.conn.cursor()
 
-    cur.execute("SELECT id FROM ra WHERE id = {} AND hall_id = {};".format(data["id"],userDict["hall_id"]))
+    # Query the DB for the given RA
+    cur.execute("SELECT id FROM ra WHERE id = %s AND hall_id = %s;", (data["id"], userDict["hall_id"]))
+
+    # Load the query result
     raId = cur.fetchone()
 
+    # Check to see if we were able to find the given RA in the DB
+    #  for the user's hall.
     if raId is None:
-        ret = stdRet(-1,"Unable to find RA {} in database".format(data["id"]))
+        # If not, then log the occurrence.
+        logging.warning("Add Duty - unable to locate RA: {} for Hall: {}"
+                        .format(data["id"], userDict["hall_id"]))
 
+        # Notify the user and stop processing
+        return jsonify(stdRet(-1, "Chosen RA is not a Valid Selection"))
 
-    cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE('{}', 'YYYY-MM-DD');".format(data["dateStr"]))
-    dayID, monthId = cur.fetchone()
+    # Query the DB for the given day
+    cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE(%s, 'YYYY-MM-DD');", (data["dateStr"],))
 
-    if dayID is None:
-        cur.close()
-        logging.warning("Unable to find day {} in database".format(data["dateStr"]))
-        return stdRet(-1,"Unable to find day {} in database".format(data["dateStr"]))
+    # Load the query results
+    rawDay = cur.fetchone()
 
-    if monthId is None:
-        cur.close()
-        logging.warning("Unable to find month for {} in database".format(data["dateStr"]))
-        return stdRet(-1,"Unable to find month for {} in database".format(data["dateStr"]))
+    # Check to see if we did not find the given day.
+    if rawDay is None:
+        # If we did not, log the occurrence.
+        logging.warning("Add Duty - unable to find Day: {}"
+                        .format(data["dateStr"]))
 
+        # Notify the user and stop processing
+        return jsonify(stdRet(0, "Invalid Date"))
 
-    cur.execute("SELECT id FROM schedule WHERE hall_id = {} AND month_id = {} ORDER BY created DESC, id DESC;".format(userDict["hall_id"],monthId))
+    else:
+        # Otherwise, unpack the query results
+        dayID, monthId = rawDay
+
+    # Query the DB for the schedule that this duty should belong to.
+    cur.execute("SELECT id FROM schedule WHERE hall_id = %s AND month_id = %s ORDER BY created DESC, id DESC;",
+                (userDict["hall_id"], monthId))
+
+    # Load the query results
     schedId = cur.fetchone()
 
-    cur.execute("""INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val)
-                    VALUES ({}, {}, {}, {}, {});""".format(userDict["hall_id"], raId[0], dayID, schedId[0], data["pts"]))
+    # Check to see if we did not find a schedule fitting the day and hall.
+    if schedId is None:
+        # If we did not, log the occurrence.
+        logging.warning("Add Duty - unable to locate schedule for Month: {}, Hall: {}"
+                        .format(monthId, userDict["hall_id"]))
 
+        # Notify the user and stop processing
+        return jsonify(stdRet(0, "Unable to validate schedule."))
+
+    # Execute an INSERT statement to have the duty created in the duties table
+    cur.execute("""INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val)
+                    VALUES (%s, %s, %s, %s, %s);""",
+                (userDict["hall_id"], raId[0], dayID, schedId[0], data["pts"]))
+
+    # Commit the changes to the DB
     ag.conn.commit()
 
+    # Close the DB cursor
     cur.close()
 
     logging.debug("Successfully added new duty")
-    return jsonify(stdRet(1,"successful"))
+
+    # Notify the user that the save was successful
+    return jsonify(stdRet(1, "successful"))
+
 
 @schedule_bp.route("/api/deleteDuty", methods=["POST"])
 @login_required
