@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% block styles %}
 {{ super() }}
-<link rel="stylesheet" href="{{url_for('.static', filename='main.css')}}">
+<link rel="stylesheet" href="{{url_for('static', filename='main.css')}}">
 <link href='https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.13.1/css/all.css' rel='stylesheet'>
-<link rel="stylesheet" href="{{url_for('.static', filename='calendar.css')}}">
-<link rel="stylesheet" href="{{url_for('.static', filename='editSched.css')}}">
+<link rel="stylesheet" href="{{url_for('static', filename='calendar.css')}}">
+<link rel="stylesheet" href="{{url_for('schedule_bp.static', filename='editSched.css')}}">
 
 {% endblock %}
 
@@ -21,7 +21,7 @@
           <div class="row">
               <div class="col-sm-5">
                   <div class="form-group">
-                      <label for"editModalPrevRA">Current Assigned RA</label>
+                      <label for="editModalPrevRA">Current Assigned RA</label>
                       <select id="editModalPrevRA" class="form-control" disabled>
                           {% for ra in raList: %}
                           <option value="{{ ra[1] }} {{ ra[2] }}">{{ ra[1] }} {{ ra[2] }}</option>
@@ -47,7 +47,7 @@
 
           </div>
           <div id="breakDutyWarning" class="row">
-              <div class="col">&#42; Break duties <em>MUST</em> be edited in the <a href="/editBreaks">Break Duty Portal</a>.</div>
+              <div class="col">&#42; Break duties <em>MUST</em> be edited in the <a href="{{url_for('breaks_bp.editBreaks'}}">Break Duty Portal</a>.</div>
           </div>
       </div>
       <div class="modalError">Update Assignment Failed: <span class="msg"></span></div>
@@ -197,12 +197,16 @@
 </div>
 {% endblock %}
 
+{%- block setBlueprintAPIPrefix %}
+var bpAPIPrefix = '/schedule';
+{%- endblock %}
+
 {% block scripts %}
 {{ super() }}
-<script src="{{url_for('.static', filename='main.js')}}"></script>
-<script src="{{url_for('.static', filename='locales-all.js')}}"></script>
-<script src="{{url_for('.static', filename='fullCal.js')}}"></script>
-<script src="{{url_for('.static', filename='editSched.js')}}"></script>
+<script src="{{url_for('static', filename='main.js')}}"></script>
+<script src="{{url_for('static', filename='locales-all.js')}}"></script>
+<script src="{{url_for('static', filename='fullCal.js')}}"></script>
+<script src="{{url_for('schedule_bp.static', filename='editSched.js')}}"></script>
 <script>
     initEditSchedCal();
 </script>
