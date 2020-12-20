@@ -651,7 +651,7 @@ def changeRAforDutyDay():
     #
     #  If called from a client, the following parameters are required:
     #
-    #     dateStr  <int>  -  a string denoting the duty for the user's hall that is
+    #     dateStr  <str>  -  a string denoting the duty for the user's hall that is
     #                         to be altered.
     #     newId    <int>  -  an integer representing the ra.id value for the RA that is
     #                         to be assigned for the given duty.
@@ -794,7 +794,7 @@ def addNewDuty():
     #
     #  If called from a client, the following parameters are required:
     #
-    #     dateStr  <int>  -  a string denoting the duty for the user's hall that is
+    #     dateStr  <str>  -  a string denoting the duty for the user's hall that is
     #                         to be altered.
     #     id       <int>  -  an integer representing the ra.id value for the RA that is
     #                         to be assigned for the given duty.
@@ -903,12 +903,43 @@ def addNewDuty():
 @schedule_bp.route("/api/deleteDuty", methods=["POST"])
 @login_required
 def daleteDuty():
+    # API Method that will add a regularly scheduled duty
+    #  with the assigned RA on the given day.
+    #
+    #  Required Auth Level: >= AHD
+    #
+    #  This method is currently unable to be called from the server.
+    #
+    #  If called from a client, the following parameters are required:
+    #
+    #     dateStr  <str>  -  a string denoting the duty for the user's hall that is
+    #                         to be altered.
+    #     raName   <str>  -  a string containing the name of the RA that is currently
+    #                         on duty for the given day.
+    #
+    #  This method returns a standard return object whose status is one of the
+    #  following:
+    #
+    #      1 : the save was successful
+    #      0 : the save was unsuccessful
+    #     -1 : an error occurred while scheduling
+
+    # Get the user's information from the database
     userDict = getAuth()
 
-    if userDict["auth_level"] < 2:                                              # If the user is not at least an AHD
-        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
-        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
+    # Check to see if the user is authorized to delete duties
+    # If the user is not at least an AHD
+    if userDict["auth_level"] < 2:
+        # Then they are not permitted to see this view.
 
+        # Log the occurrence.
+        logging.info("User Not Authorized - RA: {} attempted to delete duty for Hall: {}"
+                     .format(userDict["ra_id"], userDict["hall_id"]))
+
+        # Notify the user that they are not authorized.
+        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+
+    # Load the data from the request json
     data = request.json
 
     logging.debug("Deleted Duty RA Name: {}".format(data["raName"]))
@@ -916,36 +947,79 @@ def daleteDuty():
     # Expected as x-x-xxxx
     logging.debug("DateStr: {}".format(data["dateStr"]))
 
+    # Split the old RA's name into its two DB components
     fName, lName = data["raName"].split()
 
+    # Create a DB cursor
     cur = ag.conn.cursor()
 
-    cur.execute("SELECT id FROM ra WHERE first_name LIKE '{}' AND last_name LIKE '{}' AND hall_id = {};".format(fName,lName,userDict["hall_id"]))
+    # Query the DB for the given RA
+    cur.execute("SELECT id FROM ra WHERE first_name LIKE %s AND last_name LIKE %s AND hall_id = %s;",
+                (fName, lName, userDict["hall_id"]))
+
+    # Load the query results
     raId = cur.fetchone()
 
-    cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE('{}', 'MM/DD/YYYY');".format(data["dateStr"]))
-    dayID, monthId = cur.fetchone()
+    # Check to see if we did not find an RA for the user's Hall.
+    if raId is None:
+        # If we did not, log the occurrence.
+        logging.warning("Delete Duty - unable to locate RA: {} {} for Hall: {}"
+                        .format(fName, lName, userDict["hall_id"]))
 
-    cur.execute("SELECT id FROM schedule WHERE hall_id = {} AND month_id = {} ORDER BY created DESC, id DESC;".format(userDict["hall_id"],monthId))
-    schedId = cur.fetchone()
+        # Notify the user and stop processing
+        return jsonify(stdRet(0, "Unable to Verify Previously Assigned RA."))
 
-    if raId is not None and dayID is not None and schedId is not None:
-        cur.execute("""DELETE FROM duties
-                        WHERE ra_id = {}
-                        AND hall_id = {}
-                        AND day_id = {}
-                        AND sched_id = {}""".format(raId[0], userDict["hall_id"], dayID, schedId[0]))
+    # Query the DB to find the day the duty belongs to
+    cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE(%s, 'MM/DD/YYYY');", (data["dateStr"]))
 
-        ag.conn.commit()
+    # Load the query results
+    rawDay = cur.fetchone()
 
-        cur.close()
+    # Check to see if we did not find the given day.
+    if rawDay is None:
+        # If we did not, log the occurrence.
+        logging.warning("Delete Duty - unable to find Day: {}"
+                        .format(data["dateStr"]))
 
-        logging.info("Successfully deleted duty")
-        return jsonify(stdRet(1,"successful"))
+        # Notify the user and stop processing
+        return jsonify(stdRet(0, "Invalid Date"))
 
     else:
+        # Otherwise, unpack the query results
+        dayID, monthId = rawDay
 
-        cur.close()
+    # Query the DB for the schedule that the duty belongs to
+    cur.execute("SELECT id FROM schedule WHERE hall_id = %s AND month_id = %s ORDER BY created DESC, id DESC;",
+                (userDict["hall_id"], monthId))
 
-        logging.info("Unable to locate duty to delete")
-        return jsonify({"status":0,"error":"Unable to find parameters in DB"})
+    # Load the result from the DB
+    schedId = cur.fetchone()
+
+    # Check to see if we did not find a schedule fitting the day and hall.
+    if schedId is None:
+        # If we did not, log the occurrence.
+        logging.warning("Delete Duty - unable to locate schedule for Month: {}, Hall: {}"
+                        .format(monthId, userDict["hall_id"]))
+
+        # Notify the user and stop processing
+        return jsonify(stdRet(0, "Unable to validate schedule."))
+
+    # Execute DELETE statement to remove the provided duty from the DB
+    cur.execute("""DELETE FROM duties
+                    WHERE ra_id = %s
+                    AND hall_id = %s
+                    AND day_id = %s
+                    AND sched_id = %s""",
+                (raId[0], userDict["hall_id"], dayID, schedId[0]))
+
+    # Commit the changes to the DB
+    ag.conn.commit()
+
+    # Close the DB cursor
+    cur.close()
+
+    logging.info("Successfully deleted Duty: {} for Hall: {}"
+                 .format(data["dateStr"], userDict["hall_id"]))
+
+    # Notify the user that the delete was successful
+    return jsonify(stdRet(1, "successful"))
