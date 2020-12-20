@@ -1,6 +1,6 @@
-import unittest
+from schedule.ra_sched import Day, RA
 from datetime import date
-from ra_sched import Day, RA
+import unittest
 
 class TestDayObject(unittest.TestCase):
     def setUp(self):

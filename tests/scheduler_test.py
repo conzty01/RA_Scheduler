@@ -1,9 +1,8 @@
-import unittest
-from scheduler3_0 import schedule
-from ra_sched import Schedule, Day, RA
+from schedule.scheduler4_0 import schedule
+from schedule.ra_sched import Schedule, RA
 from datetime import date
+import unittest
 import random
-import calendar
 
 class TestScheduler(unittest.TestCase):
     def setUp(self):

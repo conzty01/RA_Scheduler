@@ -1,7 +1,7 @@
+from schedule.ra_sched import RA
+from datetime import date
 import unittest
 import random
-from datetime import date
-from ra_sched import RA
 
 class TestRAObject(unittest.TestCase):
     def setUp(self):
