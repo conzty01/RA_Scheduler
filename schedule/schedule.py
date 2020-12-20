@@ -1,8 +1,8 @@
 from flask import render_template, request, jsonify, Blueprint
 from flask_login import login_required
 from psycopg2 import IntegrityError
+from schedule import scheduler4_0
 from schedule.ra_sched import RA
-import scheduler4_0
 import copy as cp
 import calendar
 import logging
