@@ -381,8 +381,8 @@ def runScheduler():
             ) AS cons
         ON (ra.id = cons.ra_id)
         WHERE ra.hall_id = %s
-        AND ra.auth_level < 3 %s
-    """, (monthId, hallId, eligibleRAStr))
+        AND ra.auth_level < 3 {}
+    """.format(eligibleRAStr), (monthId, hallId))
 
     # Load the result from the DB
     partialRAList = cur.fetchall()
@@ -465,7 +465,7 @@ def runScheduler():
                   )
                   
                   AND day.date >= TO_DATE(%s,'YYYY-MM-DD') - %s
-                  AND day.date <= TO_DATE('{}-{}-01','YYYY-MM-DD') - 1
+                  AND day.date <= TO_DATE(%s,'YYYY-MM-DD') - 1
                   ORDER BY day.date ASC;
     """, (endMonthStr + "-01", hallId, hallId, startMonthStr, endMonthStr,
           endMonthStr + "-01", ldat, endMonthStr + "-01"))
@@ -970,7 +970,7 @@ def daleteDuty():
         return jsonify(stdRet(0, "Unable to Verify Previously Assigned RA."))
 
     # Query the DB to find the day the duty belongs to
-    cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE(%s, 'MM/DD/YYYY');", (data["dateStr"]))
+    cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE(%s, 'MM/DD/YYYY');", (data["dateStr"],))
 
     # Load the query results
     rawDay = cur.fetchone()
