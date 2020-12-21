@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% block styles %}
 {{ super() }}
-<link rel="stylesheet" href="{{url_for('.static', filename='main.css')}}">
+<link rel="stylesheet" href="{{url_for('static', filename='main.css')}}">
 <link href='https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.13.1/css/all.css' rel='stylesheet'>
-<link rel="stylesheet" href="{{url_for('.static', filename='calendar.css')}}">
-<link rel="stylesheet" href="{{url_for('.static', filename='editCons.css')}}">
+<link rel="stylesheet" href="{{url_for('static', filename='calendar.css')}}">
+<link rel="stylesheet" href="{{url_for('conflicts_bp.static', filename='editCons.css')}}">
 {% endblock %}
 
 {% block contentRows %}
@@ -69,10 +69,10 @@
 
 {% block scripts %}
 {{ super() }}
-<script src="{{url_for('.static', filename='main.js')}}"></script>
-<script src="{{url_for('.static', filename='locales-all.js')}}"></script>
-<script src="{{url_for('.static', filename='fullCal.js')}}"></script>
-<script src="{{url_for('.static', filename='editCons.js')}}"></script>
+<script src="{{url_for('static', filename='main.js')}}"></script>
+<script src="{{url_for('static', filename='locales-all.js')}}"></script>
+<script src="{{url_for('static', filename='fullCal.js')}}"></script>
+<script src="{{url_for('conflicts_bp.static', filename='editCons.js')}}"></script>
 <script>
     initEditConsCal();
     getNumberConflicts();
