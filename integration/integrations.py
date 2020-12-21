@@ -102,7 +102,7 @@ def createGoogleCalendar(calInfoId):
 # --   Integration Process Methods   --
 # -------------------------------------
 
-@integration_bp.route("/int/GCalRedirect", methods=["GET"])
+@integration_bp.route("/GCalRedirect", methods=["GET"])
 @login_required
 def returnGCalRedirect():
     # API Method that initializes the process for connecting a Google
@@ -176,7 +176,7 @@ def returnGCalRedirect():
     return redirect(authURL)
 
 
-@integration_bp.route("/int/GCalAuth", methods=["GET"])
+@integration_bp.route("/GCalAuth", methods=["GET"])
 @login_required
 def handleGCalAuthResponse():
     # API Method that handles the Google Calendar authorization response
@@ -289,7 +289,7 @@ def handleGCalAuthResponse():
     return redirect(url_for("hall_bp.manHall"))
 
 
-@integration_bp.route("/int/disconnectGCal", methods=["GET"])
+@integration_bp.route("/disconnectGCal", methods=["GET"])
 @login_required
 def disconnectGoogleCalendar():
     # API Method that disconnect the Google Calendar for the requesting
