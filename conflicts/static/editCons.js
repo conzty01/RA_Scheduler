@@ -31,7 +31,7 @@ function initEditConsCal() {
             right: ''
         },
         events: {
-            url: '/api/getRAConflicts',
+            url: '/conflicts/api/getRAConflicts',
             failure: function () {
                 alert('there was an error while fetching events!');
             },
