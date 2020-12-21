@@ -613,7 +613,7 @@ def processConflicts():
                             SELECT conflicts.day_id
                             FROM conflicts
                                 JOIN day ON (conflicts.day_id = day.id)
-                            WHERE TO_CHAR(day.date, 'YYYY-MM-DD') IN (%s)
+                            WHERE TO_CHAR(day.date, 'YYYY-MM-DD') IN %s
                             AND conflicts.ra_id = %s
                         );""", (tuple(deleteSet), userDict["ra_id"]))
 
@@ -626,7 +626,7 @@ def processConflicts():
         #  previously entered in the DB.
         cur.execute("""INSERT INTO conflicts (ra_id, day_id)
                         SELECT %s, day.id FROM day
-                        WHERE TO_CHAR(day.date, 'YYYY-MM-DD') IN (%s)
+                        WHERE TO_CHAR(day.date, 'YYYY-MM-DD') IN %s
                         """, (userDict["ra_id"], tuple(addSet)))
 
     # Commit the changes to the DB
