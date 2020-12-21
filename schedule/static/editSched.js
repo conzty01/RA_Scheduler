@@ -507,7 +507,7 @@ function exportSchedule() {
                     $("body").css("cursor", "auto");
                 });
             }, "GET", function(msg) {passModalSave("#exportModal", msg)},
-            "int");
+            "/int");
     }
 }
 
