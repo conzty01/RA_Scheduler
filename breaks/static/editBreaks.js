@@ -35,7 +35,7 @@ function initEditSchedCal() {
             right: 'addEventButton'
         },
         events: {
-            url: '/api/getBreakDuties',
+            url: 'api/getBreakDuties',
             failure: function () {
                 alert('there was an error while fetching events!');
             },
@@ -251,6 +251,42 @@ function updateBDCount(bkDict) {
     }
 }
 
+function saveModal() {
+    let selRAOption = document.getElementById("editModalNextRA").selectedOptions[0];
+
+    let dateStr = document.getElementById("editModalLongTitle").textContent;
+
+    let oldName = document.getElementById("editModalPrevRA").selectedOptions[0].value;
+
+    let newColor = selRAOption.value;
+    let newName = selRAOption.text;
+    // id = "selector_xxxxxx"
+    // There are 9 characters before the id
+    let newId = parseInt(selRAOption.id.slice(9));
+
+    // If the new RA is different than the current RA,
+    if (oldName !== newName) {
+        // Save the changes
+        console.log(dateStr+": Switching RA '"+oldName+"' for '"+newName+"'");
+
+        let changeParams = {
+            dateStr: dateStr,
+            newId: newId,
+            oldName: oldName
+        }
+
+        appConfig.base.callAPI("changeBreakDuty", changeParams,
+            function(msg) {
+                passModalSave('#editModal',msg);
+            }, "POST",
+            function(msg) {passModalSave("#editModal", {status:-1,msg:msg})});
+
+    } else {
+        // No change -- do nothing
+        console.log(dateStr+": No change detected - Nothing to save");
+
+    }
+}
 
 function passModalSave(modalId, msg, extraWork=() => {}) {
 

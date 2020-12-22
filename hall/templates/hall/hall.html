@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% block styles %}
 {{ super() }}
-<link rel="stylesheet" href="{{url_for('.static', filename='calendar.css')}}">
-<link rel="stylesheet" href="{{url_for('.static', filename='hall.css')}}">
+<link rel="stylesheet" href="{{url_for('static', filename='calendar.css')}}">
+<link rel="stylesheet" href="{{url_for('hall_bp.static', filename='hall.css')}}">
 {% endblock %}
 
 {% block contentRows %}
@@ -11,7 +11,7 @@
   <div class="modal-dialog modal-dialog" role="document">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 class="modal-title">Edit Setting: <span id="modalTitle" style="font-weight:bold;"><span></h3>
+        <h3 class="modal-title">Edit Setting: <span id="modalTitle" style="font-weight:bold;"></span></h3>
       </div>
       <form id="editSettingForm" class="modal-body">
           <div class="form-group form-row">
@@ -61,7 +61,11 @@
 </div>
 {% endblock %}
 
+{%- block setBlueprintAPIPrefix %}
+var bpAPIPrefix = '/hall';
+{%- endblock %}
+
 {% block scripts %}
 {{ super() }}
-<script src="{{url_for('.static', filename='hall.js')}}"></script>
+<script src="{{url_for('hall_bp.static', filename='hall.js')}}"></script>
 {% endblock %}

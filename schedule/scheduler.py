@@ -1,5 +1,5 @@
 from datetime import date
-from ra_sched import Schedule, Day
+from schedule.ra_sched import Schedule, Day
 import random
 import calendar                                                                 # Only needed for oldScheduling()
 

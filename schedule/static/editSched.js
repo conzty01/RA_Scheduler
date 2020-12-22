@@ -44,7 +44,7 @@ function initEditSchedCal() {
         },
         eventSources: [
             {
-                url: '/api/getSchedule',
+                url: '/schedule/api/getSchedule',
                 failure: function () {
                     alert('there was an error while fetching Regular Duties!');
                 },
@@ -57,7 +57,7 @@ function initEditSchedCal() {
                 },
             },
             {
-                url: '/api/getBreakDuties',
+                url: '/breaks/api/getBreakDuties',
                 failure: function () {
                     alert('there was an error while fetching Break Duties!');
                 },
@@ -427,7 +427,7 @@ function getPoints() {
         end: endYear.toString() + '-06-01'
     }
 
-    appConfig.base.callAPI("getStats", params, updatePoints, "GET");
+    appConfig.base.callAPI("getStats", params, updatePoints, "GET", null, "/staff");
 
 }
 
@@ -506,7 +506,8 @@ function exportSchedule() {
                     document.getElementById("exportBut").disabled = false;
                     $("body").css("cursor", "auto");
                 });
-            }, "GET", function(msg) {passModalSave("#exportModal", msg)});
+            }, "GET", function(msg) {passModalSave("#exportModal", msg)},
+            "/int");
     }
 }
 
