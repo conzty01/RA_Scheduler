@@ -23,8 +23,7 @@ This endpoint will render and return the `editBreaks.html` template which inheri
 
 ## API Methods
 The following are the API methods which are available in this 
-blueprint. All API methods can be reached via a standard HTTP
-call to their 
+blueprint.
 
 
 ### /getRABreakStats
