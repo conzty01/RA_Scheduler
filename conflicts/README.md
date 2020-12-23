@@ -188,5 +188,5 @@ If called from a client, the following parameters are required:
 This method returns a standard return object whose status is one of the
 following:
 
- 1 : the save was successful
--1 : the save was unsuccessful
+ 1 : the save was successful <br />
+-1 : the save was unsuccessful <br />
