@@ -10,7 +10,7 @@ Blueprint API Location: `/breaks/api/...` <br />
 ## Views
 The following are the views which are available in this blueprint.
 
-### /editBreaks
+### [/editBreaks](https://localhost:5000/breaks/editBreaks)
 The landing page for this blueprint that will display a calendar which
 users can interact with to view, add, edit, and remove break duties.
 RA break duty statistics will also be displayed in a side panel for the
@@ -26,7 +26,7 @@ The following are the API methods which are available in this
 blueprint.
 
 
-### /getRABreakStats
+### [/getRABreakStats](https://localhost:5000/breaks/api/getRABreakStats)
 API Method that will calculate a staff's RA Break Duty statistics for the given
 time period. This method does not calculate the number of points an RA has
 due to breaks, but rather counts the number of break duties the RA has been
@@ -66,7 +66,7 @@ This method returns an object with the following specifications:
 ```
 
 
-### /getBreakDuties
+### [/getBreakDuties](https://localhost:5000/breaks/api/getBreakDuties)
 API Method that will calculate a staff's RA Break Duty statistics for the given
 time period. This method does not calculate the number of points an RA has
 due to breaks, but rather counts the number of break duties the RA has been
@@ -113,7 +113,7 @@ This method returns an object with the following specifications:
 ```
 
 
-### /addBreakDuty
+### [/addBreakDuty](https://localhost:5000/breaks/api/addBreakDut)
 API Method that adds a break duty into the client's Res Hall's schedule 
 on the desired date.
 
@@ -138,7 +138,7 @@ following:
 -1 : the save was unsuccessful <br />
 
 
-### /deleteBreakDuty
+### [/deleteBreakDuty](https://localhost:5000/breaks/api/deleteBreakDuty)
 API Method that removes the desired break duty from the client's Res Hall's schedule.
 
 Required Auth Level (Role): _**≥ AHD**_ <br />
@@ -161,7 +161,7 @@ following:
 -1 : the save was unsuccessful <br />
 
 
-### /changeBreakDuty
+### [/changeBreakDuty](https://localhost:5000/breaks/api/changeBreakDuty)
 API Method that changes the RA assigned to a given break duty
 in the client's Res Hall's schedule from one RA on their staff
 to another.
