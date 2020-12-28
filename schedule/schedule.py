@@ -903,8 +903,8 @@ def addNewDuty():
 @schedule_bp.route("/api/deleteDuty", methods=["POST"])
 @login_required
 def daleteDuty():
-    # API Method that will add a regularly scheduled duty
-    #  with the assigned RA on the given day.
+    # API Method that will delete a regularly scheduled duty
+    #  with the given RA and day.
     #
     #  Required Auth Level: >= AHD
     #
