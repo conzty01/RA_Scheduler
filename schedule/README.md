@@ -1,7 +1,6 @@
 # Schedule Module
 This directory contains a Flask Blueprint that handles 
-all of the functionality regarding Duty Scheduling and
-Duty Statistics
+all of the functionality regarding Duty Scheduling.
 
 Template Folder: `./templates` <br />
 Static Folder: `./static` <br />
