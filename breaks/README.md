@@ -4,6 +4,7 @@ functionality regarding Break Duties.
 
 Template Folder: `./templates` <br />
 Static Folder: `./static` <br />
+Test Folder: `./tests` <br />
 Blueprint Prefix: `/breaks/...` <br />
 Blueprint API Location: `/breaks/api/...` <br />
 
