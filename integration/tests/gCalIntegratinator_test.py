@@ -1,4 +1,4 @@
-from gCalIntegration import gCalIntegratinator, Event
+from integration.gCalIntegration import gCalIntegratinator, Event
 from googleapiclient.errors import HttpError
 from unittest.mock import MagicMock, patch
 import unittest
@@ -19,12 +19,12 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
                                       "JAVASCRIPT_ORIGINS": "TEST5,TEST6"}
 
         # Create a dictionary patcher for the os.environ method
-        self.patcher_os = patch.dict("gCalIntegration.os.environ", self.helper_osEnviron)
+        self.patcher_os = patch.dict("integration.gCalIntegration.os.environ", self.helper_osEnviron)
 
-        self.patcher_flow = patch("gCalIntegration.google_auth_oauthlib.flow.Flow", autospec=True)
+        self.patcher_flow = patch("integration.gCalIntegration.google_auth_oauthlib.flow.Flow", autospec=True)
 
         # Create the patcher for the googleapiclient
-        self.patcher_build = patch("gCalIntegration.build", autospec=True)
+        self.patcher_build = patch("integration.gCalIntegration.build", autospec=True)
 
         # Start the os patcher (No mock object is returned since we used patch.dict()
         self.patcher_os.start()
