@@ -35,7 +35,7 @@ algorithm. For this application, you will need:
 Here is a step by step series of examples that tells 
 you how to get the development environment up and running.
 
-Installing PostgreSQL
+#### Installing PostgreSQL
 
 ```
 $ sudo apt-get update
@@ -46,13 +46,13 @@ Follow the prompts to create a role for yourself. I
 suggest creating a role that is the same name as your 
 username and making yourself a superuser.
 
-Installing Python
+#### Installing Python
 
 ```
 $ sudo apt-get install python3.5
 ```
 
-Installing VirtualEnv
+#### Installing VirtualEnv
 
 ```
 $ sudo pip install virtualenv
@@ -68,10 +68,12 @@ With all of the above prerequisites installed, you should
 be able to run
 ```
 $ python createDB.py
+$ python populateDB.py
 $ python scheduleServer.py
 ```
-to start the Flask server. You can then open the browser 
-of your choice and go to `localhost:5000/`.
+to create the Database, populate it with some starting data,
+and start the Flask server. You can then open the browser 
+of your choice and navigate to `localhost:5000/`.
 
 
 ## Running the tests
