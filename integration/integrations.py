@@ -1,5 +1,5 @@
 from flask import request, jsonify, redirect, url_for, Blueprint
-from gCalIntegration import gCalIntegratinator
+from integration.gCalIntegration import gCalIntegratinator
 from flask_login import login_required
 from calendar import monthrange
 from io import BytesIO
