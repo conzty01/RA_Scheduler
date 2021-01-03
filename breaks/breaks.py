@@ -1,7 +1,6 @@
 from flask import render_template, request, jsonify, Blueprint
 from flask_login import login_required
 import logging
-import os
 
 # Import the appGlobals for this blueprint to use
 import appGlobals as ag
@@ -62,7 +61,7 @@ def editBreaks():
 
     # Render and return the appropriate template
     return render_template("breaks/editBreaks.html", raList=cur.fetchall(), auth_level=userDict["auth_level"],
-                           bkDict=sorted(bkDict.items(), key=lambda x: x[1]["name"].split(" ")[1] ),
+                           bkDict=sorted(bkDict.items(), key=lambda x: x[1]["name"].split(" ")[1]),
                            curView=3, opts=ag.baseOpts, hall_name=userDict["hall_name"])
 
 
