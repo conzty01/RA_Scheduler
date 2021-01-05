@@ -166,7 +166,7 @@ class TestBreakBP_editBreaks(unittest.TestCase):
         )
 
     @patch("breaks.breaks.getRABreakStats", autospec=True)
-    def test_WithAuthorizedAHDUser_RendersAppropriateTemplate(self, mocked_getRABreakStats):
+    def test_WithAuthorizedHDUser_RendersAppropriateTemplate(self, mocked_getRABreakStats):
         # Test to ensure that when an HD that is authorized to view the
         #  Edit Breaks Portal navigates to the page, they are able to see
         #  a rendered template of the portal. An authorized user is a user
@@ -219,7 +219,7 @@ class TestBreakBP_editBreaks(unittest.TestCase):
 
     @patch("breaks.breaks.getRABreakStats", autospec=True)
     @patch("breaks.breaks.render_template", autospec=True)
-    def test_WithAuthorizedAHDUser_RendersAppropriateTemplate(self, mocked_renderTemplate, mocked_getRABreakStats):
+    def test_WithAuthorizedAHDUser_PassesExpectedDataToRenderer(self, mocked_renderTemplate, mocked_getRABreakStats):
         # Test to ensure that when a user that is authorized to view the
         #  Edit Breaks Portal navigates to the page, the expected information
         #  is being passed to the render_template function. An authorized user
