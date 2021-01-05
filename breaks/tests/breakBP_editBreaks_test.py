@@ -6,9 +6,6 @@ import unittest
 from helperFunctions.helperFunctions import stdRet, getCurSchoolYear
 
 
-# TODO: These tests do not assert what data is being passed to the
-#        render_template function as
-
 class TestBreakBP_editBreaks(unittest.TestCase):
     def setUp(self):
         # Set up a number of items that will be used for these tests.
