@@ -325,7 +325,7 @@ def addBreakDuty():
     #
     #     id       <int> -  an integer representing the ra.id for the RA that should
     #                        be assigned to the break duty.
-    #     pts      <int> -  an integer represnting how many points the new break duty
+    #     pts      <int> -  an integer representing how many points the new break duty
     #                        should be worth.
     #     dateStr  <str> -  a string representing the date that the break duty should
     #                        occur on.
