@@ -6,7 +6,6 @@ import unittest
 class TestBreakBP_getBreakDuties(unittest.TestCase):
     def setUp(self):
         app.config["TESTING"] = True
-        app.config[""]
         # Mock appGlobals
         # Mock getCurSchoolYear
         # Mock getAuth
