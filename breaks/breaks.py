@@ -302,6 +302,9 @@ def getBreakDuties(hallId=None, start=None, end=None, showAllColors=False, raId=
             "color": c,
             "extendedProps": {"dutyType": "brk"}
         })
+    
+    # Close the DB cursor
+    cur.close()
 
     # If this API method was called from the server
     if fromServer:
