@@ -616,7 +616,7 @@ def changeBreakDuty():
 
     # Query the DB for the RA that is desired to be on the duty. This query also helps
     #  to ensure that the requested RA is on the same staff as the client.
-    cur.execute("SELECT id, first_name, last_name, color FROM ra WHERE id = %s AND hall_id = %s;",
+    cur.execute("SELECT id FROM ra WHERE id = %s AND hall_id = %s;",
                 (data["newId"], userDict["hall_id"]))
 
     # Load the results from the DB
