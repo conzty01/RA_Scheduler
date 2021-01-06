@@ -651,7 +651,7 @@ def changeBreakDuty():
         logging.warning("Unable to find all necessary Break Duty parameters for in database.")
 
         # Notify the client of the issue
-        return jsonify(stdRet(0, "Unable to find all necessary Break Duty parameters for in database."))
+        return jsonify(stdRet(0, "Unable to find all necessary Break Duty parameters in database."))
 
     # Otherwise, if we have all the necessary pieces,
     #  go ahead and update the appropriate break duty
