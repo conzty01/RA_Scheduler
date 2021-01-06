@@ -341,7 +341,7 @@ class TestBreakBP_changeBreakDuty(unittest.TestCase):
         self.mocked_appGlobals.conn.cursor().close.assert_called_once()
 
     def test_whenPassedInvalidNewRA_returnsInvalidParamsResponse(self):
-        # Test to ensure that when the new RA' id is provided to the endpoint,
+        # Test to ensure that when the new RA's id is provided to the endpoint,
         #  a check is done to ensure that a ra record exists and that it belongs
         #  to the same hall as the user. If at least one of these criteria are not
         #  met, then we expect to receive an "Unable to find all necessary Break
