@@ -70,12 +70,16 @@ class TestBreakBP_addBreakDuty(unittest.TestCase):
         # We then set the auth_level mock to return the __eq__ Mock
         self.mocked_authLevel.__eq__ = self.mocked_authLevel_ltMock
 
+        # Set the ra_id and hall_id to values that can be used throughout
+        self.user_ra_id = 1
+        self.user_hall_id = 1
+
         # Assemble all of the desired values into a dict object.
         self.helper_getAuth = {
             "uEmail": "test@email.com",
-            "ra_id": 1,
+            "ra_id": self.user_ra_id,
             "name": "Test User",
-            "hall_id": 1,
+            "hall_id": self.user_hall_id,
             "auth_level": self.mocked_authLevel,
             "hall_name": "Test Hall"
         }
@@ -135,17 +139,24 @@ class TestBreakBP_addBreakDuty(unittest.TestCase):
 
         # Configure the appGlobals.conn.cursor.execute mock to return different values
         #  after subsequent calls.
+        retRAID = 3
+        retMonthID = 5
+        retDayID = 365
         self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
-            (1,),  # First call returns raID
-            (1, 1)  # Second call returns the dayID and monthID
+            (retRAID,),  # First call returns raID
+            (retDayID, retMonthID)  # Second call returns the dayID and monthID
         ]
+
+        # Set the desired point value
+        pointVal = 15
 
         # -- Act --
 
+        # Make a request to the desired API endpoint
         resp = self.server.post("/breaks/api/addBreakDuty",
                                 json=dict(
-                                    id=1,
-                                    pts=1,
+                                    id=retRAID,
+                                    pts=pointVal,
                                     dateStr="2021-01-05"
                                 ),
                                 base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
@@ -161,7 +172,7 @@ class TestBreakBP_addBreakDuty(unittest.TestCase):
         self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
             """INSERT INTO break_duties (ra_id, hall_id, month_id, day_id, point_val)
                     VALUES (%s, %s, %s, %s, %s);""",
-            (1, 1, 1, 1, 1)
+            (retRAID, self.user_hall_id, retMonthID, retDayID, pointVal)
         )
 
         # Assert that appGlobals.conn.commit was called once
@@ -194,11 +205,6 @@ class TestBreakBP_addBreakDuty(unittest.TestCase):
 
         # Make a request to the desired API endpoint
         resp = self.server.post("/breaks/api/addBreakDuty",
-                                data=dict(
-                                    id=1,
-                                    pts=1,
-                                    dateStr="2021-01-05"
-                                ),
                                 base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
 
         # -- Assert --
@@ -216,19 +222,168 @@ class TestBreakBP_addBreakDuty(unittest.TestCase):
         self.mocked_appGlobals.conn.cursor().execute.assert_not_called()
 
     def test_WhenPassedInvalidRA_returnsInvalidRAResult(self):
+        # Test to ensure that when an RA id that is not considered
+        #  valid is passed to the API endpoint, that the client is
+        #  notified that the RA selection was invalid. An invalid
+        #  RA id meets one or more of the following criteria:
+        #
+        #   - The provided RA id is not associated with an RA record
+        #      in the database.
+        #   - The provided RA id is not associated with an RA that
+        #      belongs to the same hall as the requesting user.
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 2
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            None
+        ]
+
+        # Set the desired point value and RA's ID
+        pointVal = 15
+        raID = 3
+
         # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.post("/breaks/api/addBreakDuty",
+                                json=dict(
+                                    id=raID,
+                                    pts=pointVal,
+                                    dateStr="2021-01-05"
+                                ),
+                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that the last time appGlobals.conn.cursor().execute was called,
+        #  it was a query for the RA.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
+            "SELECT id FROM ra WHERE id = %s AND hall_id = %s;",
+            (raID, self.user_hall_id)
+        )
+
+        # Assert that we received the expected response
+        self.assertEqual(resp.json, stdRet(0, "Unable to find RA: {} in Hall: {}"
+                                           .format(raID, self.user_hall_id)))
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
 
     def test_WhenPassedInvalidDay_returnsInvalidDayResult(self):
+        # Test to ensure that when a date is provided to the endpoint,
+        #  a check is done to ensure that a day record exists for that
+        #  date. If one does not exist, then we would expect to receive
+        #  an "unable to find day" result.
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 2
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        desiredRAID = 3
+        desiredMonthID = 1
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (desiredRAID,),  # First call returns raID
+            (None, desiredMonthID)  # Second call returns the dayID and monthID
+        ]
+
+        # Set the desired point value and the dateStr
+        pointVal = 11
+        dateStr = "2021-01-06"
+
         # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.post("/breaks/api/addBreakDuty",
+                                json=dict(
+                                    id=desiredRAID,
+                                    pts=pointVal,
+                                    dateStr=dateStr
+                                ),
+                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that the last time appGlobals.conn.cursor().execute was called,
+        #  it was a query for the Day record.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
+            "SELECT id, month_id FROM day WHERE date = TO_DATE(%s, 'YYYY-MM-DD');",
+            (dateStr,)
+        )
+
+        # Assert that we received the expected response
+        self.assertEqual(resp.json, stdRet(-1, "Unable to find day {} in database"
+                                           .format(dateStr)))
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
 
     def test_WhenPassedInvalidMonth_returnsInvalidMonthResult(self):
+        # Test to ensure that when a date is provided to the endpoint,
+        #  a check is done to ensure that a month record exists for that
+        #  date. If one does not exist, then we would expect to receive
+        #  an "unable to find month" result.
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 2
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        desiredRAID = 18
+        desiredDayID = 42
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (desiredRAID,),  # First call returns raID
+            (desiredDayID, None)  # Second call returns the dayID and monthID
+        ]
+
+        # Set the desired point value and the dateStr
+        pointVal = 16
+        dateStr = "2021-01-06"
+
         # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.post("/breaks/api/addBreakDuty",
+                                json=dict(
+                                    id=desiredRAID,
+                                    pts=pointVal,
+                                    dateStr=dateStr
+                                ),
+                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that the last time appGlobals.conn.cursor().execute was called,
+        #  it was a query for the Day record.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
+            "SELECT id, month_id FROM day WHERE date = TO_DATE(%s, 'YYYY-MM-DD');",
+            (dateStr,)
+        )
+
+        # Assert that we received the expected response
+        self.assertEqual(resp.json, stdRet(-1, "Unable to find month for {} in database"
+                                           .format(dateStr)))
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
