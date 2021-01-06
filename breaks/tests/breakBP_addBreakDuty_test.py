@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 from scheduleServer import app
 import unittest
 
-from helperFunctions.helperFunctions import stdRet, getCurSchoolYear
+from helperFunctions.helperFunctions import stdRet
 
 
 class TestBreakBP_addBreakDuty(unittest.TestCase):
