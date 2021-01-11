@@ -3,7 +3,7 @@ from scheduleServer import app
 import unittest
 
 
-class TestConflictBP_getConflicts(unittest.TestCase):
+class TestConflictBP_getUserConflicts(unittest.TestCase):
     def setUp(self):
         # Set up a number of items that will be used for these tests.
 
@@ -117,29 +117,129 @@ class TestConflictBP_getConflicts(unittest.TestCase):
     # ------------------------------
     # -- Called from Client Tests --
     # ------------------------------
-    def test_whenCalledFromClient_returnConflictsInExpectedJSONFormat(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
+    def test_whenPassedValidParams_returnConflictsInExpectedJSONFormat(self):
+        # Test to ensure that, when this API is called and passed valid params,
+        #  the response contains conflicts that are returned in the expected
+        #  JSON format.
+        #
+        #   monthNum  <int>  -  an integer representing the numeric month number for
+        #                        the desired month using the standard gregorian
+        #                        calendar convention.
+        #   year      <int>  -  an integer denoting the year for the desired time period
+        #                        using the standard gregorian calendar convention.
 
-    def test_whenCalledFromClient_whenNoMonthExistsInDB_returnEmptyConflictList(self):
         # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
 
-    # ------------------------------
-    # -- Called from Server Tests --
-    # ------------------------------
-    def test_whenCalledFromServer_returnsConflictsInExpectedFormat(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
 
-    def test_whenCalledFromServer_returnsEmptyConflictList(self):
-        # -- Arrange --
+        # Set various values to be used in the test
+        desiredMonthNum = "01"
+        desiredYear = "2021"
+
+        desiredMonthID = 68
+
+        expectedConflicts = [(str("2020-01-{:02}".format(i)),) for i in range(5)]
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        # Fetchone() config
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            [desiredMonthID],  # First call returns the desired month.id
+        ]
+
+        # Fetchall() config
+        self.mocked_appGlobals.conn.cursor().fetchall.side_effect = [
+            expectedConflicts  # First call returns the conflicts
+        ]
+
         # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/conflicts/api/getUserConflicts",
+                               query_string=dict(
+                                   monthNum=desiredMonthNum,
+                                   year=desiredYear
+                               ),
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that the when the appGlobals.conn.cursor().execute was called,
+        #  it was a select statement. Since this line is using triple-quote strings,
+        #  the whitespace must match exactly.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
+            """SELECT TO_CHAR(day.date, 'YYYY-MM-DD')
+                   FROM conflicts JOIN day ON (conflicts.day_id = day.id)
+                   WHERE conflicts.ra_id = %s
+                   AND day.month_id = %s""",
+            (self.user_ra_id, desiredMonthID))
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received our expected result
+        self.assertDictEqual({"conflicts": [d[0] for d in expectedConflicts]}, resp.json)
+
+    def test_whenNoMonthExistsInDB_returnEmptyConflictList(self):
+        # Test to ensure that when this API is called and passed
+        #  a monthNum that is not in the DB, that an empty list
+        #  is returned in the expected JSON format.
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set various values to be used in the test
+        desiredMonthNum = "01"
+        desiredYear = "2021"
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        # Fetchone() config
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            None,  # First call returns the desired month.id which does
+                   #  not exist in this test
+        ]
+
+        # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/conflicts/api/getUserConflicts",
+                               query_string=dict(
+                                   monthNum=desiredMonthNum,
+                                   year=desiredYear
+                               ),
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that the when the appGlobals.conn.cursor().execute was called,
+        #  it was a select statement. Since this line is using triple-quote strings,
+        #  the whitespace must match exactly.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_once_with(
+            "SELECT id FROM month WHERE num = %s AND EXTRACT(YEAR FROM year) = %s",
+            (int(desiredMonthNum), int(desiredYear)))
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received our expected result
+        self.assertDictEqual({"conflicts": []}, resp.json)
