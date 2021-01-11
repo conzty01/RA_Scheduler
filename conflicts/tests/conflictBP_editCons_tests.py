@@ -3,6 +3,8 @@ from scheduleServer import app
 from flask import Response
 import unittest
 
+from helperFunctions.helperFunctions import stdRet
+
 
 class TestConflictBP_editCons(unittest.TestCase):
     def setUp(self):
@@ -116,25 +118,198 @@ class TestConflictBP_editCons(unittest.TestCase):
         self.mocked_authLevel.return_value = 1
 
     def test_withAuthorizedAHDUser_RendersAppropriateTemplate(self):
+        # Test to ensure that when an AHD that is authorized to
+        #  view the Edit Conflicts page navigates to the page, they
+        #  are able to see a rendered template of the page. An
+        #  authorized user is a user that has an auth_level of at
+        #  least 2 (AHD).
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 2
+
         # -- Act --
+
+        # Request the desired page.
+        resp = self.server.get("/conflicts/editCons",
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+        # Assert that we received a 200 status code
+        self.assertEqual(resp.status_code, 200)
+
+        # Assert that the response is not JSON
+        self.assertFalse(resp.is_json)
 
     def test_withAuthorizedHDUser_RendersAppropriateTemplate(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
+        # Test to ensure that when an HD that is authorized to
+        #  view the Edit Conflicts page navigates to the page, they
+        #  are able to see a rendered template of the page. An
+        #  authorized user is a user that has an auth_level of at
+        #  least 2 (AHD).
 
-    def test_withAuthorizedAHDUser_PassesExpectedDataToRenderer(self):
         # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
 
-    def test_withUnauthorizedUser_ReturnsNotAuthorizedJSON(self):
-        # -- Arrange --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 2
+
         # -- Act --
+
+        # Request the desired page.
+        resp = self.server.get("/conflicts/editCons",
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+        # Assert that we received a 200 status code
+        self.assertEqual(resp.status_code, 200)
+
+        # Assert that the response is not JSON
+        self.assertFalse(resp.is_json)
+
+    @patch("conflicts.conflicts.render_template", autospec=True)
+    def test_withAuthorizedAHDUser_PassesExpectedDataToRenderer(self, mocked_renderTemplate):
+        # Test to ensure that when an AHD that is authorized to view the
+        #  Edit Conflicts page navigates to the page, the expected information
+        #  is being passed to the render_template function. An authorized user
+        #  is a user that has an auth_level of at least 2 (AHD).
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 2
+
+        # Configure the mocked render_template function to return a valid response object
+        mocked_renderTemplate.return_value = Response(status=200)
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        # Create the RA list that is expected to be returned from the first call.
+        expectedRAList = ((i, "Test{}".format(i), "User{}".format(i)) for i in range(10))
+
+        self.mocked_appGlobals.conn.cursor().fetchall.side_effect = [
+            expectedRAList  # First call returns list of RAs
+        ]
+
+        # -- Act --
+
+        # Request the desired page.
+        resp = self.server.get("/conflicts/editCons",
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+        # Assert that we received a 200 status code
+        self.assertEqual(resp.status_code, 200)
+
+        # Assert that the response is not JSON
+        self.assertFalse(resp.is_json)
+
+        # Assert that render_template was called with the expected data
+        mocked_renderTemplate.assert_called_once_with(
+            "conflicts/editCons.html",
+            raList=expectedRAList,
+            auth_level=self.mocked_authLevel,
+            curView=3,
+            opts=self.mocked_appGlobals.baseOpts,
+            hall_name=self.helper_getAuth["hall_name"]
+        )
+
+    @patch("conflicts.conflicts.render_template", autospec=True)
+    def test_withAuthorizedHDUser_PassesExpectedDataToRenderer(self, mocked_renderTemplate):
+        # Test to ensure that when an HD that is authorized to view the
+        #  Edit Conflicts page navigates to the page, the expected information
+        #  is being passed to the render_template function. An authorized user
+        #  is a user that has an auth_level of at least 2 (AHD).
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 3
+
+        # Configure the mocked render_template function to return a valid response object
+        mocked_renderTemplate.return_value = Response(status=200)
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        # Create the RA list that is expected to be returned from the first call.
+        expectedRAList = ((i, "Test{}".format(i), "User{}".format(i)) for i in range(10))
+
+        self.mocked_appGlobals.conn.cursor().fetchall.side_effect = [
+            expectedRAList  # First call returns list of RAs
+        ]
+
+        # -- Act --
+
+        # Request the desired page.
+        resp = self.server.get("/conflicts/editCons",
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+        # Assert that we received a 200 status code
+        self.assertEqual(resp.status_code, 200)
+
+        # Assert that the response is not JSON
+        self.assertFalse(resp.is_json)
+
+        # Assert that render_template was called with the expected data
+        mocked_renderTemplate.assert_called_once_with(
+            "conflicts/editCons.html",
+            raList=expectedRAList,
+            auth_level=self.mocked_authLevel,
+            curView=3,
+            opts=self.mocked_appGlobals.baseOpts,
+            hall_name=self.helper_getAuth["hall_name"]
+        )
+
+    @patch("conflicts.conflicts.render_template", autospec=True)
+    def test_withUnauthorizedUser_ReturnsNotAuthorizedJSON(self, mocked_renderTemplate):
+        # Test to ensure that when a user that is NOT authorized to view
+        #  the Edit Cons page, they receive a JSON response that indicates
+        #  that they are not authorized. An authorized user is a user that
+        #  has an auth_level of at least 2 (AHD).
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+
+        # Reset the auth_level to 1
+        self.resetAuthLevel()
+
+        # -- Act --
+
+        # Request the desired page.
+        resp = self.server.get("/conflicts/editCons",
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that the json is formatted as expected
+        self.assertEqual(resp.json, stdRet(-1, "NOT AUTHORIZED"))
+
+        # Assert that we received a 200 status code
+        self.assertEqual(resp.status_code, 200)
+
+        # Assert that no additional call to the DB was made
+        self.mocked_appGlobals.conn.cursor().execute.assert_not_called()
