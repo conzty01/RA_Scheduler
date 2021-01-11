@@ -75,22 +75,10 @@ def editCons():
 
 @conflicts_bp.route("/api/getUserConflicts", methods=["GET"])
 @login_required
-def getUserConflicts(monthNum=None, raID=None, year=None, hallId=None):
+def getUserConflicts():
     # API Method used to return the requested conflicts for a given user and month.
     #
     #  Required Auth Level: None
-    #
-    #  If called from the server, this function accepts the following parameters:
-    #
-    #     monthNum  <int>  -  an integer representing the numeric month number for
-    #                          the desired month using the standard gregorian
-    #                          calendar convention.
-    #     raID      <int>  -  an integer denoting the row id for the desired RA in the
-    #                          ra table.
-    #     year      <int>  -  an integer denoting the year for the desired time period
-    #                          using the standard gregorian calendar convention.
-    #     hallId    <int>  -  an integer representing the id of the desired residence
-    #                          hall in the res_hall table.
     #
     #  If called from a client, the following parameters are required:
     #
@@ -110,27 +98,16 @@ def getUserConflicts(monthNum=None, raID=None, year=None, hallId=None):
     #        ]
     #     }
 
-    # Assume this API was called from the server and verify that this is true.
-    fromServer = True
-    if monthNum is None and year is None and hallId is None and raID is None:
-        # If monthNum, year, HallId and raID are None, then this method
-        #  was called from a remote client.
+    # Get the user's information from the database
+    userDict = getAuth()
 
-        # Get the user's information from the database
-        userDict = getAuth()
+    # Get the monthNum and year from the request arguments
+    monthNum = int(request.args.get("monthNum"))
+    year = int(request.args.get("year"))
 
-        # Get the monthNum and year from the request arguments
-        monthNum = int(request.args.get("monthNum"))
-        year = int(request.args.get("year"))
-
-        # Set the value of hallId and raID from the userDict
-        hallId = userDict["hall_id"]
-        raID = userDict["ra_id"]
-
-        # Mark that this method was not called from the server
-        fromServer = False
-
-    logging.debug("Get Conflicts - From Server: {}".format(fromServer))
+    # Set the value of hallId and raID from the userDict
+    hallId = userDict["hall_id"]
+    raID = userDict["ra_id"]
 
     logging.debug("MonthNum: {}, Year: {}, HallID: {}, raID: {}".format(monthNum, year, hallId, raID))
 
@@ -150,6 +127,9 @@ def getUserConflicts(monthNum=None, raID=None, year=None, hallId=None):
         # Log the occurrence.
         logging.warning("No month found with Num = {} and Year = {}".format(monthNum, year))
 
+        # Close the DB cursor
+        cur.close()
+
         # Simply return an empty list
         return jsonify({"conflicts": []})
 
@@ -168,14 +148,11 @@ def getUserConflicts(monthNum=None, raID=None, year=None, hallId=None):
     #  comment at the top of this method.
     ret = [d[0] for d in cur.fetchall()]
 
-    # If this API method was called from the server
-    if fromServer:
-        # Then return the result as-is
-        return ret
+    # Close the DB cursor
+    cur.close()
 
-    else:
-        # Otherwise return a JSON version of the result
-        return jsonify({"conflicts": ret})
+    # Otherwise return a JSON version of the result
+    return jsonify({"conflicts": ret})
 
 
 @conflicts_bp.route("/api/getRAConflicts", methods=["GET"])
