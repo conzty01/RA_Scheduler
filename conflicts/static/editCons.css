@@ -43,3 +43,7 @@
     margin-left: 20%;
     background-color: none;
 }
+.filterRA {
+    background-color: var(--primary);
+    color: #FFF;
+}
