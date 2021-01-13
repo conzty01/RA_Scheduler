@@ -250,7 +250,7 @@ def getRAConflicts(startDateStr=None, endDateStr=None, raID=-1, hallID=None):
     if int(raID) != -1:
         # If an raID has been provided, then create an additional
         #  clause that will be appended to a later PSQL statement
-        addStr = "AND conflicts.ra_id = {};".format(raID)
+        addStr = "AND conflicts.ra_id = {}".format(raID)
 
     else:
         # Otherwise, create an empty string to replace the additional
@@ -290,6 +290,9 @@ def getRAConflicts(startDateStr=None, endDateStr=None, raID=-1, hallID=None):
             "start": d[3],
             "color": d[4]
         })
+
+    # Close the DB Cursor
+    cur.close()
 
     # If this API method was called from the server
     if fromServer:
