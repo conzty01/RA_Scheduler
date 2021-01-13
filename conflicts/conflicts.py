@@ -484,6 +484,9 @@ def processConflicts():
     logging.debug("DeleteSet: {}, {}".format(deleteSet, str(deleteSet)[1:-1]))
     logging.debug("AddSet: {}, {}".format(addSet, str(addSet)[1:-1]))
 
+    # Set a flag to indicate that we have not made any changes to the DB
+    madeChanges = False
+
     # If there are conflicts that should be removed from the DB
     if len(deleteSet) > 0:
         # Then remove them from the DB
@@ -499,6 +502,9 @@ def processConflicts():
                             AND conflicts.ra_id = %s
                         );""", (tuple(deleteSet), userDict["ra_id"]))
 
+        # Set the flag to indicate that we have made changes to the DB
+        madeChanges = True
+
     # If there are conflicts that should be added to the DB
     if len(addSet) > 0:
 
@@ -511,8 +517,13 @@ def processConflicts():
                         WHERE TO_CHAR(day.date, 'YYYY-MM-DD') IN %s
                         """, (userDict["ra_id"], tuple(addSet)))
 
-    # Commit the changes to the DB
-    ag.conn.commit()
+        # Set the flag to indicate that we have made changes to the DB
+        madeChanges = True
+
+    # Check to see if we have made any DB changes
+    if madeChanges:
+        # If so, commit the changes to the DB
+        ag.conn.commit()
 
     # Close the DB cursor
     cur.close()
