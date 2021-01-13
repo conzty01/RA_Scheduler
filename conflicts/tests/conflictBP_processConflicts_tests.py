@@ -2,6 +2,8 @@ from unittest.mock import MagicMock, patch
 from scheduleServer import app
 import unittest
 
+from helperFunctions.helperFunctions import stdRet
+
 
 class TestConflictBP_getRAConflicts(unittest.TestCase):
     def setUp(self):
@@ -115,27 +117,289 @@ class TestConflictBP_getRAConflicts(unittest.TestCase):
         self.mocked_authLevel.return_value = 1
 
     def test_whenGivenNewConflicts_addsNewConflictsToDB(self):
+        # When a user calls the API and provides a set of conflicts
+        #  that are not already registered in the DB, the method
+        #  will add the new conflicts into the DB.
+        #
+        #   monthNum   <int>       -  an integer representing the numeric month number for
+        #                              the desired month using the standard gregorian
+        #                              calendar convention.
+        #   year       <int>       -  an integer denoting the year for the desired time period
+        #                              using the standard gregorian calendar convention.
+        #   conflicts  <lst<str>>  -  a list containing strings representing dates that the
+        #                              user has a duty conflict with.
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        desiredMonthNum = 3
+        desiredYear = 2021
+        desiredNewConflicts = []
+        for i in range(13):
+            desiredNewConflicts.append("2021-01-{:02}".format(i))
+
+        expectedPrevConflicts = []
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        # Fetchall() config
+        self.mocked_appGlobals.conn.cursor().fetchall.side_effect = [
+            tuple(expectedPrevConflicts)  # First call returns the Previous conflicts
+        ]
+
         # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.post("/conflicts/api/enterConflicts/",
+                                json=dict(
+                                    monthNum=desiredMonthNum,
+                                    year=desiredYear,
+                                    conflicts=desiredNewConflicts
+                                ),
+                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that the when the appGlobals.conn.cursor().execute was last called,
+        #  it was an INSERT statement. Since this line is using triple-quote strings,
+        #  the whitespace must match exactly.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
+            """INSERT INTO conflicts (ra_id, day_id)
+                        SELECT %s, day.id FROM day
+                        WHERE TO_CHAR(day.date, 'YYYY-MM-DD') IN %s
+                        """, (self.user_ra_id, tuple(set(desiredNewConflicts))))
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_called_once()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received our expected result
+        self.assertEqual(stdRet(1, "successful"), resp.json)
 
     def test_whenGivenConflictsAlreadyInDB_returnsSuccessResponse(self):
+        # When a user calls the API and provides a set of conflicts that ARE
+        #  already registered in the DB, the method will not modify the conflicts.
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        desiredMonthNum = 3
+        desiredYear = 2021
+        desiredNewConflicts = ["2021-01-{:02}".format(i) for i in range(10)]
+
+        # Create the expected previous conflicts that should be returned
+        #  from the DB.
+        expectedPrevConflicts = []
+        for i in desiredNewConflicts:
+            expectedPrevConflicts.append((i,))
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        # Fetchall() config
+        self.mocked_appGlobals.conn.cursor().fetchall.side_effect = [
+            tuple(expectedPrevConflicts)  # First call returns the Previous conflicts
+        ]
+
         # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.post("/conflicts/api/enterConflicts/",
+                                json=dict(
+                                    monthNum=desiredMonthNum,
+                                    year=desiredYear,
+                                    conflicts=desiredNewConflicts
+                                ),
+                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that the when the appGlobals.conn.cursor().execute was last called,
+        #  it was an INSERT statement. Since this line is using triple-quote strings,
+        #  the whitespace must match exactly.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_once()
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that appGlobals.conn.cursor().close was NOT called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received our expected result
+        self.assertEqual(stdRet(1, "successful"), resp.json)
 
     def test_whenNotGivenPreviouslyEnteredConflicts_removesPreviouslyEnteredConflictsFromDB(self):
+        # When a user calls the API and excludes a set of conflicts that are
+        #  already registered in the DB, the method will remove the excluded
+        #  conflicts.
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        desiredMonthNum = 3
+        desiredYear = 2021
+        desiredNewConflicts = ["2021-01-{:02}".format(i) for i in range(20)]
+
+        # Create the expected previous conflicts that should be returned
+        #  from the DB.
+        expectedPrevConflicts = []
+        for i in desiredNewConflicts:
+            expectedPrevConflicts.append((i,))
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        # Fetchall() config
+        self.mocked_appGlobals.conn.cursor().fetchall.side_effect = [
+            tuple(expectedPrevConflicts)  # First call returns the Previous conflicts
+        ]
+
         # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.post("/conflicts/api/enterConflicts/",
+                                json=dict(
+                                    monthNum=desiredMonthNum,
+                                    year=desiredYear,
+                                    # In this test, we will exclude several of the
+                                    #  conflicts that we have in the expectedPrevConflicts
+                                    #  so that these are removed from the DB.
+                                    conflicts=desiredNewConflicts[:15]
+                                ),
+                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that the when the appGlobals.conn.cursor().execute was last called,
+        #  it was an Delete statement. Since this line is using triple-quote strings,
+        #  the whitespace must match exactly.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
+            """DELETE FROM conflicts
+                       WHERE conflicts.day_id IN (
+                            SELECT conflicts.day_id
+                            FROM conflicts
+                                JOIN day ON (conflicts.day_id = day.id)
+                            WHERE TO_CHAR(day.date, 'YYYY-MM-DD') IN %s
+                            AND conflicts.ra_id = %s
+                        );""", (tuple(set(desiredNewConflicts[15:])), self.user_ra_id))
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_called_once()
+
+        # Assert that appGlobals.conn.cursor().close was NOT called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received our expected result
+        self.assertEqual(stdRet(1, "successful"), resp.json)
 
     def test_ableToAddAndRemoveConflictsInSingleCall(self):
         # Essentially, is the method able to add new conflicts and remove no longer needed
         #  conflicts at the same time.
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        desiredMonthNum = 3
+        desiredYear = 2021
+        desiredNewConflicts = ["2021-01-{:02}".format(i) for i in range(5)]
+        expectedPrevConflicts = ["2021-01-{:02}".format(i) for i in range(10, 20)]
+
+        # Create a list of conflict dates to be sent to the server. It comprises of
+        #  "new" dates as well as some of the dates that were already in the DB.
+        sentConflicts = desiredNewConflicts + expectedPrevConflicts[:5]
+
+        # Create the expected previous conflicts that should be returned
+        #  from the DB.
+        for index, date in enumerate(expectedPrevConflicts):
+            expectedPrevConflicts[index] = tuple(date)
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        # Fetchall() config
+        self.mocked_appGlobals.conn.cursor().fetchall.side_effect = [
+            tuple(expectedPrevConflicts)  # First call returns the Previous conflicts
+        ]
+
+        # Create the sets that the API will use to determine what needs to be added
+        #  and removed.
+        prevSet = set([i[0] for i in expectedPrevConflicts])
+        newSet = set(sentConflicts)
+        deleteSet = prevSet.difference(newSet)
+        addSet = newSet.difference(prevSet)
+
         # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.post("/conflicts/api/enterConflicts/",
+                                json=dict(
+                                    monthNum=desiredMonthNum,
+                                    year=desiredYear,
+                                    conflicts=sentConflicts
+                                ),
+                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that the when the appGlobals.conn.cursor().execute was called,
+        #  one of the calls was the following. Since this line is using triple-
+        #  quote strings, the whitespace must match exactly.
+        self.mocked_appGlobals.conn.cursor().execute.assert_any_call(
+            """DELETE FROM conflicts
+                       WHERE conflicts.day_id IN (
+                            SELECT conflicts.day_id
+                            FROM conflicts
+                                JOIN day ON (conflicts.day_id = day.id)
+                            WHERE TO_CHAR(day.date, 'YYYY-MM-DD') IN %s
+                            AND conflicts.ra_id = %s
+                        );""", (tuple(deleteSet), self.user_ra_id)
+        )
+
+        # Assert that the when the appGlobals.conn.cursor().execute was called,
+        #  one of the calls was the following. Since this line is using triple-
+        #  quote strings, the whitespace must match exactly.
+        self.mocked_appGlobals.conn.cursor().execute.assert_any_call(
+            """INSERT INTO conflicts (ra_id, day_id)
+                        SELECT %s, day.id FROM day
+                        WHERE TO_CHAR(day.date, 'YYYY-MM-DD') IN %s
+                        """, (self.user_ra_id, tuple(addSet))
+        )
+
+        # Assert that the execute() method was called 3 times.
+        self.assertEqual(self.mocked_appGlobals.conn.cursor().execute.call_count, 3)
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_called_once()
+
+        # Assert that appGlobals.conn.cursor().close was NOT called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received our expected result
+        self.assertEqual(stdRet(1, "successful"), resp.json)
