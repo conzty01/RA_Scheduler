@@ -2,6 +2,9 @@ from unittest.mock import MagicMock, patch
 from scheduleServer import app
 import unittest
 
+from helperFunctions.helperFunctions import stdRet
+from conflicts.conflicts import getRAConflicts
+
 
 class TestConflictBP_getRAConflicts(unittest.TestCase):
     def setUp(self):
@@ -114,14 +117,373 @@ class TestConflictBP_getRAConflicts(unittest.TestCase):
         #  to the default value which is 1.
         self.mocked_authLevel.return_value = 1
 
-    def test_whenPassedRAID_returnsGivenRAConflictsInExpectedJSONFormat(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
+    # ------------------------------
+    # -- Called from Client Tests --
+    # ------------------------------
+    def test_whenCalledFromClient_whenPassedRAID_returnsGivenRAConflictsInExpectedJSONFormat(self):
+        # Test to ensure that when called from an Authorized remote client and provided an
+        #  RA ID, the API returns the given RA's conflicts in a JSON format. An authorized
+        #  user is considered a user whose "auth_level" is at least 2 (AHD).
+        #
+        #   start      <str>  -  a string representing the first day that should be included
+        #                         for the returned RA conflicts.
+        #   end        <str>  -  a string representing the last day that should be included
+        #                         for the returned RA conflicts.
+        #   raID      <int>  -  an integer denoting the row id for the RA in the
+        #                        ra table whose conflicts should be returned.
+        #                        If a value of -1 is passed, then all conflicts for the
+        #                        user's staff will be returned.
 
-    def test_whenPassedNegativeRAID_returnsAllRAConflictsForHallInExpectedJSONFormat(self):
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 2
+
+        desiredRAID = 18
+        desiredStartDate = "2021-01-01T00:00:00.000"
+        desiredEndDate = "2021-02-01T00:00:00.000"
+
+        expectedConflicts = [(i, "Test", "User", "2021-01-{:02}".format(i), "#OD1E76") for i in range(16)]
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        # Fetchall() config
+        self.mocked_appGlobals.conn.cursor().fetchall.side_effect = [
+            tuple(expectedConflicts)  # First call returns the conflicts
+        ]
+
+        expectedConflictsResult = []
+        for row in expectedConflicts:
+            expectedConflictsResult.append({
+                "id": row[0],
+                "title": row[1] + " " + row[2],
+                "start": row[3],
+                "color": row[4]
+            })
+
         # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/conflicts/api/getRAConflicts",
+                               query_string=dict(
+                                   raID=desiredRAID,
+                                   start=desiredStartDate,
+                                   end=desiredEndDate
+                               ),
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that the when the appGlobals.conn.cursor().execute was called,
+        #  it was a select statement. Since this line is using triple-quote strings,
+        #  the whitespace must match exactly.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_once_with("""
+        SELECT conflicts.id, ra.first_name, ra.last_name, TO_CHAR(day.date, 'YYYY-MM-DD'), ra.color
+        FROM conflicts JOIN day ON (conflicts.day_id = day.id)
+                       JOIN month ON (month.id=day.month_id) 
+                       JOIN ra ON (ra.id = conflicts.ra_id)
+        WHERE ra.hall_id = %s
+        AND month.year >= TO_DATE(%s, 'YYYY-MM')
+        AND month.year <= TO_DATE(%s, 'YYYY-MM') 
+        AND conflicts.ra_id = {};""".format(desiredRAID),
+        (self.user_hall_id, desiredStartDate[:10], desiredEndDate[:10]))
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received our expected result
+        self.assertListEqual(expectedConflictsResult, resp.json)
+
+    def test_whenCalledFromClient_whenPassedNegativeRAID_returnsAllRAConflictsForHallInExpectedJSONFormat(self):
+        # Test to ensure that when called from an Authorized remote client and provided a
+        #  negative RA ID, the API returns the conflicts for all of the RA's on the
+        #  requesting user's staff in a JSON format. An authorized user is considered a
+        #  user whose "auth_level" is at least 2 (AHD).
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 2
+
+        desiredRAID = -1
+        desiredStartDate = "2021-01-01T00:00:00.000"
+        desiredEndDate = "2021-02-01T00:00:00.000"
+
+        expectedConflicts = []
+        for i in range(15):
+            expectedConflicts.append(
+                (i, "Test{}".format(i), "User{}".format(i), "2021-01-{:02}".format(i), "#OD1E76")
+            )
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        # Fetchall() config
+        self.mocked_appGlobals.conn.cursor().fetchall.side_effect = [
+            tuple(expectedConflicts)  # First call returns the conflicts
+        ]
+
+        expectedConflictsResult = []
+        for row in expectedConflicts:
+            expectedConflictsResult.append({
+                "id": row[0],
+                "title": row[1] + " " + row[2],
+                "start": row[3],
+                "color": row[4]
+            })
+
+        # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/conflicts/api/getRAConflicts",
+                               query_string=dict(
+                                   raID=desiredRAID,
+                                   start=desiredStartDate,
+                                   end=desiredEndDate
+                               ),
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that the when the appGlobals.conn.cursor().execute was called,
+        #  it was a select statement. Since this line is using triple-quote strings,
+        #  the whitespace must match exactly.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_once_with("""
+        SELECT conflicts.id, ra.first_name, ra.last_name, TO_CHAR(day.date, 'YYYY-MM-DD'), ra.color
+        FROM conflicts JOIN day ON (conflicts.day_id = day.id)
+                       JOIN month ON (month.id=day.month_id) 
+                       JOIN ra ON (ra.id = conflicts.ra_id)
+        WHERE ra.hall_id = %s
+        AND month.year >= TO_DATE(%s, 'YYYY-MM')
+        AND month.year <= TO_DATE(%s, 'YYYY-MM') 
+        ;""", (self.user_hall_id, desiredStartDate[:10], desiredEndDate[:10]))
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received our expected result
+        self.assertListEqual(expectedConflictsResult, resp.json)
+
+    def test_whenCalledFromClient_withUnauthorizedUser_returnsNotAuthorizedResponse(self):
+        # Test to ensure that when a user that is NOT authorized to reach this
+        #  endpoint, they receive a JSON response that indicates that they are
+        #  not authorized. An authorized user is a user that has an auth_level
+        #  of at least 2 (AHD).
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+
+        # Reset the auth_level to 1
+        self.resetAuthLevel()
+
+        # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/conflicts/api/getRAConflicts",
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that the json is formatted as expected
+        self.assertEqual(resp.json, stdRet(-1, "NOT AUTHORIZED"))
+
+        # Assert that we received a 200 status code
+        self.assertEqual(resp.status_code, 200)
+
+        # Assert that no additional call to the DB was made
+        self.mocked_appGlobals.conn.cursor().execute.assert_not_called()
+
+    # ------------------------------
+    # -- Called from Server Tests --
+    # ------------------------------
+    def test_whenCalledFromServer_whenPassedRAID_returnsGivenRAConflictsInExpectedFormat(self):
+        # Test to ensure that when called from the server and provided an RA ID, the API returns
+        #  the given RA's conflicts in the expected format.
+        #
+        #    startDateStr  <str>  -  a string representing the first day that should be included
+        #                             for the returned RA conflicts.
+        #    endDateStr    <str>  -  a string representing the last day that should be included
+        #                             for the returned RA conflicts.
+        #    raID          <int>  -  an integer denoting the row id for the RA in the
+        #                             ra table whose conflicts should be returned.
+        #                             If a value of -1 is passed, then all conflicts for the
+        #                             user's staff will be returned.
+        #    hallID        <int>  -  an integer denoting the row id for the Res Hall
+        #                             in the res_hall table whose staff conflicts should
+        #                             be returned.
+        #
+        #  NOTE: If both the raID and hallID are provided, preference will be given
+        #         to the raID with the hallID being used to verify that the user
+        #         belongs to the provided Res Hall. If the user does not belong to
+        #         the provided hall, then an empty list is returned.
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_appGlobals.conn.reset_mock()
+
+        desiredStartDateStr = "2021-01-01"
+        desiredEndDateStr = "2021-02-01"
+        desiredRAID = 15
+        desiredHallID = 2
+
+        expectedConflicts = []
+        for i in range(15):
+            expectedConflicts.append(
+                (i, "Test", "User", "2021-01-{:02}".format(i), "#OD1E76")
+            )
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        # Fetchall() config
+        self.mocked_appGlobals.conn.cursor().fetchall.side_effect = [
+            tuple(expectedConflicts)  # First call returns the conflicts
+        ]
+
+        expectedConflictsResult = []
+        for row in expectedConflicts:
+            expectedConflictsResult.append({
+                "id": row[0],
+                "title": row[1] + " " + row[2],
+                "start": row[3],
+                "color": row[4]
+            })
+
+        # -- Act --
+
+        # Bundle the call up in a test_request_context so that we can test
+        #  the function as if we were calling it from the server.
+
+        with app.test_request_context("/conflicts/api/getRAConflicts",
+                                      base_url=self.mocked_appGlobals.baseOpts["HOST_URL"]):
+            # Make our call to the function
+            result = getRAConflicts(desiredStartDateStr, desiredEndDateStr, desiredRAID, desiredHallID)
+
+        # -- Assert --
+
+        # Assert that the when the appGlobals.conn.cursor().execute was called,
+        #  it was a select statement. Since this line is using triple-quote strings,
+        #  the whitespace must match exactly.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_once_with("""
+        SELECT conflicts.id, ra.first_name, ra.last_name, TO_CHAR(day.date, 'YYYY-MM-DD'), ra.color
+        FROM conflicts JOIN day ON (conflicts.day_id = day.id)
+                       JOIN month ON (month.id=day.month_id) 
+                       JOIN ra ON (ra.id = conflicts.ra_id)
+        WHERE ra.hall_id = %s
+        AND month.year >= TO_DATE(%s, 'YYYY-MM')
+        AND month.year <= TO_DATE(%s, 'YYYY-MM') 
+        AND conflicts.ra_id = {};""".format(desiredRAID),
+        (desiredHallID, desiredStartDateStr, desiredEndDateStr))
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received a json response
+        self.assertIsInstance(result, list)
+
+        # Assert that we received our expected result
+        self.assertListEqual(expectedConflictsResult, result)
+
+    def test_whenCalledFromServer_whenPassedNegativeRAID_returnsAllRAConflictsForHallInExpectedFormat(self):
+        # Test to ensure that when called from the server and provided a negative RA ID, the API
+        #  returns the conflicts for the given HallID.
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_appGlobals.conn.reset_mock()
+
+        desiredStartDateStr = "2021-01-01"
+        desiredEndDateStr = "2021-02-01"
+        desiredRAID = -1
+        desiredHallID = 2
+
+        expectedConflicts = []
+        for i in range(15):
+            expectedConflicts.append(
+                (i, "Test{}".format(i), "User{}".format(i), "2021-01-{:02}".format(i), "#OD1E76")
+            )
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        # Fetchall() config
+        self.mocked_appGlobals.conn.cursor().fetchall.side_effect = [
+            tuple(expectedConflicts)  # First call returns the conflicts
+        ]
+
+        expectedConflictsResult = []
+        for row in expectedConflicts:
+            expectedConflictsResult.append({
+                "id": row[0],
+                "title": row[1] + " " + row[2],
+                "start": row[3],
+                "color": row[4]
+            })
+
+        # -- Act --
+
+        # Bundle the call up in a test_request_context so that we can test
+        #  the function as if we were calling it from the server.
+
+        with app.test_request_context("/conflicts/api/getRAConflicts",
+                                      base_url=self.mocked_appGlobals.baseOpts["HOST_URL"]):
+            # Make our call to the function
+            result = getRAConflicts(desiredStartDateStr, desiredEndDateStr, desiredRAID, desiredHallID)
+
+        # -- Assert --
+
+        # Assert that the when the appGlobals.conn.cursor().execute was called,
+        #  it was a select statement. Since this line is using triple-quote strings,
+        #  the whitespace must match exactly.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_once_with("""
+        SELECT conflicts.id, ra.first_name, ra.last_name, TO_CHAR(day.date, 'YYYY-MM-DD'), ra.color
+        FROM conflicts JOIN day ON (conflicts.day_id = day.id)
+                       JOIN month ON (month.id=day.month_id) 
+                       JOIN ra ON (ra.id = conflicts.ra_id)
+        WHERE ra.hall_id = %s
+        AND month.year >= TO_DATE(%s, 'YYYY-MM')
+        AND month.year <= TO_DATE(%s, 'YYYY-MM') 
+        ;""", (desiredHallID, desiredStartDateStr, desiredEndDateStr))
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received a json response
+        self.assertIsInstance(result, list)
+
+        # Assert that we received our expected result
+        self.assertListEqual(expectedConflictsResult, result)
