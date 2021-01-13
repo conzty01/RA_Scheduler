@@ -2,6 +2,9 @@ from unittest.mock import MagicMock, patch
 from scheduleServer import app
 import unittest
 
+from helperFunctions.helperFunctions import stdRet
+from conflicts.conflicts import getNumberConflicts
+
 
 class TestConflictBP_getNumberConflicts(unittest.TestCase):
     def setUp(self):
@@ -118,22 +121,197 @@ class TestConflictBP_getNumberConflicts(unittest.TestCase):
     # -- Called from Client Tests --
     # ------------------------------
     def test_whenCalledFromClient_withAuthorizedUser_returnExpectedJSONFormat(self):
+        # Test to ensure that when this API is called from a remote client
+        #  by an authorized user, the response is formatted in the expected
+        #  JSON formatting. An authorized user is considered a user whose
+        #  "auth_level" is at least 2 (AHD).
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 2
+
+        # Set various values to be used in the test
+        desiredMonthNum = "01"
+        desiredYear = "2021"
+
+        expectedConflicts = [(i, 16-i) for i in range(16)]
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        # Fetchall() config
+        self.mocked_appGlobals.conn.cursor().fetchall.side_effect = [
+            tuple(expectedConflicts)  # First call returns the conflicts
+        ]
+
+        expectedConflictNums = {}
+        for row in expectedConflicts:
+            expectedConflictNums[str(row[0])] = row[1]
+
         # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/conflicts/api/getConflictNums",
+                               query_string=dict(
+                                   monthNum=desiredMonthNum,
+                                   year=desiredYear
+                               ),
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that the when the appGlobals.conn.cursor().execute was called,
+        #  it was a select statement. Since this line is using triple-quote strings,
+        #  the whitespace must match exactly.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_once_with(
+            """
+        SELECT ra.id, COUNT(cons.id)
+        FROM ra LEFT JOIN (
+            SELECT conflicts.id, ra_id
+            FROM conflicts JOIN day ON (conflicts.day_id = day.id)
+                           JOIN month ON (month.id = day.month_id)
+            WHERE month.num = %s
+            AND EXTRACT(YEAR FROM month.year) = %s
+        ) AS cons ON (cons.ra_id = ra.id)
+        WHERE ra.hall_id = %s
+        GROUP BY ra.id;
+    """,
+            (desiredMonthNum, desiredYear, self.user_hall_id))
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received our expected result
+        self.assertDictEqual(expectedConflictNums, resp.json)
 
     def test_whenCalledFromClient_withUnauthorizedUser_returnNotAuthorized(self):
+        # Test to ensure that when a user that is NOT authorized to reach this
+        #  endpoint, they receive a JSON response that indicates that they are
+        #  not authorized. An authorized user is a user that has an auth_level
+        #  of at least 2 (AHD).
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+
+        # Reset the auth_level to 1
+        self.resetAuthLevel()
+
+        # Set various values to be used in the test
+        desiredMonthNum = "01"
+        desiredYear = "2021"
+
         # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/conflicts/api/getConflictNums",
+                               query_string=dict(
+                                   monthNum=desiredMonthNum,
+                                   year=desiredYear
+                               ),
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that the json is formatted as expected
+        self.assertEqual(resp.json, stdRet(-1, "NOT AUTHORIZED"))
+
+        # Assert that we received a 200 status code
+        self.assertEqual(resp.status_code, 200)
+
+        # Assert that no additional call to the DB was made
+        self.mocked_appGlobals.conn.cursor().execute.assert_not_called()
 
     # ------------------------------
     # -- Called from Server Tests --
     # ------------------------------
     def test_whenCalledFromServer_returnExpectedFormat(self):
+        # Test to ensure that when this API is called from the server
+        #  the response is formatted in the expected formatting.
+        #
+        #   hallId    <int>  -  an integer representing the id of the desired residence
+        #                        hall in the res_hall table.
+        #   monthNum  <int>  -  an integer representing the numeric month number for
+        #                        the desired month using the standard gregorian
+        #                        calendar convention.
+        #   year      <int>  -  an integer denoting the year for the desired time period
+        #                        using the standard gregorian calendar convention.
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set various values to be used in the test
+        desiredMonthNum = 1
+        desiredYear = 2021
+        desiredHallID = 68
+
+        expectedConflicts = [(i, 16 - i) for i in range(16)]
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        # Fetchall() config
+        self.mocked_appGlobals.conn.cursor().fetchall.side_effect = [
+            tuple(expectedConflicts)  # First call returns the conflicts
+        ]
+
+        expectedConflictNums = {}
+        for row in expectedConflicts:
+            expectedConflictNums[row[0]] = row[1]
+
         # -- Act --
+
+        # Bundle the call up in a test_request_context so that we can test
+        #  the function as if we were calling it from the server.
+
+        with app.test_request_context("/conflicts/api/getNumberConflicts",
+                                      base_url=self.mocked_appGlobals.baseOpts["HOST_URL"]):
+            # Make our call to the function
+            result = getNumberConflicts(desiredHallID, desiredMonthNum, desiredYear)
+
         # -- Assert --
-        pass
+
+        # Assert that the when the appGlobals.conn.cursor().execute was called,
+        #  it was a select statement. Since this line is using triple-quote strings,
+        #  the whitespace must match exactly.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_once_with("""
+        SELECT ra.id, COUNT(cons.id)
+        FROM ra LEFT JOIN (
+            SELECT conflicts.id, ra_id
+            FROM conflicts JOIN day ON (conflicts.day_id = day.id)
+                           JOIN month ON (month.id = day.month_id)
+            WHERE month.num = %s
+            AND EXTRACT(YEAR FROM month.year) = %s
+        ) AS cons ON (cons.ra_id = ra.id)
+        WHERE ra.hall_id = %s
+        GROUP BY ra.id;
+    """, (desiredMonthNum, desiredYear, desiredHallID))
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received a json response
+        self.assertIsInstance(result, dict)
+
+        # Assert that we received our expected result
+        self.assertDictEqual(expectedConflictNums, result)

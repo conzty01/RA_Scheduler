@@ -157,7 +157,7 @@ def getUserConflicts():
 
 @conflicts_bp.route("/api/getRAConflicts", methods=["GET"])
 @login_required
-def getRAConflicts(startDateStr=None, endDateStr=None, raID=-1, hallID=None, ):
+def getRAConflicts(startDateStr=None, endDateStr=None, raID=-1, hallID=None):
     # API Method used to return all conflicts for either a given RA or Res Hall.
     #
     #  Required Auth Level: >= AHD
