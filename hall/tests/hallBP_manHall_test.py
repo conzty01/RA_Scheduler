@@ -86,7 +86,7 @@ class TestHallBP_manHall(unittest.TestCase):
         }
 
         # Create the patcher for the getAuth() method
-        self.patcher_getAuth = patch("conflicts.conflicts.getAuth", autospec=True)
+        self.patcher_getAuth = patch("hall.hall.getAuth", autospec=True)
 
         # Start the patcher - mock returned
         self.mocked_getAuth = self.patcher_getAuth.start()
@@ -95,7 +95,7 @@ class TestHallBP_manHall(unittest.TestCase):
         self.mocked_getAuth.return_value = self.helper_getAuth
 
         # -- Create a patcher for the appGlobals file --
-        self.patcher_appGlobals = patch("conflicts.conflicts.ag", autospec=True)
+        self.patcher_appGlobals = patch("hall.hall.ag", autospec=True)
 
         # Start the patcher - mock returned
         self.mocked_appGlobals = self.patcher_appGlobals.start()
@@ -117,21 +117,107 @@ class TestHallBP_manHall(unittest.TestCase):
         #  to the default value which is 1.
         self.mocked_authLevel.return_value = 1
 
-    def test_withAuthorizedHDUser_rendersAppropriateTemplate(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
+    @patch("hall.hall.render_template", autospec=True)
+    @patch("hall.hall.getHallSettings", autospec=True)
+    def test_withAuthorizedHDUser_rendersAppropriateTemplate(self, mocked_hallSettings, mocked_renderTemplate):
+        # Test to ensure that when an HD that is authorized to view
+        #  the Manage Hall page navigates to the page, they are able
+        #  to see a rendered template of the page. An authorized user
+        #  is a user that has an auth_level of at least 3 (HD).
 
-    def test_withUnauthorizedHDUser_returnsNotAuthorizedResponse(self):
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 3
+        self.mocked_authLevel.return_value = 3
+
+        # Configure the mocked render_template function to return a valid response object
+        mocked_renderTemplate.return_value = Response(status=200)
+
         # -- Act --
+
+        # Request the desired page.
+        resp = self.server.get("/hall/", base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that we received a 200 status code
+        self.assertEqual(resp.status_code, 200)
+
+        # Assert that the response is not JSON
+        self.assertFalse(resp.is_json)
 
     @patch("hall.hall.render_template", autospec=True)
-    def test_withAuthorizedHDUser_PassesExpectedDataToRenderer(self, mocked_renderTemplate):
+    @patch("hall.hall.getHallSettings", autospec=True)
+    def test_withUnauthorizedHDUser_returnsNotAuthorizedResponse(self, mocked_hallSettings, mocked_renderTemplate):
+        # Test to ensure that when a user that is NOT authorized to view
+        #  the Manage Hall page, they receive a JSON response that indicates
+        #  that they are not authorized. An authorized user is a user that
+        #  has an auth_level of at least 2 (HD).
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_appGlobals.conn.reset_mock()
+
         # -- Act --
+
+        # Request the desired page.
+        resp = self.server.get("/hall/", base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that we received a 200 status code
+        self.assertEqual(resp.status_code, 200)
+
+        # Assert that the response is not JSON
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received our expected result
+        self.assertEqual(stdRet(-1, "NOT AUTHORIZED"), resp.json)
+
+    @patch("hall.hall.render_template", autospec=True)
+    @patch("hall.hall.getHallSettings", autospec=True)
+    def test_withAuthorizedHDUser_PassesExpectedDataToRenderer(self, mocked_hallSettings, mocked_renderTemplate):
+        # Test to ensure that when an HD that is authorized to view the
+        #  Manage Hall page navigates to the page, the expected information
+        #  is being passed to the render_template function. An authorized user
+        #  is a user that has an auth_level of at least 3 (HD).
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 3
+        self.mocked_authLevel.return_value = 3
+
+        # Configure the mocked render_template function to return a valid response object
+        mocked_renderTemplate.return_value = Response(status=200)
+
+        # -- Act --
+
+        # Request the desired page.
+        resp = self.server.get("/hall/", base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that we received a 200 status code
+        self.assertEqual(resp.status_code, 200)
+
+        # Assert that the response is not JSON
+        self.assertFalse(resp.is_json)
+
+        # Assert that render_template was called with the expected data
+        mocked_renderTemplate.assert_called_once_with(
+            "hall/hall.html",
+            opts=self.mocked_appGlobals.baseOpts,
+            curView=4,
+            settingList=mocked_hallSettings(),
+            auth_level=self.mocked_authLevel,
+            hall_name=self.helper_getAuth["hall_name"]
+        )
