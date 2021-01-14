@@ -2,6 +2,9 @@ from unittest.mock import MagicMock, patch
 from scheduleServer import app
 import unittest
 
+from helperFunctions.helperFunctions import stdRet
+from hall.hall import getHallSettings
+
 
 class TestHallBP_getHallSettings(unittest.TestCase):
     def setUp(self):
@@ -83,7 +86,7 @@ class TestHallBP_getHallSettings(unittest.TestCase):
         }
 
         # Create the patcher for the getAuth() method
-        self.patcher_getAuth = patch("conflicts.conflicts.getAuth", autospec=True)
+        self.patcher_getAuth = patch("hall.hall.getAuth", autospec=True)
 
         # Start the patcher - mock returned
         self.mocked_getAuth = self.patcher_getAuth.start()
@@ -92,7 +95,7 @@ class TestHallBP_getHallSettings(unittest.TestCase):
         self.mocked_getAuth.return_value = self.helper_getAuth
 
         # -- Create a patcher for the appGlobals file --
-        self.patcher_appGlobals = patch("conflicts.conflicts.ag", autospec=True)
+        self.patcher_appGlobals = patch("hall.hall.ag", autospec=True)
 
         # Start the patcher - mock returned
         self.mocked_appGlobals = self.patcher_appGlobals.start()
@@ -117,23 +120,296 @@ class TestHallBP_getHallSettings(unittest.TestCase):
     # ------------------------------
     # -- Called from Client Tests --
     # ------------------------------
-    def test_whenCalledFromClient_withAuthorizedUser_returnsSettingListInExpectedJSONFormat(self):
+    def test_whenCalledFromClient_withAuthorizedUser_withGCalSetup_returnsSettingListInExpectedJSONFormat(self):
+        # Test to ensure that when this API is called from a remote client with an
+        #  authorized user, it returns the settings list in the expected JSON format.
+        #  In this test, the Google Calendar Integration is being marked as being set up.
+        #  An authorized user is considered a user whose "auth_level" is at least 3 (HD).
+        #
+        #   [
+        #      {
+        #         "settingName": ""
+        #         "settingDesc": ""
+        #         "settingVal": ""
+        #      },
+        #      ...
+        #   ]
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 3
+
+        # Set various items to be used in this test
+        expectedHallName = "Test Hall"
+        expectedGCalTokenSetup = True
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        # Fetchall() config
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedHallName,),  # First call returns the Res Hall name
+            (expectedGCalTokenSetup,)  # Second call returns whether GCal Integration
+                                       #  has been set up.
+        ]
+
+        # Build the expected returned Settings List
+        expectedSettingsList = [
+            {
+                "settingName": "Residence Hall Name",
+                "settingDesc": "The name of the Residence Hall.",
+                "settingVal": expectedHallName
+            },
+            {
+                "settingName": "Google Calendar Integration",
+                "settingDesc": "Connecting a Google Calendar account allows AHDs and " +
+                               "HDs to export a given month's duty schedule to Google Calendar.",
+                "settingVal": "Connected" if expectedGCalTokenSetup else "Not Connected"
+            }
+        ]
+
         # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/hall/api/getHallSettings",
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received our expected result
+        self.assertListEqual(expectedSettingsList, resp.json)
+
+    def test_whenCalledFromClient_withAuthorizedUser_withoutGCalSetup_returnsSettingListInExpectedJSONFormat(self):
+        # Test to ensure that when this API is called from a remote client with an
+        #  authorized user, it returns the settings list in the expected JSON format.
+        #  In this test, the Google Calendar Integration is being marked as NOT
+        #  being set up. An authorized user is considered a user whose "auth_level"
+        #  is at least 3 (HD).
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 3
+
+        # Set various items to be used in this test
+        expectedHallName = "Test Hall"
+        expectedGCalTokenSetup = False
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        # Fetchall() config
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedHallName,),  # First call returns the Res Hall name
+            (expectedGCalTokenSetup,)  # Second call returns whether GCal Integration
+                                       #  has been set up.
+        ]
+
+        # Build the expected returned Settings List
+        expectedSettingsList = [
+            {
+                "settingName": "Residence Hall Name",
+                "settingDesc": "The name of the Residence Hall.",
+                "settingVal": expectedHallName
+            },
+            {
+                "settingName": "Google Calendar Integration",
+                "settingDesc": "Connecting a Google Calendar account allows AHDs and " +
+                               "HDs to export a given month's duty schedule to Google Calendar.",
+                "settingVal": "Connected" if expectedGCalTokenSetup else "Not Connected"
+            }
+        ]
+
+        # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/hall/api/getHallSettings",
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received our expected result
+        self.assertListEqual(expectedSettingsList, resp.json)
 
     def test_whenCalledFromClient_withUnAuthorizedUser_returnsNotAuthorizedResponse(self):
+        # Test to ensure that when a user that is NOT authorized to view
+        #  the Manage Hall page, they receive a JSON response that indicates
+        #  that they are not authorized. An authorized user is a user that
+        #  has an auth_level of at least 3 (HD).
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
         # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/hall/api/getHallSettings",
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received our expected result
+        self.assertEqual(stdRet(-1, "NOT AUTHORIZED"), resp.json)
 
     # ------------------------------
     # -- Called from Client Tests --
     # ------------------------------
-    def test_whenCalledFromServer_returnsSettingListInExpectedFormatFor(self):
+    def test_whenCalledFromServer_withoutGCalSetup_returnsSettingListInExpectedFormatFor(self):
+        # Test to ensure that when this API is called from a remote client with an
+        #  authorized user, it returns the settings list in the expected JSON format.
+        #  In this test, the Google Calendar Integration is being marked as NOT
+        #  being set up. An authorized user is considered a user whose "auth_level"
+        #  is at least 3 (HD).
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set various items to be used in this test
+        expectedHallName = "Test Hall"
+        expectedGCalTokenSetup = False
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        # Fetchall() config
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedHallName,),  # First call returns the Res Hall name
+            (expectedGCalTokenSetup,)  # Second call returns whether GCal Integration
+            #  has been set up.
+        ]
+
+        # Build the expected returned Settings List
+        expectedSettingsList = [
+            {
+                "settingName": "Residence Hall Name",
+                "settingDesc": "The name of the Residence Hall.",
+                "settingVal": expectedHallName
+            },
+            {
+                "settingName": "Google Calendar Integration",
+                "settingDesc": "Connecting a Google Calendar account allows AHDs and " +
+                               "HDs to export a given month's duty schedule to Google Calendar.",
+                "settingVal": "Connected" if expectedGCalTokenSetup else "Not Connected"
+            }
+        ]
+
         # -- Act --
+
+        # Bundle the call up in a test_request_context so that we can test
+        #  the function as if we were calling it from the server.
+
+        with app.test_request_context("/conflicts/api/getRAConflicts",
+                                      base_url=self.mocked_appGlobals.baseOpts["HOST_URL"]):
+            # Make our call to the function
+            result = getHallSettings(self.user_hall_id)
+
         # -- Assert --
-        pass
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received our expected result
+        self.assertListEqual(expectedSettingsList, result)
+
+    def test_whenCalledFromServer_withGCalSetup_returnsSettingListInExpectedFormatFor(self):
+        # Test to ensure that when this API is called from a remote client with an
+        #  authorized user, it returns the settings list in the expected JSON format.
+        #  In this test, the Google Calendar Integration is being marked as being set
+        #  up. An authorized user is considered a user whose "auth_level"  is at least
+        #  3 (HD).
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set various items to be used in this test
+        expectedHallName = "Test Hall"
+        expectedGCalTokenSetup = True
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        # Fetchall() config
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedHallName,),  # First call returns the Res Hall name
+            (expectedGCalTokenSetup,)  # Second call returns whether GCal Integration
+            #  has been set up.
+        ]
+
+        # Build the expected returned Settings List
+        expectedSettingsList = [
+            {
+                "settingName": "Residence Hall Name",
+                "settingDesc": "The name of the Residence Hall.",
+                "settingVal": expectedHallName
+            },
+            {
+                "settingName": "Google Calendar Integration",
+                "settingDesc": "Connecting a Google Calendar account allows AHDs and " +
+                               "HDs to export a given month's duty schedule to Google Calendar.",
+                "settingVal": "Connected" if expectedGCalTokenSetup else "Not Connected"
+            }
+        ]
+
+        # -- Act --
+
+        # Bundle the call up in a test_request_context so that we can test
+        #  the function as if we were calling it from the server.
+
+        with app.test_request_context("/conflicts/api/getRAConflicts",
+                                      base_url=self.mocked_appGlobals.baseOpts["HOST_URL"]):
+            # Make our call to the function
+            result = getHallSettings(self.user_hall_id)
+
+        # -- Assert --
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received our expected result
+        self.assertListEqual(expectedSettingsList, result)
