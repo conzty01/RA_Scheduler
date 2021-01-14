@@ -85,7 +85,7 @@ class TestHallBP_saveHallSettings(unittest.TestCase):
         }
 
         # Create the patcher for the getAuth() method
-        self.patcher_getAuth = patch("conflicts.conflicts.getAuth", autospec=True)
+        self.patcher_getAuth = patch("hall.hall.getAuth", autospec=True)
 
         # Start the patcher - mock returned
         self.mocked_getAuth = self.patcher_getAuth.start()
@@ -94,7 +94,7 @@ class TestHallBP_saveHallSettings(unittest.TestCase):
         self.mocked_getAuth.return_value = self.helper_getAuth
 
         # -- Create a patcher for the appGlobals file --
-        self.patcher_appGlobals = patch("conflicts.conflicts.ag", autospec=True)
+        self.patcher_appGlobals = patch("hall.hall.ag", autospec=True)
 
         # Start the patcher - mock returned
         self.mocked_appGlobals = self.patcher_appGlobals.start()
@@ -117,13 +117,162 @@ class TestHallBP_saveHallSettings(unittest.TestCase):
         self.mocked_authLevel.return_value = 1
 
     def test_withAuthorizedUser_SavesResHallName(self):
+        # Test to ensure that when an authorized user passes valid
+        #  Hall Setting data to this API, the method saves the
+        #  data to the DB. An authorized user is considered a user
+        #  whose "auth_level" at least 3 (HD).
+        #
+        #   name   <str>  -  The name of the Hall Setting that has been changed.
+        #   value  <ukn>  -  The new value for the setting that has been altered.
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 3
+
+        desiredSettingName = "Residence Hall Name"
+        desiredSettingValue = "Test Hall"
+
+        expectedHallID = 14
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedHallID,)  # First call returns a Hall ID if the user belongs
+                               #  to the appropriate hall.
+        ]
+
         # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.post("/hall/api/saveHallSettings",
+                                json=dict(
+                                    name=desiredSettingName,
+                                    value=desiredSettingValue
+                                ),
+                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that the when the appGlobals.conn.cursor().execute was last called,
+        #  it was an UPDATE statement.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
+            "UPDATE res_hall SET name = %s WHERE id = %s",
+            (desiredSettingValue, self.user_hall_id)
+        )
+
+        # Assert that the API method checked to ensure that the user belonged
+        #  to the hall that whose settings they are manipulating.
+        self.mocked_appGlobals.conn.cursor().execute.assert_any_call(
+            """SELECT res_hall.id
+                       FROM res_hall JOIN ra ON (ra.hall_id = res_hall.id)
+                       WHERE ra.id = %s;""", (self.user_ra_id,)
+        )
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_called_once()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received our expected result
+        self.assertEqual(stdRet(1, "successful"), resp.json)
+
+    def test_withAuthorizedUser_withMismatchedHallID_returnsNotAuthorizedResponse(self):
+        # Test to ensure that when a user that is authorized to make
+        #  changes to Hall Settings attempts to do so but an issue
+        #  occurs in the DB so that there is no res_hall.id value
+        #  associated with them, the API returns a not authorized
+        #  JSON response.
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 3
+
+        desiredSettingName = "Residence Hall Name"
+        desiredSettingValue = "Test Hall"
+
+        expectedHallID = 14
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            None  # First call returns a Hall ID if the user belongs
+            #  to the appropriate hall.
+        ]
+
+        # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.post("/hall/api/saveHallSettings",
+                                json=dict(
+                                    name=desiredSettingName,
+                                    value=desiredSettingValue
+                                ),
+                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that the API method checked to ensure that the user belonged
+        #  to the hall that whose settings they are manipulating.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
+            """SELECT res_hall.id
+                       FROM res_hall JOIN ra ON (ra.hall_id = res_hall.id)
+                       WHERE ra.id = %s;""", (self.user_ra_id,)
+        )
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received our expected result
+        self.assertEqual(stdRet(0, "NOT AUTHORIZED"), resp.json)
 
     def test_withUnauthorizedUser_returnsNotAuthorizedResponse(self):
+        # Test to ensure that when a user that is not authorized to
+        #  make changes to Hall Settings attempts to call this API,
+        #  they receive a JSON response that indicates that they are
+        #  not authorized. An authorized user is considered a user
+        #  whose "auth_level" at least 3 (HD).
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
         # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.post("/hall/api/saveHallSettings",
+                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received our expected result
+        self.assertEqual(stdRet(-1, "NOT AUTHORIZED"), resp.json)
