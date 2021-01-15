@@ -20,15 +20,15 @@ def migrate(conn):
         logging.info("  Creating 'point_modifier' Table.")
 
         # Create the point_modifier table
-        conn.execute("""
+        cur.execute("""
         CREATE TABLE point_modifier(
             id				serial UNIQUE,
             ra_id			int,
             res_hall_id		int,
             month_id		int,
-            modifier		int,
+            modifier		int DEFAULT 0,
 
-            PRIMARY KEY (ra_id, res_hall_id),
+            PRIMARY KEY (ra_id, res_hall_id, month_id),
             FOREIGN KEY (ra_id) REFERENCES ra(id),
             FOREIGN KEY (res_hall_id) REFERENCES res_hall(id),
             FOREIGN KEY (month_id) REFERENCES month(id)
