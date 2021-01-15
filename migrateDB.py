@@ -25,13 +25,11 @@ def migrate(conn):
             id				serial UNIQUE,
             ra_id			int,
             res_hall_id		int,
-            month_id		int,
             modifier		int DEFAULT 0,
 
-            PRIMARY KEY (ra_id, res_hall_id, month_id),
+            PRIMARY KEY (ra_id, res_hall_id),
             FOREIGN KEY (ra_id) REFERENCES ra(id),
-            FOREIGN KEY (res_hall_id) REFERENCES res_hall(id),
-            FOREIGN KEY (month_id) REFERENCES month(id)
+            FOREIGN KEY (res_hall_id) REFERENCES res_hall(id)
         );""")
 
 
