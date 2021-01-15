@@ -4,7 +4,7 @@ import unittest
 from helperFunctions.helperFunctions import getAuth
 
 
-class TestHallBP_getHallSettings(unittest.TestCase):
+class TestHallBP_getAuth(unittest.TestCase):
     def setUp(self):
         # Set up a number of items that will be used for these tests.
 
