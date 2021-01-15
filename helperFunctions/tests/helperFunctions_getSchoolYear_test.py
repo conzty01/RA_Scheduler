@@ -4,7 +4,7 @@ import unittest
 from helperFunctions.helperFunctions import getSchoolYear
 
 
-class TestHelperFunctions_getCurSchoolYear(unittest.TestCase):
+class TestHelperFunctions_getSchoolYear(unittest.TestCase):
     def setUp(self):
         # Set up a number of items that will be used for these tests.
 
