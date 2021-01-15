@@ -433,7 +433,7 @@ function getPoints() {
 
 function updatePoints(pointDict) {
     // PointDict is expected to be as follows:
-    // { raId: {name: x, pts: x}, ... }
+    // { raId: {name: x, pts: { dutyPts: x, modPts: x}, ... }
     console.log(pointDict);
 
     let raListDiv = document.getElementById("raList");
@@ -457,7 +457,7 @@ function updatePoints(pointDict) {
             let newPtsDiv = document.createElement("div");
             newPtsDiv.id = "list_points_" + idKey;
             newPtsDiv.classList.add("tPoints");
-            newPtsDiv.innerHTML = pointDict[idKey].pts;
+            newPtsDiv.innerHTML = pointDict[idKey].pts.dutyPts;
 
             newLi.appendChild(newNameDiv);
             newLi.appendChild(newPtsDiv);
@@ -465,7 +465,7 @@ function updatePoints(pointDict) {
 
         } else {
             // Else update the point value
-            ptDiv.innerHTML = pointDict[idKey].pts;
+            ptDiv.innerHTML = pointDict[idKey].pts.dutyPts;
         }
     }
 }

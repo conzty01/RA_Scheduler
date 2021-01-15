@@ -189,7 +189,7 @@
             {% for idKey, idVal in ptDict: %}
             <li id="list_{{ idKey }}">
                 <div id="list_name_{{ idKey }}" class="tName">{{ idVal["name"] }}</div>
-                <div id="list_points_{{ idKey }}" class="tPoints">{{ idVal["pts"] }}</div>
+                <div id="list_points_{{ idKey }}" class="tPoints">{{ idVal["pts"]["dutyPts"] }}</div>
             </li>
             {% endfor %}
         </ul>

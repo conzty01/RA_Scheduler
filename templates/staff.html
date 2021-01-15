@@ -51,6 +51,27 @@
               </div>
               <input id="raID" type="text" style="display:none;" disabled />
           </div>
+          <hr />
+          <div class="form-group form-row">
+              <div class="col-md-3">
+                  <label for="dutyPts">Duty Points</label>
+                  <input class="form-control" type="number" value="0" id="dutyPts" readonly />
+              </div>
+              <div class="col-md-1">
+                  <span class="fa fa-plus"></span>
+              </div>
+              <div class="col-md-3">
+                  <label for="modPts">Modifier</label>
+                  <input class="form-control" type="number" value="0" id="modPts" onchange="calculateTotalPoints()"/>
+              </div>
+              <div class="col-md-2 fa-container">
+                  <span class="fa fa-arrow-right"></span>
+              </div>
+              <div class="col-md-3">
+                  <label for="totalPts">Total Points</label>
+                  <input class="form-control" type="number" value="0" id="totalPts" readonly />
+              </div>
+          </div>
      </form>
       <div class="modalError">Add Staffer Failed: <span class="msg"></span></div>
       <div class="modal-footer">
@@ -111,7 +132,9 @@
                 <th scope="col">Email</th>
                 <th scope="col">Date Started</th>
                 <th scope="col">Res Hall</th>
-                <th scope="col">Points</th>
+                <th scope="col" hidden>Duty Points</th>
+                <th scope="col" hidden>Modifier Points</th>
+                <th scope="col">Total Points</th>
                 <th scope="col">Color</th>
                 <th scope="col">Role</th>
                 <th scope="col">Edit</th>
@@ -126,7 +149,9 @@
                 <td class="email">{{ ra[3] }}</td>
                 <td class="startDate">{{ ra[4] }}</td>
                 <td class="resHall">{{ ra[5] }}</td>
-                <td class="points">{{ pts[ra[0]]["pts"] }}</td>
+                <td class="dutyPts" hidden>{{ pts[ra[0]]["pts"]["dutyPts"] }}</td>
+                <td class="modPts" hidden>{{ pts[ra[0]]["pts"]["modPts"] }}</td>
+                <td class="totalPts">{{ pts[ra[0]]["pts"]["dutyPts"] + pts[ra[0]]["pts"]["modPts"] }}</td>
                 <td class="color"><input type="color" value="{{ ra[6] }}" disabled /></td>
                 <td class="authLevel">{% if ra[7] == 1: %}RA{% elif ra[7] == 2: %}AHD{% else %}HD{% endif %}</td>
                 <td class="edit"><span class="fa fa-pencil" onclick="showEditModal({{ ra[0] }})"></span></td>

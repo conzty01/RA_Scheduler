@@ -395,7 +395,7 @@ def manStaff():
     return render_template("staff.html",raList=cur.fetchall(),auth_level=userDict["auth_level"], \
                             opts=baseOpts,curView=4, hall_name=userDict["hall_name"], pts=ptStats)
 
-@app.route("/hall")
+@app.route("/hall/")
 @login_required
 def manHall():
     userDict = getAuth()
@@ -519,7 +519,10 @@ def getStaffStats():
     start, end = getCurSchoolYear()
     pts = getRAStats(userDict["hall_id"], start, end)
 
-    ret = {"raList":cur.fetchall(), "pts":pts}
+    ret = {
+        "raList": cur.fetchall(),
+        "pts": pts
+    }
 
     return jsonify(ret)
 
@@ -565,8 +568,8 @@ def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None
     logging.debug("breakDutyStart: {}".format(breakDutyStart))
     logging.debug("breakDutyEnd: {}".format(breakDutyEnd))
 
-
-    cur.execute("""SELECT ra.id, ra.first_name, ra.last_name, COALESCE(ptQuery.pts,0)
+    cur.execute("""SELECT ra.id, ra.first_name, ra.last_name, COALESCE(ptQuery.pts,0), 
+                          COALESCE(point_modifier.modifier, 0)
                FROM
                (
                    SELECT combined_res.rid AS rid, CAST(SUM(combined_res.pts) AS INTEGER) AS pts
@@ -605,6 +608,7 @@ def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None
                    GROUP BY combined_res.rid
                ) ptQuery
                RIGHT JOIN ra ON (ptQuery.rid = ra.id)
+               LEFT JOIN point_modifier ON (ra.id = point_modifier.ra_id)
                WHERE ra.hall_id = {};""".format(hallId, hallId, startDateStr, \
                                                 endDateStr, hallId, breakDutyStart, \
                                                 breakDutyEnd, hallId))
@@ -612,7 +616,13 @@ def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None
     raList = cur.fetchall()
 
     for ra in raList:
-        res[ra[0]] = { "name": ra[1] + " " + ra[2], "pts": ra[3] }
+        res[ra[0]] = {
+            "name": ra[1] + " " + ra[2],
+            "pts": {
+                "dutyPts": ra[3],
+                "modPts": ra[4]
+            }
+        }
 
     cur.close()
     if fromServer:
@@ -837,7 +847,20 @@ def runScheduler(hallId=None, monthNum=None, year=None):
 
     # -- Assemble the RA List --
 
-    ra_list = [RA(res[0],res[1],res[2],res[3],res[4],res[5],ptsDict[res[2]]["pts"]) for res in partialRAList]
+    ra_list = []
+    for res in partialRAList:
+        ra_list.append(
+            RA(
+                res[0],   # First Name
+                res[1],   # Last Name
+                res[2],   # ID
+                res[3],   # Hall ID
+                res[4],   # Date Started
+                res[5],   # Conflicts
+                # The sum of the RA's duty points and any modifier points that have been assigned to them.
+                ptsDict[res[2]]["pts"]["dutyPts"] + ptsDict[res[2]]["pts"]["modPts"]))
+
+    #ra_list = [RA(res[0],res[1],res[2],res[3],res[4],res[5],ptsDict[res[2]]["pts"]) for res in partialRAList]
 
     # logging.debug("RA_LIST_______________________")
     # for ra in ra_list:
@@ -1026,7 +1049,7 @@ def changeStaffInfo():
 
     if userDict["auth_level"] < 3:                                              # If the user is not at least an AHD
         logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
-        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
+        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
 
     data = request.json
 
@@ -1036,14 +1059,32 @@ def changeStaffInfo():
                        date_started = TO_DATE('{}', 'YYYY-MM-DD'),
                        color = '{}', email = '{}', auth_level = {}
                    WHERE id = {};
-                """.format(data["fName"],data["lName"], \
-                        data["startDate"],data["color"], \
-                        data["email"],data["authLevel"], \
-                        data["raID"]))
+                """.format(data["fName"], data["lName"],
+                           data["startDate"], data["color"],
+                           data["email"], data["authLevel"],
+                           data["raID"]))
+
+    # Check to see if there is a point modifier entry for the given RA.
+    cur.execute("SELECT id FROM point_modifier WHERE ra_id = %s AND res_hall_id = %s", (data["raID"], hallId))
+
+    # Load the record from the DB
+    ptModRecord = cur.fetchone()
+
+    if ptModRecord is None:
+        # If we don't have a point modifier record,
+        #  then create one.
+        cur.execute("""INSERT INTO point_modifier (ra_id, res_hall_id, modifier)
+                       VALUES (%s, %s, %s);""", (data["raID"], hallId, data["modPts"]))
+
+    else:
+        # Otherwise, update the existing point modifier record
+        cur.execute("""UPDATE point_modifier
+                       SET modifier = %s
+                       WHERE id = %s""", (data["modPts"], ptModRecord[0]))
 
     conn.commit()
     cur.close()
-    return jsonify(stdRet(1,"successful"))
+    return jsonify(stdRet(1, "successful"))
 
 @app.route("/api/removeStaffer", methods=["POST"])
 @login_required
