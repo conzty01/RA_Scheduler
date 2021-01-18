@@ -7,7 +7,11 @@ import os
 def migrate(conn):
     cur = conn.cursor()
 
-    # Check to see if the google_calendar_info table exists
+    # ----------------------
+    # --  point_modifier  --
+    # ----------------------
+
+    # Check to see if the point_modifier table exists
     cur.execute("SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'point_modifier');")
 
     exists = cur.fetchone()
