@@ -80,3 +80,7 @@
 #breakDutyWarning {
     color: red;
 }
+
+.bootstrap-select > button {
+    height: 100%;
+}

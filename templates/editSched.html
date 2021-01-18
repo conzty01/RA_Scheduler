@@ -6,6 +6,8 @@
 <link rel="stylesheet" href="{{url_for('.static', filename='calendar.css')}}">
 <link rel="stylesheet" href="{{url_for('.static', filename='editSched.css')}}">
 
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.13.1/css/bootstrap-select.css" />
+
 {% endblock %}
 
 {% block contentRows %}
@@ -21,7 +23,7 @@
           <div class="row">
               <div class="col-sm-5">
                   <div class="form-group">
-                      <label for"editModalPrevRA">Current Assigned RA</label>
+                      <label for="editModalPrevRA">Current Assigned RA</label>
                       <select id="editModalPrevRA" class="form-control" disabled>
                           {% for ra in raList: %}
                           <option value="{{ ra[1] }} {{ ra[2] }}">{{ ra[1] }} {{ ra[2] }}</option>
@@ -110,9 +112,15 @@
           </div>
           <div class="form-group">
               <label for="runRAList">
-                  Select the RAs that SHOULD be scheduled for duty for this month.
+                  Select staff members to schedule.
               </label>
-              <div>
+              <select id="runRAList" class="form-control selectpicker" multiple data-live-search="true"
+                      data-selected-text-format="count > 4" data-size="10" data-actions-box="true">
+                  {% for ra in raList: %}
+                  <option id="{{ ra[0] }}" value="{{ ra[0] }}">{{ ra[1] }} {{ra[2] }}</option>
+                  {% endfor %}
+              </select>
+              <!--<div>
                   <ul id="runRAList">
                       {% for ra in raList: %}
                       <li>
@@ -121,8 +129,14 @@
                       </li>
                       {% endfor %}
                   </ul>
-              </div>
+              </div>-->
           </div>
+          <!--<div class="form-group form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="autoExcAdj">
+              <label class="form-check-label" for="autoExcAdj">
+                  Automatically adjust excluded staff points.
+              </label>
+          </div>-->
           <!--<div class="row">
               <label for="runLDA">
                   Number of days between duties.
@@ -203,7 +217,12 @@
 <script src="{{url_for('.static', filename='locales-all.js')}}"></script>
 <script src="{{url_for('.static', filename='fullCal.js')}}"></script>
 <script src="{{url_for('.static', filename='editSched.js')}}"></script>
+<script src="{{url_for('.static', filename='bootstrap-select.js')}}"></script>
 <script>
     initEditSchedCal();
+    $(function () {
+        $('#runRAList').selectpicker();
+    });
+    $('#runRAList').selectpicker('selectAll');
 </script>
 {% endblock %}

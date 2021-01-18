@@ -271,17 +271,24 @@ function showRunModal() {
 
 function runScheduler() {
     let noDutyDays = document.getElementById("runNoDutyDates").value;
-    let eligibleRAs = [];
+    //    let eligibleRAs = [];
+    //
+    //    // Assemble list of RA ids that are eligible for the scheduler
+    //    for (let li of document.getElementById("runRAList").getElementsByTagName("input")) {
+    //        if (li.checked) {
+    //            eligibleRAs.push(li.id);
+    //        }
+    //    }
 
-    // Assemble list of RA ids that are eligible for the scheduler
-    for (let li of document.getElementById("runRAList").getElementsByTagName("input")) {
-        if (li.checked) {
-            eligibleRAs.push(li.id);
-        }
-    }
+    // Get the list of selected eligibleRAs
+    let eligibleRAs = $('#runRAList').val()
 
     let monthNum = appConfig.calDate.getMonth();
     let year = appConfig.calDate.getFullYear();
+
+    // Get the value of the autoExcAdj checkbox -- currently unused
+    //let autoExcAdjVal = document.getElementById("autoExcAdj").checked;
+
 
     console.log("Running Scheduler for month: "+(monthNum+1));
     console.log("  with no duties on: "+noDutyDays);
@@ -291,9 +298,17 @@ function runScheduler() {
     document.getElementById("runButton").disabled = true;
     $("body").css("cursor", "wait");
 
+    let data = {
+        monthNum: monthNum + 1,
+        year: year,
+        noDuty: noDutyDays,
+        eligibleRAs: eligibleRAs,
+        //autoExcAdj: autoExcAdjVal - Currently unused
+    }
+
     //document.getElementById("loading").style.display = "block";
     appConfig.base.callAPI("runScheduler",
-            {monthNum:monthNum+1, year:year, noDuty:noDutyDays, eligibleRAs:eligibleRAs},
+            data,
             function(msg) {
                 passModalSave("#runModal", msg, () => {
                     document.getElementById("runButton").disabled = false;
