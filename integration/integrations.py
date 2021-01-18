@@ -327,7 +327,7 @@ def disconnectGoogleCalendar():
     cur.execute("DELETE FROM google_calendar_info WHERE res_hall_id = %s;", (userDict["hall_id"], ))
 
     # Redirect user back to Manage Hall page
-    return redirect(url_for("manHall"))
+    return redirect(url_for("hall_bp.manHall"))
 
 
 # ---------------------
