@@ -63,6 +63,9 @@ def createGoogleCalendar(calInfoId):
         # Log the occurrence.
         logging.info("No Google Calendar token found for Id: {}".format(calInfoId))
 
+        # Close the DB cursor
+        cur.close()
+
         # Return a failed standard return
         return jsonify(stdRet(-1, "No Token Found"))
 
@@ -93,6 +96,9 @@ def createGoogleCalendar(calInfoId):
 
     # Commit the changes to the DB
     ag.conn.commit()
+
+    # Close the DB cursor
+    cur.close()
 
     # Return a successful standard return
     return stdRet(1, "successful")
