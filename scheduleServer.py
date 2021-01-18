@@ -395,7 +395,7 @@ def manStaff():
     return render_template("staff.html",raList=cur.fetchall(),auth_level=userDict["auth_level"], \
                             opts=baseOpts,curView=4, hall_name=userDict["hall_name"], pts=ptStats)
 
-@app.route("/hall")
+@app.route("/hall/")
 @login_required
 def manHall():
     userDict = getAuth()
@@ -519,7 +519,10 @@ def getStaffStats():
     start, end = getCurSchoolYear()
     pts = getRAStats(userDict["hall_id"], start, end)
 
-    ret = {"raList":cur.fetchall(), "pts":pts}
+    ret = {
+        "raList": cur.fetchall(),
+        "pts": pts
+    }
 
     return jsonify(ret)
 
@@ -565,8 +568,8 @@ def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None
     logging.debug("breakDutyStart: {}".format(breakDutyStart))
     logging.debug("breakDutyEnd: {}".format(breakDutyEnd))
 
-
-    cur.execute("""SELECT ra.id, ra.first_name, ra.last_name, COALESCE(ptQuery.pts,0)
+    cur.execute("""SELECT ra.id, ra.first_name, ra.last_name, COALESCE(ptQuery.pts,0), 
+                          COALESCE(point_modifier.modifier, 0)
                FROM
                (
                    SELECT combined_res.rid AS rid, CAST(SUM(combined_res.pts) AS INTEGER) AS pts
@@ -605,6 +608,7 @@ def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None
                    GROUP BY combined_res.rid
                ) ptQuery
                RIGHT JOIN ra ON (ptQuery.rid = ra.id)
+               LEFT JOIN point_modifier ON (ra.id = point_modifier.ra_id)
                WHERE ra.hall_id = {};""".format(hallId, hallId, startDateStr, \
                                                 endDateStr, hallId, breakDutyStart, \
                                                 breakDutyEnd, hallId))
@@ -612,7 +616,13 @@ def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None
     raList = cur.fetchall()
 
     for ra in raList:
-        res[ra[0]] = { "name": ra[1] + " " + ra[2], "pts": ra[3] }
+        res[ra[0]] = {
+            "name": ra[1] + " " + ra[2],
+            "pts": {
+                "dutyPts": ra[3],
+                "modPts": ra[4]
+            }
+        }
 
     cur.close()
     if fromServer:
@@ -753,12 +763,26 @@ def runScheduler(hallId=None, monthNum=None, year=None):
 
     # -- Begin parsing provided parameters --
     fromServer = True
-    if monthNum == None and year == None and hallId == None:                    # Effectively: If API was called from the client and not from the server
+    if monthNum is None and year is None and hallId is None:                    # Effectively: If API was called from the client and not from the server
         monthNum = int(request.json["monthNum"])
         year = int(request.json["year"])
         userDict = getAuth()                                                    # Get the user's info from our database
         hallId = userDict["hall_id"]
         fromServer = False
+
+        # Currently unused feature that allows the scheduler to automatically create
+        #  point_modifiers for RAs that have been excluded from being scheduled for
+        #  the given month. This feature is unreleased because if the user sets this
+        #  to true and then runs the scheduler more than once for the same month,
+        #  there is no way for the application to know if it created any
+        #  point_modifiers for the excluded RAs of the previous run so that it can
+        #  remove them from the system/algorithm. As a result, any point_modifiers
+        #  created in this manner will just grow and grow until an HD goes in and
+        #  manually alters the point_modifier.modifier value.
+        # TODO: Figure out how to address the above comment. Possibly implement a
+        #        draft system so that AHD+ users can view a scheduler run before
+        #        publishing it to the rest of staff?
+        autoExcAdj = False  #bool(request.json["autoExcAdj"])
 
     logging.debug("Run Scheduler - From Server: {}".format(fromServer))
     res = {}
@@ -773,6 +797,8 @@ def runScheduler(hallId=None, monthNum=None, year=None):
         if request.json["eligibleRAs"] != "":
             eligibleRAs = [int(i) for i in request.json["eligibleRAs"]]
             eligibleRAStr = "AND ra.id IN ({});".format(str(eligibleRAs)[1:-1])
+
+            logging.debug("Eligible RAs: {}".format(eligibleRAs))
 
         else:
             eligibleRAStr = ";"
@@ -837,7 +863,20 @@ def runScheduler(hallId=None, monthNum=None, year=None):
 
     # -- Assemble the RA List --
 
-    ra_list = [RA(res[0],res[1],res[2],res[3],res[4],res[5],ptsDict[res[2]]["pts"]) for res in partialRAList]
+    ra_list = []
+    for res in partialRAList:
+        ra_list.append(
+            RA(
+                res[0],   # First Name
+                res[1],   # Last Name
+                res[2],   # ID
+                res[3],   # Hall ID
+                res[4],   # Date Started
+                res[5],   # Conflicts
+                # The sum of the RA's duty points and any modifier points that have been assigned to them.
+                ptsDict[res[2]]["pts"]["dutyPts"] + ptsDict[res[2]]["pts"]["modPts"]))
+
+    #ra_list = [RA(res[0],res[1],res[2],res[3],res[4],res[5],ptsDict[res[2]]["pts"]) for res in partialRAList]
 
     # logging.debug("RA_LIST_______________________")
     # for ra in ra_list:
@@ -976,6 +1015,9 @@ def runScheduler(hallId=None, monthNum=None, year=None):
     for res in cur.fetchall():
         days[res[0]] = res[1]
 
+    # Create a dictionary to add up all of the averages
+    avgPtDict = {}
+
     # Iterate through the schedule
     dutyDayStr = ""
     noDutyDayStr = ""
@@ -984,6 +1026,13 @@ def runScheduler(hallId=None, monthNum=None, year=None):
         if d.numberOnDuty() > 0:
             for r in d:
                 dutyDayStr += "({},{},{},{},{}),".format(hallId, r.getId(), days[d.getDate()], schedId, d.getPoints())
+
+                # Check to see if the RA has already been added to the dictionary
+                if r in avgPtDict.keys():
+                    # If so, add the points to the dict
+                    avgPtDict[r.getId()] += d.getPoints()
+                else:
+                    avgPtDict[r.getId()] = d.getPoints()
 
         else:
             noDutyDayStr += "({},{},{},{}),".format(hallId, days[d.getDate()], schedId, d.getPoints())
@@ -1006,7 +1055,35 @@ def runScheduler(hallId=None, monthNum=None, year=None):
         logging.debug("ROLLBACK")
         conn.rollback()
 
+    # Commit the changes to the DB
     conn.commit()
+
+    # If autoExcAdj is set, then create adjust the excluded RAs' points
+    if not fromServer and autoExcAdj and len(eligibleRAStr) > 1:
+        logging.info("Adjusting Excluded RA Point Modifiers")
+
+        # Select all RAs in the given hall whose auth_level is below 3 (HD)
+        #  that were not included in the eligibleRAs list
+        cur.execute("""SELECT id FROM ra WHERE id NOT IN %s AND hall_id = %s""", (tuple(eligibleRAs), hallId))
+
+        raAdjList = cur.fetchall()
+
+        # Calculate the average number of points earned for the month.
+        sum = 0
+        for ra in avgPtDict.keys():
+            sum += avgPtDict[ra]
+
+        # Calculate the average using floor division
+        avgPointGain = sum // len(avgPtDict.keys())
+
+        logging.info("Average Point Gain: {} for Schedule: {}".format(avgPointGain, schedId))
+        logging.debug("Number of excluded RAs: {}".format(len(raAdjList)))
+        #logging.debug(str(avgPtDict))
+
+        # Iterate through the excluded RAs and add point modifiers
+        #  to them.
+        for ra in raAdjList:
+            addRAPointModifier(ra[0], hallId, avgPointGain)
 
     cur.close()
 
@@ -1017,6 +1094,86 @@ def runScheduler(hallId=None, monthNum=None, year=None):
     else:
         return jsonify(stdRet(1,"successful"))
 
+def addRAPointModifier(raID, resHallID, modifier, set=False):
+    # Helper function that will check to see if a point_modifier record
+    #  exists for the given raID and resHallID. If so, this function will
+    #  add the provided modifier to the record. If a record does not exist,
+    #  this function will create a new point_modifier record with the given
+    #  modifier.
+    #
+    #  If called from the server, this function accepts the following parameters:
+    #
+    #     raID       <int>   -  an integer representing the id of the desired
+    #                            record in the ra table (ra.id).
+    #     resHallID  <int>   -  an integer representing the id of the desired
+    #                            record in the res_hall table (res_hall.id).
+    #     modifier   <int>   -  an integer denoting how much the modifier field
+    #                            should be adjusted in the point_modifier table.
+    #                            This can be either positive or negative.
+    #     set        <bool>  -  a boolean denoting whether this function should
+    #                            add the provided modifier to any existing
+    #                            modifier (set=False) or if it should set the
+    #                            modifier to the provided value instead (set=True).
+    #
+    #  This method cannot be called from a remote client.
+    #
+    #  This method does not return any additional information.
+
+    logging.debug("Adding point modifier for RA: {}, Hall: {}".format(raID, resHallID))
+
+    # Create a DB cursor
+    cur = conn.cursor()
+
+    # Query the DB to see if a point_modifier record already exists.
+    cur.execute("SELECT id, modifier FROM point_modifier WHERE ra_id = %s AND res_hall_id = %s",
+                (raID, resHallID))
+
+    # Load the results from the DB
+    record = cur.fetchone()
+
+    # Check to see if a record was returned
+    if record is not None:
+        # If a record exists then we will need to update it with a new value
+
+        # Load the results from the DB
+        ptModID, prevModifier = record
+
+        logging.debug("  Record located in point_modifier table: {}".format(ptModID))
+        logging.debug("  Update existing record: {}".format(not set))
+
+        # Check to see if we should update or set the modifier
+        if set:
+            # If True, set the newMod to the provided modifier
+            newMod = modifier
+
+        else:
+            # If False, add the new modifier to the previous modifier
+            newMod = prevModifier + modifier
+
+        # Save the entry to the DB
+        cur.execute("UPDATE point_modifier SET modifier = %s WHERE id = %s",
+                    (newMod, ptModID))
+
+    else:
+        # If a record does NOT exist, then we will need to create one.
+
+        logging.debug("  Creating new point_modifier record.")
+
+        # Create a new record into the point_modifier table.
+        cur.execute("""INSERT INTO point_modifier (ra_id, res_hall_id, modifier)
+        VALUES (%s, %s, %s);""", (raID, resHallID, modifier))
+
+    logging.debug("  Committing changes")
+
+    # Commit the changes to the DB
+    conn.commit()
+
+    # Close the DB cursor
+    cur.close()
+
+    # Return to the calling method
+    return
+
 @app.route("/api/changeStaffInfo", methods=["POST"])
 @login_required
 def changeStaffInfo():
@@ -1026,7 +1183,7 @@ def changeStaffInfo():
 
     if userDict["auth_level"] < 3:                                              # If the user is not at least an AHD
         logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
-        return jsonify(stdRet(-1,"NOT AUTHORIZED"))
+        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
 
     data = request.json
 
@@ -1036,14 +1193,18 @@ def changeStaffInfo():
                        date_started = TO_DATE('{}', 'YYYY-MM-DD'),
                        color = '{}', email = '{}', auth_level = {}
                    WHERE id = {};
-                """.format(data["fName"],data["lName"], \
-                        data["startDate"],data["color"], \
-                        data["email"],data["authLevel"], \
-                        data["raID"]))
+                """.format(data["fName"], data["lName"],
+                           data["startDate"], data["color"],
+                           data["email"], data["authLevel"],
+                           data["raID"]))
 
     conn.commit()
+
+    # Add the point modifier to the DB
+    addRAPointModifier(data["raID"], hallId, data["modPts"], set=True)
+
     cur.close()
-    return jsonify(stdRet(1,"successful"))
+    return jsonify(stdRet(1, "successful"))
 
 @app.route("/api/removeStaffer", methods=["POST"])
 @login_required

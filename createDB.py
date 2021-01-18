@@ -152,7 +152,7 @@ def createGoogleCalendarDB(conn):
 	conn.execute("DROP TABLE IF EXISTS google_calendar_info CASCADE;")
 	conn.execute("""
 		CREATE TABLE google_calendar_info(
-			id				serial UNIQUE.
+			id				serial UNIQUE,
 			res_hall_id		int,
 			auth_state		varchar(30),
 			token 			bytea,
@@ -161,6 +161,22 @@ def createGoogleCalendarDB(conn):
 			PRIMARY KEY (res_hall_id),
 			FOREIGN KEY (res_hall_id) REFERENCES res_hall(id)
 		);""")
+
+
+def createPointModifierDB(conn):
+	conn.execute("DROP TABLE IF EXISTS point_modifier CASCADE;")
+	conn.execute("""
+		CREATE TABLE point_modifier(
+			id				serial UNIQUE,
+			ra_id			int,
+			res_hall_id		int,
+			modifier		int DEFAULT 0,
+			
+			PRIMARY KEY (ra_id, res_hall_id),
+			FOREIGN KEY (ra_id) REFERENCES ra(id),
+			FOREIGN KEY (res_hall_id) REFERENCES res_hall(id)
+		);""")
+
 
 def main():
 	conn = psycopg2.connect(os.environ["DATABASE_URL"])
@@ -175,8 +191,10 @@ def main():
 	createUserDB(conn.cursor())
 	createOAuthDB(conn.cursor())
 	createGoogleCalendarDB(conn.cursor())
+	createPointModifierDB(conn.cursor())
 
 	conn.commit()
+
 
 if __name__ == "__main__":
 	main()
