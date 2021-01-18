@@ -12,7 +12,7 @@ import appGlobals as ag
 
 # Import the needed functions from other parts of the application
 from helperFunctions.helperFunctions import getAuth, stdRet, getCurSchoolYear, getSchoolYear
-from staff.staff import getRAStats
+from staff.staff import getRAStats, addRAPointModifier
 
 schedule_bp = Blueprint("schedule_bp", __name__,
                         template_folder="templates",
@@ -264,6 +264,20 @@ def runScheduler():
 
     # Get the user's information from the database
     userDict = getAuth()
+
+    # Currently unused feature that allows the scheduler to automatically create
+    #  point_modifiers for RAs that have been excluded from being scheduled for
+    #  the given month. This feature is unreleased because if the user sets this
+    #  to true and then runs the scheduler more than once for the same month,
+    #  there is no way for the application to know if it created any
+    #  point_modifiers for the excluded RAs of the previous run so that it can
+    #  remove them from the system/algorithm. As a result, any point_modifiers
+    #  created in this manner will just grow and grow until an HD goes in and
+    #  manually alters the point_modifier.modifier value.
+    # TODO: Figure out how to address the above comment. Possibly implement a
+    #        draft system so that AHD+ users can view a scheduler run before
+    #        publishing it to the rest of staff?
+    autoExcAdj = False  # bool(request.json["autoExcAdj"])
 
     # Check to see if the user is authorized to run the scheduler
     # If the user is not at least an AHD
@@ -576,6 +590,9 @@ def runScheduler():
         # Map the date to the day.id
         days[res[0]] = res[1]
 
+    # Create a dictionary to add up all of the averages
+    avgPtDict = {}
+
     # Iterate through the schedule and generate parts of an insert query that will ultimately
     #  add the duties to the DB
     dutyDayStr = ""
@@ -590,6 +607,13 @@ def runScheduler():
             for r in d:
                 dutyDayStr += "({},{},{},{},{}),".format(hallId, r.getId(), days[d.getDate()],
                                                          schedId, d.getPoints())
+
+                # Check to see if the RA has already been added to the dictionary
+                if r in avgPtDict.keys():
+                    # If so, add the points to the dict
+                    avgPtDict[r.getId()] += d.getPoints()
+                else:
+                    avgPtDict[r.getId()] = d.getPoints()
 
         else:
             # Otherwise, if there are no RAs assigned for duty on this day,
@@ -626,6 +650,33 @@ def runScheduler():
 
         # Notify the user of this issue.
         return jsonify(stdRet(-1, "Unable to Generate Schedule"))
+
+    # If autoExcAdj is set, then create adjust the excluded RAs' points
+    if autoExcAdj and len(eligibleRAStr) > 1:
+        logging.info("Adjusting Excluded RA Point Modifiers")
+
+        # Select all RAs in the given hall whose auth_level is below 3 (HD)
+        #  that were not included in the eligibleRAs list
+        cur.execute("""SELECT id FROM ra WHERE id NOT IN %s AND hall_id = %s""", (tuple(eligibleRAs), hallId))
+
+        raAdjList = cur.fetchall()
+
+        # Calculate the average number of points earned for the month.
+        sum = 0
+        for ra in avgPtDict.keys():
+            sum += avgPtDict[ra]
+
+        # Calculate the average using floor division
+        avgPointGain = sum // len(avgPtDict.keys())
+
+        logging.info("Average Point Gain: {} for Schedule: {}".format(avgPointGain, schedId))
+        logging.debug("Number of excluded RAs: {}".format(len(raAdjList)))
+        # logging.debug(str(avgPtDict))
+
+        # Iterate through the excluded RAs and add point modifiers
+        #  to them.
+        for ra in raAdjList:
+            addRAPointModifier(ra[0], hallId, avgPointGain)
 
     # Commit changes to the DB
     ag.conn.commit()
