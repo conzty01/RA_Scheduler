@@ -3,9 +3,6 @@ from scheduleServer import app
 from flask import Response
 import unittest
 
-from integration.integrations import disconnectGoogleCalendar
-from helperFunctions.helperFunctions import stdRet
-
 
 class TestIntegration_disconnectGoogleCalendar(unittest.TestCase):
     def setUp(self):
