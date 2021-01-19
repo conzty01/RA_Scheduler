@@ -178,6 +178,9 @@ def returnGCalRedirect():
     # Commit the changes to the DB
     ag.conn.commit()
 
+    # Close the DB cursor
+    cur.close()
+
     # Redirect the user to the Google Authorization URL
     return redirect(authURL)
 
