@@ -2,7 +2,6 @@ language: python
 python:
   - "3.6"
 script:
-  - pwd
-  - python -m unittest discover -p "*_test.py"
+  - python -m unittest discover -p "*_test.py" -v
 notifications:
     slack: ra-scheduler:z6I7Y1LLLdzzVggMuJnw4Jiq
