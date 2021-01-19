@@ -1,8 +1,10 @@
 from unittest.mock import MagicMock, patch
 from scheduleServer import app
+from flask import Response
 import unittest
 
 from integration.integrations import returnGCalRedirect
+from helperFunctions.helperFunctions import stdRet
 
 
 class TestIntegration_returnGCalRedirect(unittest.TestCase):
@@ -144,31 +146,244 @@ class TestIntegration_returnGCalRedirect(unittest.TestCase):
         self.mocked_authLevel.return_value = 1
 
     def test_withoutAuthorizedUser_returnsNotAuthorizedResponse(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
+        # Test to ensure that when this method is called without an authorized user,
+        #  a NOT AUTHORIZED response is returned. An authorized user is a user that
+        #  has an auth_level of at least 3 (HD).
 
-    def test_withAuthorizedUser_callsGCalIntegratinatorGenerateAuthURLMethod(self):
         # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
 
-    def test_withAuthorizedUser_withPartialInfoInDB_updatesRecordInDB(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+        self.resetAuthLevel()
 
-    def test_withAuthorizedUser_withNoInfoInDB_createsNewRecordInDB(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
+        expectedResponse = stdRet(-1, "NOT AUTHORIZED")
 
-    def test_withAuthorizedUser_returnsRedirectToGeneratedAuthURL(self):
-        # -- Arrange --
         # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/int/GCalRedirect",
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that the response we received is json
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received the expected response
+        self.assertDictEqual(expectedResponse, resp.json)
+
+    @patch("integration.integrations.redirect", autospec=True)
+    def test_withAuthorizedUser_callsGCalIntegratinatorGenerateAuthURLMethod(self, mocked_redirect):
+        # Test to ensure that when this method is called with an authorized user,
+        #  the gCalIntegratinator.generateAuthURLMethod() is called. An authorized
+        #  user is a user that has an auth_level of at least 3 (HD).
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+        self.mocked_integrationPart.reset_mock()
+        self.resetAuthLevel()
+
+        # Set the auth_level to be used for this test.
+        self.mocked_authLevel.return_value = 3
+
+        # Create the objects needed for this test
+        expectedGAuthURL = "TEST GOOGLE AUTH URL"
+        expectedState = "TEST STATE"
+        expectedInfoID = 19
+        expectedResponse = Response(status=200)
+        expectedInternalAuthURL = self.mocked_appGlobals.baseOpts["HOST_URL"] + "/int/GCalAuth"
+
+        # Configure the mocked redirect to behave as expected.
+        mocked_redirect.return_value = expectedResponse
+
+        # Configure the gCalIntegratinator.generateAuthURL() method to behave as expected.
+        self.mocked_integrationPart.generateAuthURL.return_value = (expectedGAuthURL, expectedState)
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedInfoID,)  # First call returns any existing googleCalID
+        ]
+
+        # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/int/GCalRedirect",
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that the gCalIntegratinator.generateAuthURL() is called.
+        self.mocked_integrationPart.generateAuthURL.assert_called_once_with(expectedInternalAuthURL)
+
+    @patch("integration.integrations.redirect", autospec=True)
+    def test_withAuthorizedUser_withPartialInfoInDB_updatesRecordInDB(self, mocked_redirect):
+        # Test to ensure that when this method is called with an authorized user
+        #  and a partial authorization record already exists in the DB, this method
+        #  UPDATES the existing record with the new information.
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+        self.mocked_integrationPart.reset_mock()
+        self.resetAuthLevel()
+
+        # Set the auth_level to be used for this test.
+        self.mocked_authLevel.return_value = 3
+
+        # Create the objects needed for this test
+        expectedGAuthURL = "TEST GOOGLE AUTH URL"
+        expectedState = "TEST STATE"
+        expectedInfoID = 19
+        expectedResponse = Response(status=200)
+
+        # Configure the mocked redirect to behave as expected.
+        mocked_redirect.return_value = expectedResponse
+
+        # Configure the gCalIntegratinator.generateAuthURL() method to behave as expected.
+        self.mocked_integrationPart.generateAuthURL.return_value = (expectedGAuthURL, expectedState)
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedInfoID,)  # First call returns any existing googleCalID
+        ]
+
+        # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/int/GCalRedirect",
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that the when the appGlobals.conn.cursor().execute was called,
+        #  it was a UPDATE statement.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
+            "UPDATE google_calendar_info SET auth_state = %s WHERE id = %s",
+            (expectedState, expectedInfoID)
+        )
+
+        # Assert that appGlobals.conn.commit was called
+        self.mocked_appGlobals.conn.commit.assert_called_once()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+    @patch("integration.integrations.redirect", autospec=True)
+    def test_withAuthorizedUser_withNoInfoInDB_createsNewRecordInDB(self, mocked_redirect):
+        # Test to ensure that when this method is called with an authorized user
+        #  and NO partial authorization record already exists in the DB, this method
+        #  INSERTS the a new record with the information into the DB.
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+        self.mocked_integrationPart.reset_mock()
+        self.resetAuthLevel()
+
+        # Set the auth_level to be used for this test.
+        self.mocked_authLevel.return_value = 3
+
+        # Create the objects needed for this test
+        expectedGAuthURL = "TEST GOOGLE AUTH URL"
+        expectedState = "TEST STATE"
+        expectedResponse = Response(status=200)
+
+        # Configure the mocked redirect to behave as expected.
+        mocked_redirect.return_value = expectedResponse
+
+        # Configure the gCalIntegratinator.generateAuthURL() method to behave as expected.
+        self.mocked_integrationPart.generateAuthURL.return_value = (expectedGAuthURL, expectedState)
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            None  # First call returns any existing googleCalID
+        ]
+
+        # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/int/GCalRedirect",
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that the when the appGlobals.conn.cursor().execute was called,
+        #  it was a UPDATE statement.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
+            """INSERT INTO google_calendar_info (res_hall_id, auth_state) 
+                        VALUES (%s, %s)""",
+            (self.user_hall_id, expectedState)
+        )
+
+        # Assert that appGlobals.conn.commit was called
+        self.mocked_appGlobals.conn.commit.assert_called_once()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+    @patch("integration.integrations.redirect", autospec=True)
+    def test_withAuthorizedUser_returnsRedirectToGeneratedAuthURL(self, mocked_redirect):
+        # Test to ensure that when this method is called with an authorized user,
+        #  a redirect to the Google Authorization URL is returned.
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+        self.mocked_integrationPart.reset_mock()
+        self.resetAuthLevel()
+
+        # Set the auth_level to be used for this test.
+        self.mocked_authLevel.return_value = 3
+
+        # Create the objects needed for this test
+        expectedGAuthURL = "TEST GOOGLE AUTH URL"
+        expectedState = "TEST STATE"
+        expectedResponse = Response(status=200)
+
+        # Configure the mocked redirect to behave as expected.
+        mocked_redirect.return_value = expectedResponse
+
+        # Configure the gCalIntegratinator.generateAuthURL() method to behave as expected.
+        self.mocked_integrationPart.generateAuthURL.return_value = (expectedGAuthURL, expectedState)
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            None  # First call returns any existing googleCalID
+        ]
+
+        # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/int/GCalRedirect",
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that appGlobals.conn.commit was called
+        self.mocked_appGlobals.conn.commit.assert_called_once()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that the mocked redirect is called as expected
+        mocked_redirect.assert_called_once_with(expectedGAuthURL)
+
+        # Assert that we received the expected response
+        self.assertIsInstance(resp, Response)
