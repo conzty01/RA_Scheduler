@@ -1,7 +1,6 @@
 language: python
 python:
   - "3.6"
-before_script: cd project
 script:
   - cd RAScheduler
   - python -m unittest discover -p "*_test.py"
