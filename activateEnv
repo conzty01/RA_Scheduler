@@ -42,4 +42,4 @@ export LOG_LEVEL='DEBUG'
 # Enabling EXPLAIN_TEMPLATE_LOADING will instruct Flask to print out the steps
 #  it goes through to locate templates on every render_template call. This is
 #  used for debugging
-export EXPLAIN_TEMPLATE_LOADING=false
+export EXPLAIN_TEMPLATE_LOADING=''
