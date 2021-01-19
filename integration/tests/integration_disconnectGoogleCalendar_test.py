@@ -1,8 +1,10 @@
 from unittest.mock import MagicMock, patch
 from scheduleServer import app
+from flask import Response
 import unittest
 
 from integration.integrations import disconnectGoogleCalendar
+from helperFunctions.helperFunctions import stdRet
 
 
 class TestIntegration_disconnectGoogleCalendar(unittest.TestCase):
@@ -124,19 +126,114 @@ class TestIntegration_disconnectGoogleCalendar(unittest.TestCase):
         self.mocked_authLevel.return_value = 1
 
     def test_withAuthorizedUser_deletesAppropriateRecordFromDB(self):
+        # Test to ensure that if this function is called with an authorized user
+        #  that the appropriate record is deleted from the DB.
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+        self.resetAuthLevel()
+
+        # Set the auth_level to the appropriate value
+        self.mocked_authLevel.return_value = 3
+
         # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/int/disconnectGCal",
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that the when the appGlobals.conn.cursor().execute was called,
+        #  it was a SELECT statement.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_once_with(
+            "DELETE FROM google_calendar_info WHERE res_hall_id = %s;",
+            (self.user_hall_id,)
+        )
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_called_once()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
 
     def test_withoutAuthorizedUser_returnsNotAuthorizedResponse(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
+        # Test to ensure that when this method is called without an authorized user,
+        #  they receive a "not authorized" response.
 
-    def test_withAuthorizedUser_returnsRedirectToManHallPage(self):
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+        self.resetAuthLevel()
+
         # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/int/disconnectGCal",
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_not_called()
+
+    @patch("integration.integrations.redirect", autospec=True)
+    @patch("integration.integrations.url_for", autospec=True)
+    def test_withAuthorizedUser_returnsRedirectToManHallPage(self, mocked_urlFor, mocked_redirect):
+        # Test to ensure that when this method is called with an authorized user,
+        #  this method returns a redirect to the Manage Hall page.
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+        self.resetAuthLevel()
+
+        # Set the auth_level to the appropriate value
+        self.mocked_authLevel.return_value = 3
+
+        # Create the objects needed for this test.
+        expectedResponse = Response(status=200)
+
+        # Configure the mocked redirect object to return a Response object
+        mocked_redirect.return_value = expectedResponse
+
+        # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/int/disconnectGCal",
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that the when the appGlobals.conn.cursor().execute was called,
+        #  it was a SELECT statement.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_once_with(
+            "DELETE FROM google_calendar_info WHERE res_hall_id = %s;",
+            (self.user_hall_id,)
+        )
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_called_once()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that the mocked url_for function is called with the appropriate endpoint
+        mocked_urlFor.assert_called_once_with("hall_bp.manHall")
+
+        # Assert that the mocked redirect function is called with the url_for result
+        mocked_redirect.assert_called_once_with(mocked_urlFor.return_value)
+
+        # Assert that we received the expected response
+        self.assertEqual(expectedResponse.status_code, resp.status_code)
+        self.assertEqual(type(expectedResponse), type(resp))
