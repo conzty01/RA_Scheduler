@@ -59,7 +59,7 @@ class gCalIntegratinator:
             self.__appCreds, scopes=scopes)
 
     def _getCredsFromEnv(self):
-        # This will return a desearlized JSON object that is assembled per
+        # This will return a deserialized JSON object that is assembled per
         #  Google's specifications. This object will be configured for a 'web' app
 
         # This does assume the following parameters are available in the environment:
