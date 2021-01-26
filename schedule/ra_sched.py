@@ -422,7 +422,7 @@ class Schedule:
             self.schedule = []
 
             # Iterate through the days of the desired month
-            for date, dow in calendar.Calendar().itermonthdays2(year, month):
+            for d, dow in calendar.Calendar().itermonthdays2(year, month):
                 # The iterator returned from the loop yields a tuple that
                 #  contains an integer for the day of the week and the date
                 #  of the month. The mapping of the day of the week is as follows:
@@ -434,15 +434,15 @@ class Schedule:
                 #  date belongs to the next or previous month.
 
                 # Check to see if the current date belongs to this month
-                if date != 0:
+                if d != 0:
 
                     # Check to see if this date should not have a duty scheduled on it
-                    if date in noDutyDates:
+                    if d in noDutyDates:
                         # If no duty should be scheduled, create a Day object with
                         #  no duty slots and append it to the schedule
                         self.schedule.append(
                             Day(
-                                date(year, month, date),
+                                date(year, month, d),
                                 dow,
                                 numDutySlots=0
                             )
@@ -460,7 +460,7 @@ class Schedule:
                             # Add a Day object with two duty slots to the schedule
                             self.schedule.append(
                                 Day(
-                                    date(year, month, date),
+                                    date(year, month, d),
                                     dow,
                                     numDutySlots=2
                                 )
@@ -471,7 +471,7 @@ class Schedule:
                             #  then it should only have one RA on duty
                             self.schedule.append(
                                 Day(
-                                    date(year, month, date),
+                                    date(year, month, d),
                                     dow,
                                     numDutySlots=1
                                 )
@@ -539,6 +539,237 @@ class Schedule:
     def shouldReview(self):
         # Return whether this schedule should be manually reviewed.
         return self.review
+
+
+class State:
+    """ Object for storing information regarding the current "state" of the Scheduler's DFS traversal.
+
+        Args:
+            day               (Day):     Day object for the current state.
+            raList            (lst):     A sorted list of unvisited RA candidates for the
+                                          given date.
+            lastDateAssigned  (dict):    A dictionary containing information regarding the
+                                          last day each of the RAs were assigned to duty
+            numDoubleDays     (dict):    A dictionary containing information regarding the
+                                          number of double days an RA has already been
+                                          assigned.
+            ldaTolerance      (int):     An integer denoting the number of days before an RA
+                                          should be considered for another duty.
+            nddTolerance      (float):   An integer denoting the number of double
+            predetermined     (bool):    Boolean denoting if this state can is allowed to
+                                          be changed/reevaluated. This is used to denote
+                                          whether this particular date/duty was preset.
+    """
+
+    def __init__(self, day, raList, lastDateAssigned, numDoubleDays, ldaTolerance,
+                 nddTolerance, predetermined=False):
+        # The current day of the state
+        self.curDay = day
+
+        # The Last Date Assigned Dictionary of the state
+        self.lda = lastDateAssigned
+
+        # The Number of Double Days Dictionary of the state
+        self.ndd = numDoubleDays
+
+        # The Last Duty Assigned Tolerance of the state
+        self.ldaTol = ldaTolerance
+
+        # The Next Double Day Tolerance of the state
+        self.nddTol = nddTolerance
+
+        # Whether the state was predetermined
+        self.predetermined = predetermined
+
+        # If this state has been predetermined, then the first RA in the raList
+        #  will always be selected as the for duty on this day.
+        if self.predetermined:
+            # Set the provided raList as the candidate list
+            self.candList = raList
+
+        elif len(raList) == 0:
+            # Else if the provided raList is empty, then do not attempt to calculate
+            #  an ordered candidate list (results in divide by 0 error if allowed)
+            self.candList = raList
+
+        else:
+            # Otherwise we will calculate the ordered candidate list for this state.
+            self.candList = self.getSortedWorkableRAs(raList, self.curDay, self.lda,
+                                                      self.curDay.isDoubleDay(), self.ndd,
+                                                      self.curDay.getPoints(), self.ldaTol,
+                                                      self.nddTol)
+
+    def __deepcopy__(self):
+        # Return a new State object with all of the same attributes as this State
+        return State(
+            self.curDay,
+            self.candList,
+            self.lda.copy(),
+            self.ndd.copy(),
+            self.ldaTol,
+            self.nddTol,
+            self.predetermined
+        )
+
+    def deepcopy(self):
+        # Call the __deepcopy__ magic method
+        return self.__deepcopy__()
+
+    def restoreState(self):
+        # Return the values of the current state
+        return self.curDay, self.candList, self.lda, self.ndd
+
+    def hasEmptyCandList(self):
+        # Return a boolean denoting whether the candidate list is empty or not
+        return len(self.candList) == 0
+
+    def returnedFromPreviousState(self):
+        # Return a boolean denoting whether this state has been visited again
+        #  from another subsequent state. This is used to indicate whether the
+        #  algorithm reached a dead-end and had to turn around.
+
+        # This is asserted if an RA has been assigned a duty for the current day.
+        return self.curDay.numberOnDuty() > 0
+
+    def isDoubleDay(self):
+        # Return a boolean denoting whether the current day of the state is
+        #  considered a double-day.
+        return self.curDay.isDoubleDay()
+
+    def getNextCandidate(self):
+        # Remove and return the next duty candidate
+        return self.candList.pop(0)
+
+    def assignNextRA(self):
+        # Assign the next candidate RA for curDay's duty
+
+        # Get the next candidate RA for the curDay's duty
+        candRA = self.getNextCandidate()
+
+        # Assign the candidate RA for th curDay's duty
+        self.curDay.addRA(candRA)
+
+        # Update lastDateAssigned
+        self.lda[candRA] = self.curDay.getDate()
+
+        # If doubleDay, then update numDoubleDays
+        if self.isDoubleDay():
+            self.ndd[candRA] += 1
+
+        # Return the selected candidate RA
+        return candRA
+
+    def getSortedWorkableRAs(self, raList, day, lastDateAssigned, isDoubleDay,
+                             numDoubleDays, datePts, ldaTolerance, nddTolerance):
+        # Create and return a new sorted list of RAs that are available for duty
+        #  on the provided day.
+
+        # Calculate the average number of points amongst RAs
+        s = 0
+        for ra in raList:
+            s += ra.getPoints()
+
+        ptsAvg = s / len(raList)
+
+        # print("  Average Points:",ptsAvg)
+
+        # If isDoubleDay, calculate the average number of double days
+        #  assigned amongst RAs
+        if isDoubleDay:
+            s = 0
+            for ra in numDoubleDays:
+                s += numDoubleDays[ra]
+
+            doubleDayAvg = s / len(numDoubleDays)
+            # print("  Double Day Average:",doubleDayAvg)
+
+        else:
+            # Default to -1 when not a doubleDay
+            doubleDayAvg = -1
+
+        retList = []    # List to be returned containing all workable RAs
+
+        # print("  Removing candidates")
+        # Get rid of the unavailable candidates
+        for ra in raList:
+            # print("    ",ra)
+            isCand = True
+
+            # If an RA has a conflict with the duty shift
+            # print(day.getDate() in ra.getConflicts())
+            if day.getDate() in ra.getConflicts():
+                isCand = False
+                # print("      Removed: Conflict")
+
+            # If an RA has been assigned a duty recently
+            #  This is skipped when the LDA is 0, meaning the RA has not been
+            #  assigned for duty yet this month.
+            if lastDateAssigned[ra] != 0 and \
+               day.getDate() - lastDateAssigned[ra] < ldaTolerance:
+                isCand = False
+                # print("      Removed: Recent Duty")
+
+            # If it is a double duty day
+            if isDoubleDay:
+                # If an RA has been assigned more double day duties than
+                #  the nddTolerance over the doubleDayAvg
+                if numDoubleDays[ra] > ((1 + nddTolerance) * doubleDayAvg):
+                    isCand = False
+                    # print("      Removed: Double Day Overload")
+
+            # If an RA meets the necessary criteria
+            if isCand:
+                retList.append(ra)
+                # print("      Valid Candidate")
+
+
+        def genCandScore(ra, day, lastDateAssigned, numDoubleDays, isDoubleDay,
+                        datePts ,doubleDayAvg, ptsAvg):
+            # This function generates the candidate score of the RA
+            #  For simplicity's sake, all variables aside from 'ra' are values
+
+            # Base value is the number of points an RA has
+            weight = ra.getPoints()
+
+            # Add the difference between the number of points an RA has and the
+            #  average number of points for all the RAs. This value could be
+            #  negative, in which case, it will push the ra further towards the front
+            weight += ra.getPoints() - ptsAvg
+
+            # Subtract the number of days since the RA was last assigned
+            weight -= day - lastDateAssigned
+
+            # If it is a doubleDay
+            if isDoubleDay:
+                # Add the difference between the number of doubleDays an RA has
+                #  and the average number of doubleDays for all the RAs.
+                weight += numDoubleDays - doubleDayAvg
+
+            # If the number of points from this day will throw the RA over
+            #  the average...
+            if ra.getPoints() + datePts > ptsAvg:
+                # ... then add the number of points over the average
+                weight += (ra.getPoints() + datePts) - ptsAvg
+
+            else:
+                # Otherwise subtract the difference between the average and the
+                #  number of points the RA would have.
+                weight -= ptsAvg - (ra.getPoints() + datePts)
+
+            return weight
+
+        # Sort the RAs from lowest candidate score to the highest.
+        #  The following line sorts the retList using a lambda function as the
+        #  key. The purpose of this lambda function is to wrap genCandScore
+        #  so that it can be passed the necessary parameters that are within a
+        #  scope that is beyond genCandScore. Additionally, these parameters can
+        #  be recalculated for each RA that is passed to the lambda function.
+        # print("  Sorting")
+        retList.sort(key=lambda ra: genCandScore(ra, day.getDate(), lastDateAssigned[ra],
+                                                 numDoubleDays[ra], isDoubleDay, datePts,
+                                                 doubleDayAvg, ptsAvg))
+
+        return retList
 
 
 if __name__ == "__main__":
