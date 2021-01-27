@@ -2,6 +2,8 @@ from unittest.mock import MagicMock, patch
 from scheduleServer import app
 import unittest
 
+from helperFunctions.helperFunctions import stdRet
+
 
 class TestSchedule_changeRAforDutyDay(unittest.TestCase):
     def setUp(self):
@@ -136,37 +138,328 @@ class TestSchedule_changeRAforDutyDay(unittest.TestCase):
         self.mocked_authLevel.return_value = 1
 
     def test_withoutAuthorizedUser_returnsNotAuthorizedResponse(self):
+        # Test to ensure that when an unauthorized user attempts to reach this API,
+        #  a NOT AUTHORIZED response is returned. An authorized user is one whose
+        #  auth_level is at least 2 (AHD).
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Reset the auth_level to 1
+        self.resetAuthLevel()
+
         # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.post("/schedule/api/changeRAonDuty",
+                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that the json is formatted as expected
+        self.assertEqual(resp.json, stdRet(-1, "NOT AUTHORIZED"))
+
+        # Assert that we received a 200 status code
+        self.assertEqual(resp.status_code, 200)
+
+        # Assert that no additional call to the DB was made
+        self.mocked_appGlobals.conn.cursor().execute.assert_not_called()
 
     def test_withAuthorizedUser_withInvalidNewRA_returnsInvalidSelectionResponse(self):
+        # Test to ensure that when an authorized user attempts to use this API, if
+        #  an invalid new RA is provided, this method will return a "New Assigned RA
+        #  is Not a Valid Selection" response.
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 2
+
+        # Generate the various objects that will be used in this test
+        desiredNewRAID = 1
+        desiredDateStr = "2021-01-26"
+        desiredOldName = "Test User"
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            None,  # First query is for the New RA ID
+            None,  # Second query is for the Old RA ID
+            None,  # Third query is for the Day information
+            None,  # Fourth query is for the Schedule ID
+        ]
+
         # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.post("/schedule/api/changeRAonDuty",
+                                json=dict(
+                                    newId=desiredNewRAID,
+                                    oldName=desiredOldName,
+                                    dateStr=desiredDateStr
+                                ),
+                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that the last time appGlobals.conn.cursor().execute was called,
+        #  it was a query for the RA.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
+            "SELECT id FROM ra WHERE id = %s AND hall_id = %s;",
+            (desiredNewRAID, self.user_hall_id)
+        )
+
+        # Assert that we received the expected response
+        self.assertEqual(resp.json, stdRet(0, "New Assigned RA is Not a Valid Selection"))
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
 
     def test_withAuthorizedUser_withInvalidOldRA_returnsInvalidSelectionResponse(self):
+        # Test to ensure that when an authorized user attempts to use this API, if
+        #  an invalid old RA is provided, this method will return an "Unable to locate
+        #  Previously Assigned RA for Duty" response.
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 2
+
+        # Generate the various objects that will be used in this test
+        desiredNewRAID = 4
+        desiredDateStr = "2021-01-26"
+        desiredOldName = "Test User"
+
+        expectedfName, expectedlName = desiredOldName.split()
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (desiredNewRAID,),  # First query is for the New RA ID
+            None,  # Second query is for the Old RA ID
+            None,  # Third query is for the Day information
+            None,  # Fourth query is for the Schedule ID
+        ]
+
         # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.post("/schedule/api/changeRAonDuty",
+                                json=dict(
+                                    newId=desiredNewRAID,
+                                    oldName=desiredOldName,
+                                    dateStr=desiredDateStr
+                                ),
+                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that the last time appGlobals.conn.cursor().execute was called,
+        #  it was a query for the RA.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
+            "SELECT id FROM ra WHERE first_name LIKE %s AND last_name LIKE %s AND hall_id = %s",
+            (expectedfName, expectedlName, self.user_hall_id)
+        )
+
+        # Assert that we received the expected response
+        self.assertEqual(resp.json, stdRet(0, "Unable to Locate Previously Assigned RA for Duty."))
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
 
     def test_withAuthorizedUser_withInvalidDay_returnsInvalidSelectionResponse(self):
+        # Test to ensure that when an authorized user attempts to use this API, if
+        #  an invalid Date is provided, this method will return an "Invalid Date"
+        #  response.
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 2
+
+        # Generate the various objects that will be used in this test
+        desiredNewRAID = 6
+        desiredDateStr = "2021-01-26"
+        desiredOldName = "Test User"
+
+        expectedOldRAID = 18
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (desiredNewRAID,),      # First query is for the New RA ID
+            (expectedOldRAID,),     # Second query is for the Old RA ID
+            None,  # Third query is for the Day information
+            None,  # Fourth query is for the Schedule ID
+        ]
+
         # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.post("/schedule/api/changeRAonDuty",
+                                json=dict(
+                                    newId=desiredNewRAID,
+                                    oldName=desiredOldName,
+                                    dateStr=desiredDateStr
+                                ),
+                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that the last time appGlobals.conn.cursor().execute was called,
+        #  it was a query for the RA.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
+            "SELECT id, month_id FROM day WHERE date = TO_DATE(%s, 'MM/DD/YYYY');",
+            (desiredDateStr,)
+        )
+
+        # Assert that we received the expected response
+        self.assertEqual(resp.json, stdRet(0, "Invalid Date"))
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
 
     def test_withAuthorizedUser_withInvalidSchedule_returnsInvalidSelectionResponse(self):
+        # Test to ensure that when an authorized user attempts to use this API, if
+        #  no schedule is found, this method will return an invalid schedule
+        #  response.
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 2
+
+        # Generate the various objects that will be used in this test
+        desiredNewRAID = 6
+        desiredDateStr = "2021-01-26"
+        desiredOldName = "Test User"
+
+        expectedOldRAID = 18
+        expectedDayID = 34
+        expectedMonthID = 1
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (desiredNewRAID,),                  # First query is for the New RA ID
+            (expectedOldRAID,),                 # Second query is for the Old RA ID
+            (expectedDayID, expectedMonthID),   # Third query is for the Day information
+            None,  # Fourth query is for the Schedule ID
+        ]
+
         # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.post("/schedule/api/changeRAonDuty",
+                                json=dict(
+                                    newId=desiredNewRAID,
+                                    oldName=desiredOldName,
+                                    dateStr=desiredDateStr
+                                ),
+                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that the last time appGlobals.conn.cursor().execute was called,
+        #  it was a query for the RA.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
+            "SELECT id FROM schedule WHERE hall_id = %s AND month_id = %s ORDER BY created DESC, id DESC;",
+            (self.user_hall_id, expectedMonthID)
+        )
+
+        # Assert that we received the expected response
+        self.assertEqual(resp.json, stdRet(0, "Unable to validate schedule."))
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
 
     def test_withAuthorizedUser_withValidParams_updatesDutyInDB(self):
+        # Test to ensure that when an authorized user attempts to use this API
+        #  with all valid parameters, this method will update the appropriate
+        #  record in the DB.
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 2
+
+        # Generate the various objects that will be used in this test
+        desiredNewRAID = 6
+        desiredDateStr = "2021-01-26"
+        desiredOldName = "Test User"
+
+        expectedOldRAID = 18
+        expectedDayID = 34
+        expectedMonthID = 1
+        expectedScheduleID = 5
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (desiredNewRAID,),                  # First query is for the New RA ID
+            (expectedOldRAID,),                 # Second query is for the Old RA ID
+            (expectedDayID, expectedMonthID),   # Third query is for the Day information
+            (expectedScheduleID,),              # Fourth query is for the Schedule ID
+        ]
+
         # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.post("/schedule/api/changeRAonDuty",
+                                json=dict(
+                                    newId=desiredNewRAID,
+                                    oldName=desiredOldName,
+                                    dateStr=desiredDateStr
+                                ),
+                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that the last time appGlobals.conn.cursor().execute was called,
+        #  it was a query for the RA.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
+            """UPDATE duties
+                   SET ra_id = %s
+                   WHERE hall_id = %s
+                   AND day_id = %s
+                   AND sched_id = %s
+                   AND ra_id = %s
+                   """,
+            (desiredNewRAID, self.user_hall_id, expectedDayID,
+             expectedScheduleID, expectedOldRAID)
+        )
+
+        # Assert that we received the expected response
+        self.assertEqual(resp.json, stdRet(1, "successful"))
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that appGlobals.conn.commit was called
+        self.mocked_appGlobals.conn.commit.assert_called_once()
