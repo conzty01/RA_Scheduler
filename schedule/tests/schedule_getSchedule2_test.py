@@ -2,6 +2,8 @@ from unittest.mock import MagicMock, patch
 from scheduleServer import app
 import unittest
 
+from schedule.schedule import getSchedule2
+
 
 class TestSchedule_getSchedule2(unittest.TestCase):
     def setUp(self):
