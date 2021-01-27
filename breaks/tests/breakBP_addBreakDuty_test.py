@@ -217,6 +217,7 @@ class TestBreakBP_addBreakDuty(unittest.TestCase):
 
         # Reset all of the mocked objects that will be used in this test
         self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
 
         # Reset the auth_level to 1
         self.resetAuthLevel()
