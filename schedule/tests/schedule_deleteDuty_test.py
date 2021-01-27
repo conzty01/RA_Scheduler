@@ -2,6 +2,8 @@ from unittest.mock import MagicMock, patch
 from scheduleServer import app
 import unittest
 
+from helperFunctions.helperFunctions import stdRet
+
 
 class TestSchedule_deleteDuty(unittest.TestCase):
     def setUp(self):
@@ -136,31 +138,255 @@ class TestSchedule_deleteDuty(unittest.TestCase):
         self.mocked_authLevel.return_value = 1
 
     def test_withoutAuthorizedUser_returnsNotAuthorizedResponse(self):
+        # Test to ensure that when an unauthorized user attempts to reach this
+        #  API, a NOT AUTHORIZED response is returned. An authorized user is one
+        #  whose auth_level is at least 2 (AHD).
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Reset the auth_level to 1
+        self.resetAuthLevel()
+
         # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.post("/schedule/api/deleteDuty",
+                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that the json is formatted as expected
+        self.assertEqual(resp.json, stdRet(-1, "NOT AUTHORIZED"))
+
+        # Assert that we received a 200 status code
+        self.assertEqual(resp.status_code, 200)
+
+        # Assert that no additional call to the DB was made
+        self.mocked_appGlobals.conn.cursor().execute.assert_not_called()
 
     def test_withAuthorizedUser_withInvalidOldRA_returnsInvalidSelectionResponse(self):
+        # Test to ensure that when an authorized user attempts to use this API, if
+        #  an invalid old RA is provided, this method will return an Invalid RA
+        #  Selection response.
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 2
+
+        # Generate the various objects that will be used in this test
+        desiredDateStr = "2021-01-26"
+        desiredRAName = "Test User"
+
+        expectedfName, expectedlName = desiredRAName.split()
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            None,  # First query is for the Old RA ID
+            None,  # Second query is for the Date information
+            None   # Third query is for the Schedule information
+        ]
+
         # -- Act --
+
+        resp = self.server.post("/schedule/api/deleteDuty",
+                                json=dict(
+                                    raName=desiredRAName,
+                                    dateStr=desiredDateStr
+                                ),
+                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that the last time appGlobals.conn.cursor().execute was called,
+        #  it was a query for the RA.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
+            "SELECT id FROM ra WHERE first_name LIKE %s AND last_name LIKE %s AND hall_id = %s;",
+            (expectedfName, expectedlName, self.user_hall_id)
+        )
+
+        # Assert that we received the expected response
+        self.assertEqual(resp.json, stdRet(0, "Unable to Verify Previously Assigned RA."))
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
 
     def test_withAuthorizedUser_withInvalidDay_returnsInvalidSelectionResponse(self):
+        # Test to ensure that when an authorized user attempts to use this API, if
+        #  an invalid Day is provided, this method will return an Invalid Date
+        #  Selection response.
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 2
+
+        # Generate the various objects that will be used in this test
+        desiredDateStr = "2021-01-26"
+        desiredRAName = "Test User"
+
+        expectedRAID = 9
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedRAID,),    # First query is for the Old RA ID
+            None,  # Second query is for the Date information
+            None   # Third query is for the Schedule information
+        ]
+
         # -- Act --
+
+        resp = self.server.post("/schedule/api/deleteDuty",
+                                json=dict(
+                                    raName=desiredRAName,
+                                    dateStr=desiredDateStr
+                                ),
+                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that the last time appGlobals.conn.cursor().execute was called,
+        #  it was a query for the RA.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
+            "SELECT id, month_id FROM day WHERE date = TO_DATE(%s, 'MM/DD/YYYY');",
+            (desiredDateStr,)
+        )
+
+        # Assert that we received the expected response
+        self.assertEqual(resp.json, stdRet(0, "Invalid Date"))
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
 
     def test_withAuthorizedUser_withInvalidSchedule_returnsInvalidSelectionResponse(self):
+        # Test to ensure that when an authorized user attempts to use this API, if
+        #  an invalid Day is provided, this method will return an Invalid Date
+        #  Selection response.
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 2
+
+        # Generate the various objects that will be used in this test
+        desiredDateStr = "2021-01-26"
+        desiredRAName = "Test User"
+
+        expectedDayID = 34
+        expectedMonthID = 3
+        expectedRAID = 9
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedRAID,),                    # First query is for the Old RA ID
+            (expectedDayID, expectedMonthID),   # Second query is for the Date information
+            None   # Third query is for the Schedule information
+        ]
+
         # -- Act --
+
+        resp = self.server.post("/schedule/api/deleteDuty",
+                                json=dict(
+                                    raName=desiredRAName,
+                                    dateStr=desiredDateStr
+                                ),
+                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that the last time appGlobals.conn.cursor().execute was called,
+        #  it was a query for the RA.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
+            "SELECT id FROM schedule WHERE hall_id = %s AND month_id = %s ORDER BY created DESC, id DESC;",
+            (self.user_hall_id, expectedMonthID)
+        )
+
+        # Assert that we received the expected response
+        self.assertEqual(resp.json, stdRet(0, "Unable to validate schedule."))
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
 
     def test_withAuthorizedUser_withValidParams_removesDutyFromDB(self):
+        # Test to ensure that when an authorized user attempts to use this API, if
+        #  all provided parameters are valid, this method will remove the appropriate
+        #  duty from the DB.
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 2
+
+        # Generate the various objects that will be used in this test
+        desiredDateStr = "2021-01-26"
+        desiredRAName = "Test User"
+
+        expectedDayID = 34
+        expectedMonthID = 3
+        expectedRAID = 9
+        expectedScheduleID = 14
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedRAID,),                    # First query is for the Old RA ID
+            (expectedDayID, expectedMonthID),   # Second query is for the Date information
+            (expectedScheduleID,)               # Third query is for the Schedule information
+        ]
+
         # -- Act --
+
+        resp = self.server.post("/schedule/api/deleteDuty",
+                                json=dict(
+                                    raName=desiredRAName,
+                                    dateStr=desiredDateStr
+                                ),
+                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that the last time appGlobals.conn.cursor().execute was called,
+        #  it was a query for the RA.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
+            """DELETE FROM duties
+                    WHERE ra_id = %s
+                    AND hall_id = %s
+                    AND day_id = %s
+                    AND sched_id = %s""",
+            (expectedRAID, self.user_hall_id, expectedDayID, expectedScheduleID)
+        )
+
+        # Assert that we received the expected response
+        self.assertEqual(resp.json, stdRet(1, "successful"))
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that appGlobals.conn.commit was called
+        self.mocked_appGlobals.conn.commit.assert_called_once()
