@@ -759,6 +759,9 @@ def changeRAforDutyDay():
         logging.warning("Alter Duty - unable to locate RA: {} for Hall: {}"
                         .format(data["newId"], userDict["hall_id"]))
 
+        # Close the DB cursor
+        cur.close()
+
         # Notify the user and stop processing
         return jsonify(stdRet(0, "New Assigned RA is Not a Valid Selection"))
 
@@ -775,6 +778,9 @@ def changeRAforDutyDay():
         logging.warning("Alter Duty - unable to locate RA: {} {} for Hall: {}"
                         .format(fName, lName, userDict["hall_id"]))
 
+        # Close the DB cursor
+        cur.close()
+
         # Notify the user and stop processing
         return jsonify(stdRet(0, "Unable to Locate Previously Assigned RA for Duty."))
 
@@ -789,6 +795,9 @@ def changeRAforDutyDay():
         # If we did not, log the occurrence.
         logging.warning("Alter Duty - unable to find Day: {}"
                         .format(data["dateStr"]))
+
+        # Close the DB cursor
+        cur.close()
 
         # Notify the user and stop processing
         return jsonify(stdRet(0, "Invalid Date"))
@@ -809,6 +818,9 @@ def changeRAforDutyDay():
         # If we did not, log the occurrence.
         logging.warning("Alter Duty - unable to locate schedule for Month: {}, Hall: {}"
                         .format(monthId, userDict["hall_id"]))
+
+        # Close the DB cursor
+        cur.close()
 
         # Notify the user and stop processing
         return jsonify(stdRet(0, "Unable to validate schedule."))
@@ -896,6 +908,9 @@ def addNewDuty():
         logging.warning("Add Duty - unable to locate RA: {} for Hall: {}"
                         .format(data["id"], userDict["hall_id"]))
 
+        # Close the DB cursor
+        cur.close()
+
         # Notify the user and stop processing
         return jsonify(stdRet(-1, "Chosen RA is not a Valid Selection"))
 
@@ -910,6 +925,9 @@ def addNewDuty():
         # If we did not, log the occurrence.
         logging.warning("Add Duty - unable to find Day: {}"
                         .format(data["dateStr"]))
+
+        # Close the DB cursor
+        cur.close()
 
         # Notify the user and stop processing
         return jsonify(stdRet(0, "Invalid Date"))
@@ -930,6 +948,9 @@ def addNewDuty():
         # If we did not, log the occurrence.
         logging.warning("Add Duty - unable to locate schedule for Month: {}, Hall: {}"
                         .format(monthId, userDict["hall_id"]))
+
+        # Close the DB cursor
+        cur.close()
 
         # Notify the user and stop processing
         return jsonify(stdRet(0, "Unable to validate schedule."))
@@ -1017,6 +1038,9 @@ def deleteDuty():
         logging.warning("Delete Duty - unable to locate RA: {} {} for Hall: {}"
                         .format(fName, lName, userDict["hall_id"]))
 
+        # Close the DB cursor
+        cur.close()
+
         # Notify the user and stop processing
         return jsonify(stdRet(0, "Unable to Verify Previously Assigned RA."))
 
@@ -1031,6 +1055,9 @@ def deleteDuty():
         # If we did not, log the occurrence.
         logging.warning("Delete Duty - unable to find Day: {}"
                         .format(data["dateStr"]))
+
+        # Close the DB cursor
+        cur.close()
 
         # Notify the user and stop processing
         return jsonify(stdRet(0, "Invalid Date"))
@@ -1051,6 +1078,9 @@ def deleteDuty():
         # If we did not, log the occurrence.
         logging.warning("Delete Duty - unable to locate schedule for Month: {}, Hall: {}"
                         .format(monthId, userDict["hall_id"]))
+
+        # Close the DB cursor
+        cur.close()
 
         # Notify the user and stop processing
         return jsonify(stdRet(0, "Unable to validate schedule."))
