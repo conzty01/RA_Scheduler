@@ -3,7 +3,7 @@ from scheduleServer import app
 from flask import Response
 import unittest
 
-from helperFunctions.helperFunctions import stdRet
+from helperFunctions.helperFunctions import stdRet, getCurSchoolYear
 
 
 class TestSchedule_editSched(unittest.TestCase):
@@ -139,19 +139,176 @@ class TestSchedule_editSched(unittest.TestCase):
         self.mocked_authLevel.return_value = 1
 
     def test_withoutAuthorizedUser_returnsNotAuthorizedResponse(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
+        # Test to ensure that when a user that is NOT authorized to view
+        #  the Edit Schedule Portal navigates to the page, they receive a
+        #  JSON response that indicates that they are not authorized. An
+        #  authorized user is a user that has an auth_level of at least
+        #  2 (AHD).
 
-    def test_withAuthorizedUser_callsGetRAStatsFunction(self):
         # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
 
-    def test_withAuthorizedUser_passesExpectedDataToRenderer(self):
-        # -- Arrange --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+
+        # Reset the auth_level to 1
+        self.resetAuthLevel()
+
         # -- Act --
+
+        # Request the desired page.
+        resp = self.server.get("/schedule/editSched",
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that the json is formatted as expected
+        self.assertEqual(resp.json, stdRet(-1, "NOT AUTHORIZED"))
+
+        # Assert that we received a 200 status code
+        self.assertEqual(resp.status_code, 200)
+
+        # Assert that no additional call to the DB was made
+        self.mocked_appGlobals.conn.cursor().execute.assert_not_called()
+
+    @patch("schedule.schedule.getRAStats", autospec=True)
+    def test_withAuthorizedUser_callsGetRAStatsFunction(self, mocked_getRAStats):
+        # Test to ensure that when an AHD that is authorized to view the
+        #  Edit Schedule Portal navigates to the page, this method calls
+        #  the getRAStats API.
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 2
+
+        # Generate the various objects that will be used in this test
+        # Configure the getRAStats mock to behave as expected. This function
+        #  will be thoroughly tested in another test class.
+        mocked_getRAStats.return_value = {
+            1: {
+                "name": "Test UserA",
+                "pts": 19
+            },
+            2: {
+                "name": "Test User",
+                "pts": 1
+            }
+        }
+
+        # Get the values for the start and end dates of the current school year
+        start, end = getCurSchoolYear()
+
+        # -- Act --
+
+        # Request the desired page.
+        resp = self.server.get("/schedule/editSched",
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that we received a 200 status code
+        self.assertEqual(resp.status_code, 200)
+
+        # Assert that the response is not JSON
+        self.assertFalse(resp.is_json)
+
+        # Assert that the getRABreakStats Function was called as expected
+        mocked_getRAStats.assert_called_once_with(self.helper_getAuth["hall_id"], start, end)
+
+        # Assert that the last call to the DB was queried as expected.
+        #  In this instance, we are unable to use the assert_called_once_with
+        #  method as this function calls out to
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
+            "SELECT id, first_name, last_name, color FROM ra WHERE hall_id = %s ORDER BY first_name ASC;",
+            (self.helper_getAuth["hall_id"],)
+        )
+
+    @patch("schedule.schedule.getRAStats", autospec=True)
+    @patch("schedule.schedule.render_template", autospec=True)
+    def test_withAuthorizedUser_passesExpectedDataToRenderer(self, mocked_renderTemplate, mocked_getRAStats):
+        # Test to ensure that when a user that is authorized to view the
+        #  Edit Schedule Portal navigates to the page, the expected information
+        #  is being passed to the render_template function. An authorized user
+        #  is a user that has an auth_level of at least 2 (AHD).
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 2
+
+        # Generate the various objects that will be used in this test
+        expectedRAList = []
+        for i in range(10):
+            expectedRAList.append((i, "User{}".format(i), "Test", "#{i}"))
+
+        # Configure the getRAStats mock to behave as expected. This function
+        #  will be thoroughly tested in another test class.
+        mocked_getRAStats.return_value = {
+            1: {
+                "name": "Test UserA",
+                "pts": 19
+            },
+            2: {
+                "name": "Test User",
+                "pts": 1
+            }
+        }
+
+        # Sort alphabetically by last name of RA
+        ptDictSorted = sorted(
+            mocked_getRAStats.return_value.items(),
+            key=lambda kv: kv[1]["name"].split(" ")[1]
+        )
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchall.side_effect = [
+            expectedRAList  # First query is for the list of all RAs
+        ]
+
+        # Configure the mocked render_template function to return a valid response object
+        mocked_renderTemplate.return_value = Response(status=200)
+
+        # -- Act --
+
+        # Request the desired page.
+        resp = self.server.get("/schedule/editSched",
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that we received a 200 status code
+        self.assertEqual(resp.status_code, 200)
+
+        # Assert that the response is not JSON
+        self.assertFalse(resp.is_json)
+
+        # Assert that the last call to the DB was queried as expected.
+        #  In this instance, we are unable to use the assert_called_once_with
+        #  method as this function calls out to
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
+            "SELECT id, first_name, last_name, color FROM ra WHERE hall_id = %s ORDER BY first_name ASC;",
+            (self.helper_getAuth["hall_id"],)
+        )
+
+        # Assert that the appropriate information was passed to the render_template function
+        mocked_renderTemplate.assert_called_once_with(
+            "schedule/editSched.html",
+            raList=expectedRAList,
+            auth_level=self.mocked_authLevel,
+            ptDict=ptDictSorted,
+            curView=3,
+            opts=self.mocked_appGlobals.baseOpts,
+            hall_name=self.helper_getAuth["hall_name"]
+        )
