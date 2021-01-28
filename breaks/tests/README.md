@@ -1,18 +1,19 @@
-# /tests Folder
-This folder contains all of the Python unittests for the Breaks Blueprint. 
-The purpose of these unittests are to ensure predictable functionality of 
-the various components of RADSA while development continues. These tests 
-will be run on each Github pull request before it is allowed to be merged.
+# Breaks Module /tests Folder
+This folder contains all of the Python unittests for the components of 
+the RADSA application which reside in the Breaks module. The purpose of 
+these unittests are to ensure predictable functionality of the various 
+components of RADSA while development continues. These tests will be 
+run on each Github pull request before it is allowed to be merged.
 
 ## Running Tests
 
 Developers are encouraged to run these tests on their repos before 
 submitting a pull request to speed up the debugging process. The following 
-commands will run the test suite:
+commands will run the test suite using the `runTests` script:
 
 ```
 cd \path\to\repo\
-python -m unittest discover -p "*_test.py"
+runTests
 ```
 
 The expected output of a repo that passes all tests should be 'OK' with all 

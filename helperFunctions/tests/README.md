@@ -1,10 +1,7 @@
-# Application /tests Folder
+# HelperFunctions Module /tests Folder
 This folder contains all of the Python unittests for the components of 
-the RADSA application which reside in the top most directory. Such
-components include:
-  - scheduleServer.py
-
-The purpose of these unittests are to ensure predictable functionality of 
+the RADSA application which reside in the HelperFunctions module. The 
+purpose of these unittests are to ensure predictable functionality of 
 the various components of RADSA while development continues. These tests 
 will be run on each Github pull request before it is allowed to be merged.
 
