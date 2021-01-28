@@ -304,7 +304,7 @@ if __name__ == "__main__":
                     'Rob': [20,25]
                     },2017,5)
 
-    from ra_sched import RA
+    from schedule.ra_sched import RA
     year = 2018
     month = 5
     reviewed = 0

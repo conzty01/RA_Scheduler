@@ -3,46 +3,38 @@ import psycopg2
 import logging
 import os
 
+
 def migrate(conn):
     cur = conn.cursor()
 
-    # Check to see if the google_calendar_info table exists
-    cur.execute("SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'google_calendar_info');")
+    # ----------------------
+    # --  point_modifier  --
+    # ----------------------
+
+    # Check to see if the point_modifier table exists
+    cur.execute("SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'point_modifier');")
 
     exists = cur.fetchone()
 
-    logging.info("  'google_calendar_info' Table Exists: {}".format(exists))
+    logging.info("  'point_modifier' Table Exists: {}".format(exists))
 
     if not exists[0]:
         # If the table does not exist, create the table
 
-        logging.info("  Creating 'google_calendar_info' Table.")
+        logging.info("  Creating 'point_modifier' Table.")
 
-        # Create the google_calendar_info table
+        # Create the point_modifier table
         cur.execute("""
-            CREATE TABLE google_calendar_info(
-                id				serial UNIQUE,
-                res_hall_id		int,
-                auth_state		varchar(30),
-                token 			bytea,
-                calendar_id		varchar(60),
-    
-                PRIMARY KEY (res_hall_id),
-                FOREIGN KEY (res_hall_id) REFERENCES res_hall(id)
-            );""")
+        CREATE TABLE point_modifier(
+            id				serial UNIQUE,
+            ra_id			int,
+            res_hall_id		int,
+            modifier		int DEFAULT 0,
 
-    # Drop all Google related columns in the res_hall table
-
-    logging.info("  Removing Google Related Columns From 'res_hall' Table.")
-
-    cur.execute("""
-        ALTER TABLE res_hall
-        DROP COLUMN IF EXISTS calendar_id,
-        DROP COLUMN IF EXISTS g_cal_token,
-        DROP COLUMN IF EXISTS g_cal_auth_state
-    """)
-
-
+            PRIMARY KEY (ra_id, res_hall_id),
+            FOREIGN KEY (ra_id) REFERENCES ra(id),
+            FOREIGN KEY (res_hall_id) REFERENCES res_hall(id)
+        );""")
 
 
 if __name__ == "__main__":

@@ -1,7 +1,6 @@
 from flask import render_template, request, jsonify, Blueprint
 from flask_login import login_required
 import logging
-import os
 
 # Import the appGlobals for this blueprint to use
 import appGlobals as ag
@@ -62,7 +61,7 @@ def editBreaks():
 
     # Render and return the appropriate template
     return render_template("breaks/editBreaks.html", raList=cur.fetchall(), auth_level=userDict["auth_level"],
-                           bkDict=sorted(bkDict.items(), key=lambda x: x[1]["name"].split(" ")[1] ),
+                           bkDict=sorted(bkDict.items(), key=lambda x: x[1]["name"].split(" ")[1]),
                            curView=3, opts=ag.baseOpts, hall_name=userDict["hall_name"])
 
 
@@ -303,6 +302,9 @@ def getBreakDuties(hallId=None, start=None, end=None, showAllColors=False, raId=
             "color": c,
             "extendedProps": {"dutyType": "brk"}
         })
+    
+    # Close the DB cursor
+    cur.close()
 
     # If this API method was called from the server
     if fromServer:
@@ -326,7 +328,7 @@ def addBreakDuty():
     #
     #     id       <int> -  an integer representing the ra.id for the RA that should
     #                        be assigned to the break duty.
-    #     pts      <int> -  an integer represnting how many points the new break duty
+    #     pts      <int> -  an integer representing how many points the new break duty
     #                        should be worth.
     #     dateStr  <str> -  a string representing the date that the break duty should
     #                        occur on.
@@ -617,7 +619,7 @@ def changeBreakDuty():
 
     # Query the DB for the RA that is desired to be on the duty. This query also helps
     #  to ensure that the requested RA is on the same staff as the client.
-    cur.execute("SELECT id, first_name, last_name, color FROM ra WHERE id = %s AND hall_id = %s;",
+    cur.execute("SELECT id FROM ra WHERE id = %s AND hall_id = %s;",
                 (data["newId"], userDict["hall_id"]))
 
     # Load the results from the DB
@@ -652,7 +654,7 @@ def changeBreakDuty():
         logging.warning("Unable to find all necessary Break Duty parameters for in database.")
 
         # Notify the client of the issue
-        return jsonify(stdRet(0, "Unable to find all necessary Break Duty parameters for in database."))
+        return jsonify(stdRet(0, "Unable to find all necessary Break Duty parameters in database."))
 
     # Otherwise, if we have all the necessary pieces,
     #  go ahead and update the appropriate break duty

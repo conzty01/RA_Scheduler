@@ -36,7 +36,7 @@ def getAuth():
             SELECT ra.id, username, first_name, last_name, hall_id, auth_level, res_hall.name
             FROM "user" JOIN ra ON ("user".ra_id = ra.id)
                         JOIN res_hall ON (ra.hall_id = res_hall.id)
-            WHERE username = '{}';""".format(uEmail))
+            WHERE username = %s;""", (uEmail,))
 
     # Get user info from the database
     res = cur.fetchone()

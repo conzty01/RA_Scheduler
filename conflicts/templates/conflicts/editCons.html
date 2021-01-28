@@ -67,6 +67,10 @@
 </div>
 {% endblock %}
 
+{%- block setBlueprintAPIPrefix %}
+var bpAPIPrefix = '/conflicts';
+{%- endblock %}
+
 {% block scripts %}
 {{ super() }}
 <script src="{{url_for('static', filename='main.js')}}"></script>

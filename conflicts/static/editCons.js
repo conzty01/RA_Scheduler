@@ -37,8 +37,6 @@ function initEditConsCal() {
             },
             extraParams: function () {
                 return {
-                    monthNum: appConfig.calDate.getMonth() + 1,
-                    year: appConfig.calDate.getFullYear(),
                     raID: getSelectedRAID(),
                     allColors: true
                 };
@@ -115,13 +113,28 @@ function filterConflicts(id) {
     if (selectedRAli !== tmp) {
         selectedRAli = document.getElementById("list_"+id);
 
+        // Iterate through all the <li> elements and remove
+        //  any highlighting
+        for (let li of document.getElementById("raList").children[0].children) {
+            li.classList.remove("filterRA");
+        }
+
+        // Lastly, highlight just the we want.
+        tmp.classList.add("filterRA");
+
+
     } else {
         // Otherwise undefine the selectedRAli
         selectedRAli = undefined;
+
+        // Remove highlighting to the <li> element.
+        tmp.classList.remove("filterRA");
     }
 
     // refetch events
     calendar.currentData.calendarApi.refetchEvents();
+
+
 }
 
 function getNumberConflicts() {

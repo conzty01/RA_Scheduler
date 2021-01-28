@@ -128,6 +128,9 @@ def getHallSettings(hallId=None):
     # Add the Google Calendar Integration settings to the settingList
     settingList.append(tmp)
 
+    # Close the DB cursor
+    cur.close()
+
     # If this API method was called from the server
     if fromServer:
         # Then return the settingList as-is

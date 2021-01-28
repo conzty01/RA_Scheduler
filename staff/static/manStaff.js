@@ -40,6 +40,10 @@ function showEditModal(id) {
     document.getElementById("email").value = tr.getElementsByClassName("email")[0].innerHTML;
     document.getElementById("color").value = tr.getElementsByClassName("color")[0].childNodes[0].value;
     document.getElementById("startDate").value = tr.getElementsByClassName("startDate")[0].innerHTML;
+    document.getElementById("dutyPts").value = tr.getElementsByClassName("dutyPts")[0].innerHTML;
+    document.getElementById("modPts").value = tr.getElementsByClassName("modPts")[0].innerHTML;
+    document.getElementById("totalPts").value = tr.getElementsByClassName("totalPts")[0].innerHTML;
+
     let authLevelTxt = tr.getElementsByClassName("authLevel")[0].innerHTML;
     let authLevelVal;
     switch (authLevelTxt) {
@@ -67,7 +71,8 @@ function submitChanges(id) {
         email : document.getElementById("email").value,
         color : document.getElementById("color").value,
         startDate : document.getElementById("startDate").value,
-        authLevel : document.getElementById("authLevelOpts").value
+        authLevel : document.getElementById("authLevelOpts").value,
+        modPts : Math.ceil(document.getElementById("modPts").value)
     }
 
     appConfig.base.callAPI("changeStaffInfo",data,getStaffInfo,"POST");
@@ -98,8 +103,14 @@ function reDrawTable(data) {
 
     for (let staffer of data.raList) {
 
-        // Add the points into the list in the expected location
-        staffer.splice(6, 0, data.pts[staffer[0]].pts)
+        // Add the points into the list in the expected locations
+        // Total Points
+        staffer.splice(6, 0, data.pts[staffer[0]].pts.modPts + data.pts[staffer[0]].pts.dutyPts);
+        // Modifier Points
+        staffer.splice(6, 0, data.pts[staffer[0]].pts.modPts);
+        // Duty Points
+        staffer.splice(6, 0, data.pts[staffer[0]].pts.dutyPts);
+
         addRow(staffer, newTBody);
     }
 
@@ -111,9 +122,23 @@ function addRow(data, table) {
     newRow.id = data[0];
     newRow.setAttribute("scope","row");
 
+    let columnList = [
+        "raID",
+        "fName",
+        "lName",
+        "email",
+        "startDate",
+        "resHall",
+        "dutyPts",
+        "modPts",
+        "totalPts",
+        "color",
+        "authLevel"
+    ];
+
     let col;
     let i = 0;
-    for (let d of ["raID","fName","lName","email","startDate","resHall","points","color","authLevel"]) {
+    for (let d of columnList) {
         col = newRow.insertCell(i);
         col.className = d;
 
@@ -145,6 +170,15 @@ function addRow(data, table) {
                     col.innerHTML = "HD";
                     break;
             }
+
+        } else if (d.includes("Pts") && d != "totalPts") {
+            // Check to see if the current column contains the
+            //  term "Pts" but is also not "totalPts".
+
+            // If this is the case, then we want to hide these
+            //  columns from view but still set their value.
+            col.hidden = true;
+            col.innerHTML = data[i];
 
         } else {
             col.innerHTML = data[i];
@@ -198,4 +232,24 @@ function importStaff() {
 
     // Submit the form
     document.getElementById("importStaffForm").submit();
+}
+
+function calculateTotalPoints() {
+    console.log("Calculating total points");
+
+    // Load the Duty Points
+    let dutyPts = parseInt(document.getElementById("dutyPts").value);
+
+    // Load the Modifier (could be a float if the user incorrectly enters
+    //  a decimal number
+    let modPts = parseFloat(document.getElementById("modPts").value);
+
+    // Load the Total Points field
+    let totalInput = document.getElementById("totalPts");
+
+    // Do the math and round any invalid decimal up
+    let totalPts = dutyPts + Math.ceil(modPts);
+
+    // Set the Total Points to the sum
+    totalInput.value = totalPts;
 }

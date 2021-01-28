@@ -107,7 +107,7 @@ function getPrevConflicts() {
         year: appConfig.calDate.getFullYear()
     }
 
-    appConfig.base.callAPI("getConflicts", data, showPrevConflicts, "GET");
+    appConfig.base.callAPI("getUserConflicts", data, showPrevConflicts, "GET");
 }
 
 function showPrevConflicts(conRes) {

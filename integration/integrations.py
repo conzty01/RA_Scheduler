@@ -1,5 +1,5 @@
 from flask import request, jsonify, redirect, url_for, Blueprint
-from gCalIntegration import gCalIntegratinator
+from integration.gCalIntegration import gCalIntegratinator
 from flask_login import login_required
 from calendar import monthrange
 from io import BytesIO
@@ -63,6 +63,9 @@ def createGoogleCalendar(calInfoId):
         # Log the occurrence.
         logging.info("No Google Calendar token found for Id: {}".format(calInfoId))
 
+        # Close the DB cursor
+        cur.close()
+
         # Return a failed standard return
         return jsonify(stdRet(-1, "No Token Found"))
 
@@ -93,6 +96,9 @@ def createGoogleCalendar(calInfoId):
 
     # Commit the changes to the DB
     ag.conn.commit()
+
+    # Close the DB cursor
+    cur.close()
 
     # Return a successful standard return
     return stdRet(1, "successful")
@@ -172,6 +178,9 @@ def returnGCalRedirect():
     # Commit the changes to the DB
     ag.conn.commit()
 
+    # Close the DB cursor
+    cur.close()
+
     # Redirect the user to the Google Authorization URL
     return redirect(authURL)
 
@@ -233,12 +242,15 @@ def handleGCalAuthResponse():
         # If not, stop processing
         logging.debug("Associated hall not found")
 
+        # Close the DB cursor
+        cur.close()
+
         # Notify the user of this issue.
         return jsonify(stdRet(-1, "Invalid State Received"))
 
     # Get the credentials from the Google Calendar Interface
     creds = gCalInterface.handleAuthResponse(request.url,
-                                             ag.baseOpts["HOST_URL"] + "integration/int/GCalAuth")
+                                             ag.baseOpts["HOST_URL"] + "int/GCalAuth")
 
     logging.debug("Received user credentials from interface")
 
@@ -326,8 +338,14 @@ def disconnectGoogleCalendar():
     # Delete the google_calendar_info record for the appropriate hall.
     cur.execute("DELETE FROM google_calendar_info WHERE res_hall_id = %s;", (userDict["hall_id"], ))
 
+    # Commit the changes to the DB
+    ag.conn.commit()
+
+    # Close the DB cursor
+    cur.close()
+
     # Redirect user back to Manage Hall page
-    return redirect(url_for("manHall"))
+    return redirect(url_for("hall_bp.manHall"))
 
 
 # ---------------------
@@ -397,6 +415,9 @@ def exportToGCal():
 
         logging.info("No Google Calendar token found for Hall: {}".format(userDict["hall_id"]))
 
+        # Close the DB cursor
+        cur.close()
+
         # We will need to let the user know that they will need
         #  to connect/reconnect their Google Calendar Account.
         return jsonify(stdRet(0, "No Token Found"))
@@ -449,11 +470,17 @@ def exportToGCal():
         # Log that an error was encountered for future reference.
         logging.warning("Error: {} encountered while exporting to Google Calendar for Hall: {}".format(status, userDict["hall_id"]))
 
+        # Close the DB cursor
+        cur.close()
+
         # Then we will need to let the user know that they will need
         #  to connect/reconnect their Google Calendar Account. This is
         #  a default suggestion as there currently is no implementation
         #  that gives us a more granular look at what went wrong.
         return jsonify(stdRet(0, "Reconnect Google Calendar Account"))
+
+    # Close the DB cursor
+    cur.close()
 
     # Otherwise report that it was a success!
     return jsonify(stdRet(1, "successful"))

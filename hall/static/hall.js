@@ -86,7 +86,7 @@ function generateGoogleRow(alreadyConnected) {
         disconnButton.innerHTML = "Disconnect Account";
         disconnButton.setAttribute("type", "button");
         disconnButton.setAttribute("class", "btn btn-danger");
-        disconnButton.setAttribute("onclick", "location.href='../integration/int/disconnectGCal'");
+        disconnButton.setAttribute("onclick", "location.href='../int/disconnectGCal'");
 
         // Add the disconnect button to the div
         valDiv.appendChild(disconnButton);

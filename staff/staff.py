@@ -193,6 +193,7 @@ def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None
                    GROUP BY combined_res.rid
                ) ptQuery
                RIGHT JOIN ra ON (ptQuery.rid = ra.id)
+               LEFT JOIN point_modifier ON (ra.id = point_modifier.ra_id)
                WHERE ra.hall_id = %s;""", (hallId, hallId, startDateStr,
                                            endDateStr, hallId, breakDutyStart,
                                            breakDutyEnd, hallId))
@@ -203,7 +204,13 @@ def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None
     # Iterate through the raList from the DB and assembled the return result
     #  in the format outlined in the comments at the top of this method.
     for ra in raList:
-        res[ra[0]] = {"name": ra[1] + " " + ra[2], "pts": ra[3]}
+        res[ra[0]] = {
+            "name": ra[1] + " " + ra[2],
+            "pts": {
+                "dutyPts": ra[3],
+                "modPts": ra[4]
+            }
+        }
 
     # Close the DB cursor
     cur.close()
@@ -365,6 +372,9 @@ def changeStaffInfo():
                        WHERE id = %s;
                     """, (data["fName"], data["lName"], data["startDate"], data["color"],
                           data["email"], data["authLevel"], data["raID"]))
+
+        # Add the point modifier to the DB
+        addRAPointModifier(data["raID"], userDict["hall_id"], data["modPts"], set=True)
 
         # Commit the changes to the DB
         ag.conn.commit()
@@ -705,6 +715,10 @@ def importStaff():
                                             "or the file extension that was received was not allowed."))
 
 
+# ------------------------
+# --  Helper Functions  --
+# ------------------------
+
 def validateImportStaffUpload(partList):
     # Helper function designed for the staff_bp.importStaff endpoint that
     #  ensures that the provided row parts fit our expected schema.
@@ -817,3 +831,84 @@ def validateImportStaffUpload(partList):
 
     # Return the pl, valid, and reasons variables
     return pl, valid, reasons
+
+
+def addRAPointModifier(raID, resHallID, modifier, set=False):
+    # Helper function that will check to see if a point_modifier record
+    #  exists for the given raID and resHallID. If so, this function will
+    #  add the provided modifier to the record. If a record does not exist,
+    #  this function will create a new point_modifier record with the given
+    #  modifier.
+    #
+    #  If called from the server, this function accepts the following parameters:
+    #
+    #     raID       <int>   -  an integer representing the id of the desired
+    #                            record in the ra table (ra.id).
+    #     resHallID  <int>   -  an integer representing the id of the desired
+    #                            record in the res_hall table (res_hall.id).
+    #     modifier   <int>   -  an integer denoting how much the modifier field
+    #                            should be adjusted in the point_modifier table.
+    #                            This can be either positive or negative.
+    #     set        <bool>  -  a boolean denoting whether this function should
+    #                            add the provided modifier to any existing
+    #                            modifier (set=False) or if it should set the
+    #                            modifier to the provided value instead (set=True).
+    #
+    #  This method cannot be called from a remote client.
+    #
+    #  This method does not return any additional information.
+
+    logging.debug("Adding point modifier for RA: {}, Hall: {}".format(raID, resHallID))
+
+    # Create a DB cursor
+    cur = ag.conn.cursor()
+
+    # Query the DB to see if a point_modifier record already exists.
+    cur.execute("SELECT id, modifier FROM point_modifier WHERE ra_id = %s AND res_hall_id = %s",
+                (raID, resHallID))
+
+    # Load the results from the DB
+    record = cur.fetchone()
+
+    # Check to see if a record was returned
+    if record is not None:
+        # If a record exists then we will need to update it with a new value
+
+        # Load the results from the DB
+        ptModID, prevModifier = record
+
+        logging.debug("  Record located in point_modifier table: {}".format(ptModID))
+        logging.debug("  Update existing record: {}".format(not set))
+
+        # Check to see if we should update or set the modifier
+        if set:
+            # If True, set the newMod to the provided modifier
+            newMod = modifier
+
+        else:
+            # If False, add the new modifier to the previous modifier
+            newMod = prevModifier + modifier
+
+        # Save the entry to the DB
+        cur.execute("UPDATE point_modifier SET modifier = %s WHERE id = %s",
+                    (newMod, ptModID))
+
+    else:
+        # If a record does NOT exist, then we will need to create one.
+
+        logging.debug("  Creating new point_modifier record.")
+
+        # Create a new record into the point_modifier table.
+        cur.execute("""INSERT INTO point_modifier (ra_id, res_hall_id, modifier)
+        VALUES (%s, %s, %s);""", (raID, resHallID, modifier))
+
+    logging.debug("  Committing changes")
+
+    # Commit the changes to the DB
+    ag.conn.commit()
+
+    # Close the DB cursor
+    cur.close()
+
+    # Return to the calling method
+    return
