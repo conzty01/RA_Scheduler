@@ -154,7 +154,8 @@ def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None
 
     # Query the DB for all of the duties within the provided timeframe and add up the points
     #  for each RA.
-    cur.execute("""SELECT ra.id, ra.first_name, ra.last_name, COALESCE(ptQuery.pts,0), point_modifier.modifier
+    cur.execute("""SELECT ra.id, ra.first_name, ra.last_name, COALESCE(ptQuery.pts, 0),
+                          COALESCE(point_modifier.modifier, 0)
                FROM
                (
                    SELECT combined_res.rid AS rid, CAST(SUM(combined_res.pts) AS INTEGER) AS pts
