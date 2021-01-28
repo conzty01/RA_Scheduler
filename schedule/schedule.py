@@ -418,7 +418,21 @@ def runScheduler():
     logging.debug("ptsDict: {}".format(ptsDict))
 
     # Assemble the RA list with RA objects that have the individual RAs' information
-    ra_list = [RA(res[0], res[1], res[2], res[3], res[4], res[5], ptsDict[res[2]]["pts"]) for res in partialRAList]
+    ra_list = []
+    for res in partialRAList:
+        # Add up the RA's duty points and any point modifier
+        pts = ptsDict[res[2]]["pts"]["dutyPts"] + ptsDict[res[2]]["pts"]["modPts"]
+        ra_list.append(
+            RA(
+                res[0],     # First Name
+                res[1],     # Last Name
+                res[2],     # RA ID
+                res[3],     # Hall ID
+                res[4],     # Start Date
+                res[5],     # Conflicts
+                pts         # Points
+            )
+        )
 
     # Set the Last Duty Assigned Tolerance based on floor dividing the number of
     #  RAs by 2 then adding 1. For example, with a staff_manager of 15, the LDA Tolerance
