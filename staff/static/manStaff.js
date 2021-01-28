@@ -213,7 +213,8 @@ function addStaff() {
         email : document.getElementById("email").value,
         color : document.getElementById("color").value,
         startDate : document.getElementById("startDate").value,
-        authLevel : document.getElementById("authLevelOpts").value
+        authLevel : document.getElementById("authLevelOpts").value,
+        modPts : Math.ceil(document.getElementById("modPts").value)
     }
 
     appConfig.base.callAPI("addStaffer",data,getStaffInfo,"POST");

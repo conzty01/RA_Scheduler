@@ -515,22 +515,32 @@ def addStaffer():
     # Load the result from the DB
     checkRes = cur.fetchone()
 
+    # Initialize the query string and supplemental tuple for use below
+    queryStr = ""
+    queryTup = tuple()
+
     # If there is a user with the provided email already
     if checkRes is not None:
-        # Then update RA record to be associated with the new hall
-        cur.execute("UPDATE ra SET hall_id = %s WHERE email = %s;", (userDict["hall_id"], data["email"]))
+        # Then set the query string to update RA record to be associated with the new hall
+        queryStr = "UPDATE ra SET hall_id = %s WHERE email = %s RETURNING id;"
+        queryTup = (userDict["hall_id"], data["email"])
 
-        # Commit the changes to the DB
-        ag.conn.commit()
+    else:
+        # Otherwise set the query string create a new RA record in the ra table with
+        # the provided information.
+        queryStr = """INSERT INTO ra (first_name, last_name, hall_id, date_started, color, email, auth_level)
+                   VALUES (%s, %s, %s, NOW(), %s, %s, %s) RETURNING id"""
+        queryTup = (data["fName"], data["lName"], userDict["hall_id"],
+                    data["color"], data["email"], data["authLevel"])
 
-        # Notify the user that the change was successful
-        return jsonify(stdRet(1, "successful"))
+    # Execute the query string
+    cur.execute(queryStr, queryTup)
 
-    # Otherwise create a new RA record in the ra table with the provided information.
-    cur.execute("""INSERT INTO ra (first_name, last_name, hall_id, date_started, color, email, auth_level)
-                   VALUES (%s, %s, %s, NOW(), %s, %s, %s)
-                """, (data["fName"], data["lName"], userDict["hall_id"], data["color"],
-                      data["email"], data["authLevel"]))
+    # Fetch the returned ID of the RA record
+    raID = cur.fetchone()
+
+    # Add the point modifier to the DB
+    addRAPointModifier(raID, userDict["hall_id"], data["modPts"], set=True)
 
     # Commit the changes to the DB
     ag.conn.commit()
