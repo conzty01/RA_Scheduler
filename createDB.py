@@ -66,6 +66,7 @@ def createDutyDB(conn):
 			day_id		int,
 			sched_id	int,
 			point_val	int DEFAULT 0 CONSTRAINT pos_duty_point_value CHECK (point_val >= 0),
+			flagged		boolean NOT NULL DEFAULT FALSE,
 
 			PRIMARY KEY (id),
 			FOREIGN KEY (hall_id) REFERENCES res_hall(id),
