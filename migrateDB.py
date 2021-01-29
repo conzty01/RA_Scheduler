@@ -8,33 +8,30 @@ def migrate(conn):
     cur = conn.cursor()
 
     # ----------------------
-    # --  point_modifier  --
+    # --  duties.flagged  --
     # ----------------------
 
-    # Check to see if the point_modifier table exists
-    cur.execute("SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'point_modifier');")
+    # Check to see if the duties.flagged column exists
+    cur.execute(
+        """SELECT EXISTS 
+        (
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name='duties' and column_name='flagged'
+        );"""
+    )
 
     exists = cur.fetchone()
 
-    logging.info("  'point_modifier' Table Exists: {}".format(exists))
+    logging.info("  'duties.flagged' Column Exists: {}".format(exists))
 
     if not exists[0]:
-        # If the table does not exist, create the table
+        # If the table does not exist, create the column
 
-        logging.info("  Creating 'point_modifier' Table.")
+        logging.info("  Creating 'duties.flagged' Column.")
 
-        # Create the point_modifier table
-        cur.execute("""
-        CREATE TABLE point_modifier(
-            id				serial UNIQUE,
-            ra_id			int,
-            res_hall_id		int,
-            modifier		int DEFAULT 0,
-
-            PRIMARY KEY (ra_id, res_hall_id),
-            FOREIGN KEY (ra_id) REFERENCES ra(id),
-            FOREIGN KEY (res_hall_id) REFERENCES res_hall(id)
-        );""")
+        # Create the flagged column
+        cur.execute("""ALTER TABLE duties ADD COLUMN "flagged" BOOLEAN NOT NULL DEFAULT FALSE;""")
 
 
 if __name__ == "__main__":
