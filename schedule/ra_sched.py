@@ -180,9 +180,14 @@ class Day:
             isDoubleDay     (bool):   A boolean denoting whether or not the day should be considered
                                        a day where more than one RA should be assigned for duty and,
                                        as a result, more than one point should be earned per RA.
+            flagDutySlot    (bool):   A boolean denoting whether or not a duty slot should be flagged
+                                       as being considered a special slot. If more that one duty slot
+                                       is configured for a given day, this will only flag one (1)
+                                       duty slot. If set to True, the last duty slot will be flagged.
     """
 
-    def __init__(self, date, dow, numDutySlots=1, ras=[], customPointVal=0, dayID=0, isDoubleDay=False):
+    def __init__(self, date, dow, numDutySlots=1, ras=[], customPointVal=0, dayID=0,
+                 isDoubleDay=False, flagDutySlot=False):
         # The date of the Day object
         self.date = date
 
@@ -198,10 +203,18 @@ class Day:
         # Whether the day should be considered for manual review
         self.review = False
 
+        # Set the value of flagDutySlot
+        self.flagDutySlot = flagDutySlot
+
         # If an RA list has been provided
         if ras:
-            # Set the RA list
-            self.ras = ras
+            # Set the RA list with assigned duty slots
+            self.ras = [self.DutySlot(ra) for ra in ras]
+
+            # If we should flag a duty slot
+            if self.flagDutySlot:
+                # Then flag the last duty slot in the list
+                self.ras[-1].setFlag(True)
 
             # Also set the number of duty slots to be the
             #  length of the RA list.
@@ -211,8 +224,8 @@ class Day:
             # Set the number of duty slots for this day.
             self.numDutySlots = numDutySlots
 
-            # Set the RA list to an empty list
-            self.ras = list()
+            # Initialize the empty ra list
+            self.ras = []
 
         # Check to see if a custom point value has been provided.
         if customPointVal == 0:
@@ -244,8 +257,8 @@ class Day:
     def __iter__(self):
         # Iterate through the RAs that are assigned
         #  for duty on this Day
-        for ra in self.ras:
-            yield ra
+        for slot in self.ras:
+            yield slot.getAssignment()
 
     def __lt__(self, other):
         # Sort by comparing the date of the two Days
@@ -261,6 +274,35 @@ class Day:
         #  dates are equal.
         return self.date == other.date
 
+    def __contains__(self, other):
+        # Return True if the "other" object is in any of the
+        #  duty slots.
+
+        # Set some variables used in finding the object
+        i = 0
+        upperBound = len(self.ras)
+        found = False
+
+        # While the appropriate duty slot has not been found and
+        #  we have not gotten to the end of the ra list...
+        while not found and i < upperBound:
+            # Peek the assigned duties list and see if its the object
+            if ra == self.ras[i].getAssignment():
+                # If it is, then set found to True
+                found = True
+
+            else:
+                # Otherwise move to the next index
+                i += 1
+
+        # Check to see if we found the RA
+        if found:
+            # If so, then return True
+            return True
+
+        # Otherwise return False
+        return False
+
     def addRA(self, ra):
         # Add an RA to the list of RAs that are assigned
         #  to be on duty for this Day. This method will
@@ -270,11 +312,19 @@ class Day:
         #  been filled.
         if len(self.ras) < self.numDutySlots:
             # If there is still room, append the RA to the list
-            self.ras.append(ra)
+            self.ras.append(self.DutySlot(ra))
 
             # And add the point values awarded for this duty to
             #  the RA.
             ra.addPoints(self.pointVal)
+
+            # Check to see if we need to set any flags
+            if self.flagDutySlot:
+                # Then check to see if this was the last duty that
+                #  can be added.
+                if len(self.ras) >= self.numDutySlots:
+                    # If so, then flag this duty.
+                    self.ras[-1].setFlag(True)
 
         else:
             # If all of the duty slots have already been filled,
@@ -290,7 +340,15 @@ class Day:
         #  been filled.
         if len(self.ras) < self.numDutySlots:
             # If there is still room, append the RA to the list
-            self.ras.append(ra)
+            self.ras.append(self.DutySlot(ra))
+
+            # Check to see if we need to set any flags
+            if self.flagDutySlot:
+                # Then check to see if this was the last duty that
+                #  can be added.
+                if len(self.ras) >= self.numDutySlots:
+                    # If so, then flag this duty.
+                    self.ras[-1].setFlag(True)
 
         else:
             # If all of the duty slots have already been filled,
@@ -301,21 +359,52 @@ class Day:
         # Remove and return the given RA from the list of RAs on duty.
 
         # First, remove the Day's points from the RA's total.
-        ra.removePoints(self.pointVal)
 
-        # Then remove and return the RA object.
-        return self.ras.remove(ra)
+
+        # Iterate through the duty slots and find the RA
+
+        # Set some variables used in finding the RA
+        i = 0
+        upperBound = len(self.ras)
+        found = False
+
+        # While the appropriate duty slot has not been found and
+        #  we have not gotten to the end of the ra list...
+        while not found and i < upperBound:
+            # Peek the assigned duties list and see if its the RA
+            if ra == self.ras[i].getAssignment():
+                # If it is, then set found to True
+                found = True
+
+            else:
+                # Otherwise move to the next index
+                i += 1
+
+        # Check to see if we found the RA
+        if found:
+            # If so, then remove the Day's points from the RA's total.
+            ra.removePoints(self.pointVal)
+
+            # Then remove and return the RA object.
+            return self.ras.pop(i).getAssignment()
+
+        else:
+            # Otherwise we were unable to find the RA so return None
+            return None
 
     def removeAllRAs(self):
         # Remove and return all RAs from the list of RAs on duty.
 
-        # Create a temporary reference to the list that can be returned.
-        tmp = self.ras
+        # Create a temporary list that will be returned
+        tmp = []
 
         # Iterate through all of the RAs assigned for duty.
-        for ra in self.ras:
+        for slot in self.ras:
             # Remove the Day's points from the RA's total.
-            ra.removePoints(self.pointVal)
+            slot.getAssignment().removePoints(self.pointVal)
+
+            # Add the RA to the tmp list
+            tmp.append(slot.getAssignment())
 
         # Reset the RA list to an empty list.
         self.ras = []
@@ -363,16 +452,94 @@ class Day:
     def getRAs(self):
         # Return the list of RA's assigned for duty
         #  on this day.
-        return self.ras
+        return [slot.getAssignment() for slot in self.ras]
 
-    def setReview(self):
+    def setReview(self, val=True):
         # Set this day as being in need of manual review.
-        self.review = True
+        self.review = val
 
     def review(self):
         # Return whether or not this day should be manually
         #  reviewed.
         return self.review
+
+    def combineDay(self, otherDay):
+        # Merge the duty slots of the provided other day into this one.
+
+        # Ensure that we are dealing with a Day object
+        if type(otherDay) != Day:
+            # If not, raise a Type error exception
+            raise TypeError("Cannot combine Day object with type: {}".format(type(otherDay)))
+
+        # Check to ensure that after combining, we will not have not
+        #  exceeded the number of duty slots for this day
+        if len(self.ras) + len(otherDay.ras) > self.numDutySlots:
+            # If so, throw an Overflow exception
+            raise OverflowError("Limit for number on duty exceeded.")
+
+        # Otherwise, append the otherDay's duty slots to this day's
+        #  duty slots
+        for s in otherDay.ras:
+            self.ras.append(s)
+
+    def iterDutySlots(self):
+        # Iterate through the Duty Slots for the day
+        for slot in self.ras:
+            yield slot
+
+    # ------------------------
+    # -- Supporting Classes --
+    # ------------------------
+    class DutySlot:
+        """ Object for abstracting the idea of a duty slot within a Day object.
+
+            This class is intended to be used to attach metadata to a particular duty.
+
+            Args:
+                assignee    (RA):     An RA object that has been scheduled for this duty.
+                flagged     (bool):   A boolean denoting whether or not the duty slot should be
+                                       flagged as a special duty.
+        """
+
+        def __init__(self, assignee=None, flagged=False):
+            # If this object is created with an assigned RA,
+            #  set it to the duty slot.
+            self.slot = assignee
+
+            # Set whether or not this duty slot should be flagged as special
+            self.flagged = flagged
+
+        def isAssigned(self):
+            # Return whether or not this duty slot has been assigned.
+            return self.slot is not None
+
+        def assignRA(self, ra):
+            # Assign the provided RA to the duty slot.
+            self.slot = ra
+
+        def setFlag(self, val):
+            # Set the value of the flag
+            self.flagged = val
+
+        def getFlag(self):
+            # Return the value of the flag
+            return self.flagged
+
+        def getAssignment(self):
+            # Return the RA on duty
+            return self.slot
+
+        def removeAssignment(self):
+            # Remove and return the assigned RA
+
+            # Set the assigned RA to a temporary variable
+            tmp = self.slot
+
+            # Clear out the duty slot assignment
+            self.slot = None
+
+            # Return the unassigned RA
+            return tmp
 
 
 class Schedule:
