@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block styles %}
+{{ super() }}
+<link rel="stylesheet" href="{{url_for('static', filename='main.css')}}">
+<link href='https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.13.1/css/all.css' rel='stylesheet'>
+<link rel="stylesheet" href="{{url_for('static', filename='calendar.css')}}">
+<link rel="stylesheet" href="{{url_for('breaks_bp.static', filename='editBreaks.css')}}">
+
+{% endblock %}
+
+{% block contentRows %}
+
+<!-- Edit Break Duty Modal -->
+<div class="modal fade" id="editModal" tabindex="-1" role="dialog" aria-labelledby="editModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Change Break Duty: <span id="editModalLongTitle" style="font-weight:bold;"></span></h3>
+      </div>
+      <div class="modal-body">
+          <div class="row">
+              <div class="col-sm-5">
+                  <div class="form-group">
+                      <label for="editModalPrevRA">Current Assigned RA</label>
+                      <select id="editModalPrevRA" class="form-control" disabled>
+                          {% for ra in raList: %}
+                          <option value="{{ ra[1] }} {{ ra[2] }}">{{ ra[1] }} {{ ra[2] }}</option>
+                          {% endfor %}
+                      </select>
+                  </div>
+              </div>
+
+              <div class="col-sm-1 align-middle">
+                  <span class="fa fa-arrow-right"></span>
+              </div>
+
+              <div class="col-sm-5 modalRight">
+                  <div class="form-group">
+                      <label for="editModalNextRA">New Assigned RA</label>
+                      <select id="editModalNextRA" class="form-control">
+                          {% for ra in raList: %}
+                          <option id="selector_{{ ra[0] }}" value="{{ ra[4] }}">{{ ra[1] }} {{ ra[2] }}</option>
+                          {% endfor %}
+                      </select>
+                  </div>
+              </div>
+
+          </div>
+      </div>
+      <div class="modalError">Update Assignment Failed: <span class="msg"></span></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-danger" onclick="deleteBreakDuty()">Delete Break Duty</button>
+        <button type="button" class="btn btn-primary" onclick="saveModal()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Break Duty Modal -->
+<div class="modal fade" id="addDutyModal" tabindex="-1" role="dialog" aria-labelledby="addDutyModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Add a New Break Duty</h3>
+      </div>
+      <div class="modal-body">
+          <div class="form-group">
+              <label for="addDateDate">Break Duty Date:</label>
+              <input class="form-control" type="date" id="addDateDate">
+          </div>
+          <div class="form-group">
+              <label for="addDateRASelect">Assigned RA:</label>
+              <select class="form-control" id="addDateRASelect">
+                  {% for ra in raList: %}
+                  <option id="selector_{{ ra[0] }}" value="{{ ra[4] }}">{{ ra[1] }} {{ ra[2] }}</option>
+                  {% endfor %}
+              </select>
+          </div>
+          <div class="form-group">
+              <label for="addDatePts">Point Value:</label>
+              <input class="form-control" type="number" id="addDatePts" name="addDatePts" value="3">
+         </div>
+      </div>
+      <div class="modalError">Update Assignment Failed: <span class="msg"></span></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" onclick="addBreakDuty()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="calContainer" class="col-lg-9">
+    <div id="calendar">
+
+    </div>
+</div>
+<div id="raListContainer" class="col-lg-3">
+    <div id="raList" class="raList">
+        <ul>
+            <li id="list_header">
+                <div id="list_name_header" class="tName">Name</div>
+                <div id="list_points_header" class="tPoints"># Break Duties</div>
+            </li>
+            {% for idKey, idVal in bkDict: %}
+            <li id="list_{{ idKey }}">
+                <div id="list_name_{{ idKey }}" class="tName">{{ idVal["name"] }}</div>
+                <div id="list_points_{{ idKey }}" class="tPoints">{{ idVal["count"] }}</div>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endblock %}
+
+{%- block setBlueprintAPIPrefix %}
+var bpAPIPrefix = '/breaks';
+{%- endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="{{url_for('static', filename='main.js')}}"></script>
+<script src="{{url_for('static', filename='locales-all.js')}}"></script>
+<script src="{{url_for('static', filename='fullCal.js')}}"></script>
+<script src="{{url_for('breaks_bp.static', filename='editBreaks.js')}}"></script>
+<script>
+    initEditSchedCal();
+</script>
+{% endblock %}
