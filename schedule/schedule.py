@@ -1,7 +1,7 @@
 from flask import render_template, request, jsonify, Blueprint
 from flask_login import login_required
 from psycopg2 import IntegrityError
-from schedule import scheduler4_0
+from schedule import scheduler4_1
 from schedule.ra_sched import RA
 import copy as cp
 import calendar
@@ -535,9 +535,10 @@ def runScheduler():
     successful = False
     while not completed:
         # While we are not finished scheduling, create a candidate schedule
-        sched = scheduler4_0.schedule(copy_raList, year, monthNum,
+        sched = scheduler4_1.schedule(copy_raList, year, monthNum,
                                       noDutyDates=copy_noDutyList, ldaTolerance=ldat,
-                                      prevDuties=prevRADuties, breakDuties=breakDuties)
+                                      prevDuties=prevRADuties, breakDuties=breakDuties,
+                                      setDDFlag=True)
 
         # If we were unable to schedule with the previous parameters,
         if len(sched) == 0:
@@ -618,15 +619,20 @@ def runScheduler():
             # If there is at least one RA assigned for duty on this day,
             #  then iterate over all of the RAs assigned for duty on this
             #  day and add them to the dutyDayStr
-            for r in d:
-                dutyDayStr += "({},{},{},{},{}),".format(hallId, r.getId(), days[d.getDate()],
-                                                         schedId, d.getPoints())
+            for s in d.iterDutySlots():
+                # Retrieve the RA object that is assigned to this duty slot
+                r = s.getAssignment()
+
+                # Add the necessary information to the dutyDayStr
+                dutyDayStr += "({},{},{},{},{},{}),".format(hallId, r.getId(), days[d.getDate()],
+                                                         schedId, d.getPoints(), s.getFlag())
 
                 # Check to see if the RA has already been added to the dictionary
                 if r in avgPtDict.keys():
                     # If so, add the points to the dict
                     avgPtDict[r.getId()] += d.getPoints()
                 else:
+                    # Otherwise, initialize the RA's entry with this day's points.
                     avgPtDict[r.getId()] = d.getPoints()
 
         else:
@@ -640,8 +646,9 @@ def runScheduler():
         if dutyDayStr != "":
             # Then insert all of the duties that were scheduled for the month into the DB
             cur.execute("""
-                    INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val) VALUES {};
-                    """.format(dutyDayStr[:-1]))
+            INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val, flagged) 
+            VALUES {};
+            """.format(dutyDayStr[:-1]))
 
         # If there were days added to the noDutyDayStr
         if noDutyDayStr != "":
@@ -671,7 +678,8 @@ def runScheduler():
 
         # Select all RAs in the given hall whose auth_level is below 3 (HD)
         #  that were not included in the eligibleRAs list
-        cur.execute("""SELECT id FROM ra WHERE id NOT IN %s AND hall_id = %s""", (tuple(eligibleRAs), hallId))
+        cur.execute("""SELECT id FROM ra WHERE id NOT IN %s AND hall_id = %s""",
+                    (tuple(eligibleRAs), hallId))
 
         raAdjList = cur.fetchall()
 
