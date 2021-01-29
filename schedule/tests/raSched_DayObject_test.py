@@ -38,19 +38,22 @@ class TestDayObject(unittest.TestCase):
         self.patcher_loggingCRITICAL.stop()
         self.patcher_loggingERROR.stop()
 
+    # --------------------------
+    # -- Tests for Day Object --
+    # --------------------------
     def test_hasExpectedMethods(self):
         # -- Arrange --
         # -- Act --
         # -- Assert --
         pass
 
-    def test_hasExpectedProperties(self):
+    def test_DayObject_hasExpectedProperties(self):
         # -- Arrange --
         # -- Act --
         # -- Assert --
         pass
 
-    def test_hasExpectedDefaultValues(self):
+    def test_DayObject_hasExpectedDefaultValues(self):
         # -- Arrange --
         # -- Act --
         # -- Assert --
@@ -173,6 +176,12 @@ class TestDayObject(unittest.TestCase):
         # -- Assert --
         pass
 
+    def test_magicMethodContains_isTrueIfAndOnlyIfRAIsAssignedForDuty(self):
+        # -- Arrange --
+        # -- Act --
+        # -- Assert --
+        self.fail("Incomplete test")
+
     def test_addRA_withDutySlotsLeft_addsRAToDutySlots(self):
         ra1 = RA("R","E",99,1,date(2017,2,2))
         ra2 = RA("C","K",98,1,date(2017,3,3))
@@ -288,9 +297,90 @@ class TestDayObject(unittest.TestCase):
         # -- Assert --
         pass
 
-    def test_getRAs_returnsRAsAttribute(self):
+    def test_getRAs_returnsRAsOnDuty(self):
         ras = self.day.getRAs()
         self.assertEqual(ras, self.day.ras)
+
+    # -------------------------------
+    # -- Tests for DutySlot Object --
+    # -------------------------------
+    def test_DutySlotObject_hasExpectedProperties(self):
+        # -- Arrange --
+        # -- Act --
+        # -- Assert --
+        self.fail("Incomplete test")
+
+    def test_DutySlotObject_hasExpectedDefaultValues(self):
+        # -- Arrange --
+        # -- Act --
+        # -- Assert --
+        self.fail("Incomplete test")
+
+    def test_DutySlotObject_isAssigned_returnsTrueIfAndOnlyIfDutyIsNotAssigned(self):
+        # -- Arrange --
+        # -- Act --
+        # -- Assert --
+        self.fail("Incomplete test")
+
+    def test_DutySlotObject_assignRA_setsRAToDutySlot(self):
+        # -- Arrange --
+        # -- Act --
+        # -- Assert --
+        self.fail("Incomplete test")
+
+    def test_DutySlotObject_setFlag_setsTheFlaggedAttribute(self):
+        # -- Arrange --
+        # -- Act --
+        # -- Assert --
+        self.fail("Incomplete test")
+
+    def test_DutySlotObject_getFlag_returnsTheValueOfTheFlaggedAttribute(self):
+        # -- Arrange --
+        # -- Act --
+        # -- Assert --
+        self.fail("Incomplete test")
+
+    def test_DutySlotObject_getAssignment_returnsRAObjectAssignedToDutySlot(self):
+        # -- Arrange --
+        # -- Act --
+        # -- Assert --
+        self.fail("Incomplete test")
+
+    def test_DutySlotObject_removeAssignment_removesAndReturnsRAObjectAssignedToDuty(self):
+        # -- Arrange --
+        # -- Act --
+        # -- Assert --
+        self.fail("Incomplete test")
+
+    def test_DayObject_whenRAListProvided_whenFlagDutySlotIsTrue_setsLastDutyAsFlagged(self):
+        # -- Arrange --
+        # -- Act --
+        # -- Assert --
+        self.fail("Incomplete test")
+
+    def test_DayObject_iterDutySlots_iteratesThroughDutySlots(self):
+        # -- Arrange --
+        # -- Act --
+        # -- Assert --
+        self.fail("Incomplete test")
+
+    def test_DayObject_combineDay_ensuresOtherObjectIsDayObject(self):
+        # -- Arrange --
+        # -- Act --
+        # -- Assert --
+        self.fail("Incomplete test")
+
+    def test_DayObject_combineDay_throwsOverflowErrorWhenTooManyDutiesAreAdded(self):
+        # -- Arrange --
+        # -- Act --
+        # -- Assert --
+        self.fail("Incomplete test")
+
+    def test_DayObject_combineDay_appendsOtherDayToOwnDutySlotList(self):
+        # -- Arrange --
+        # -- Act --
+        # -- Assert --
+        self.fail("Incomplete test")
 
 
 if __name__ == "__main__":
