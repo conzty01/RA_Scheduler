@@ -763,6 +763,10 @@ def alterDuty():
     #                         to be assigned for the given duty.
     #     oldName  <str>  -  a string containing the name of the RA that is currently
     #                         on duty for the given day.
+    #     flag     <bool> -  a boolean used to denote whether or not this duty should
+    #                         be flagged in the DB.
+    #     pts      <int>  -  an integer denoting the number of points that should be
+    #                         awarded for this duty.
     #
     #  This method returns a standard return object whose status is one of the
     #  following:
@@ -919,6 +923,10 @@ def addNewDuty():
     #                         to be altered.
     #     id       <int>  -  an integer representing the ra.id value for the RA that is
     #                         to be assigned for the given duty.
+    #     flag     <bool> -  a boolean used to denote whether or not this duty should
+    #                         be flagged in the DB.
+    #     pts      <int>  -  an integer denoting the number of points that should be
+    #                         awarded for this duty.
     #
     #  This method returns a standard return object whose status is one of the
     #  following:
