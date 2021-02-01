@@ -199,6 +199,12 @@ class TestSchedule_alterDuty(unittest.TestCase):
             None,  # Fourth query is for the Schedule ID
         ]
 
+        # Configure the flag that should be sent
+        desiredFlag = True
+
+        # Configure the points that should be set
+        desiredPts = 16
+
         # -- Act --
 
         # Make a request to the desired API endpoint
@@ -206,7 +212,9 @@ class TestSchedule_alterDuty(unittest.TestCase):
                                 json=dict(
                                     newId=desiredNewRAID,
                                     oldName=desiredOldName,
-                                    dateStr=desiredDateStr
+                                    dateStr=desiredDateStr,
+                                    flag=desiredFlag,
+                                    pts=desiredPts
                                 ),
                                 base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
 
@@ -255,6 +263,12 @@ class TestSchedule_alterDuty(unittest.TestCase):
             None,  # Fourth query is for the Schedule ID
         ]
 
+        # Configure the flag that should be sent
+        desiredFlag = True
+
+        # Configure the points that should be set
+        desiredPts = 16
+
         # -- Act --
 
         # Make a request to the desired API endpoint
@@ -262,7 +276,9 @@ class TestSchedule_alterDuty(unittest.TestCase):
                                 json=dict(
                                     newId=desiredNewRAID,
                                     oldName=desiredOldName,
-                                    dateStr=desiredDateStr
+                                    dateStr=desiredDateStr,
+                                    flag=desiredFlag,
+                                    pts=desiredPts
                                 ),
                                 base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
 
@@ -311,6 +327,12 @@ class TestSchedule_alterDuty(unittest.TestCase):
             None,  # Fourth query is for the Schedule ID
         ]
 
+        # Configure the flag that should be sent
+        desiredFlag = True
+
+        # Configure the points that should be set
+        desiredPts = 16
+
         # -- Act --
 
         # Make a request to the desired API endpoint
@@ -318,7 +340,9 @@ class TestSchedule_alterDuty(unittest.TestCase):
                                 json=dict(
                                     newId=desiredNewRAID,
                                     oldName=desiredOldName,
-                                    dateStr=desiredDateStr
+                                    dateStr=desiredDateStr,
+                                    flag=desiredFlag,
+                                    pts=desiredPts
                                 ),
                                 base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
 
@@ -369,6 +393,12 @@ class TestSchedule_alterDuty(unittest.TestCase):
             None,  # Fourth query is for the Schedule ID
         ]
 
+        # Configure the flag that should be sent
+        desiredFlag = True
+
+        # Configure the points that should be set
+        desiredPts = 16
+
         # -- Act --
 
         # Make a request to the desired API endpoint
@@ -376,7 +406,9 @@ class TestSchedule_alterDuty(unittest.TestCase):
                                 json=dict(
                                     newId=desiredNewRAID,
                                     oldName=desiredOldName,
-                                    dateStr=desiredDateStr
+                                    dateStr=desiredDateStr,
+                                    flag=desiredFlag,
+                                    pts=desiredPts
                                 ),
                                 base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
 
@@ -428,6 +460,12 @@ class TestSchedule_alterDuty(unittest.TestCase):
             (expectedScheduleID,),              # Fourth query is for the Schedule ID
         ]
 
+        # Configure the flag that should be sent
+        desiredFlag = True
+
+        # Configure the points that should be set
+        desiredPts = 16
+
         # -- Act --
 
         # Make a request to the desired API endpoint
@@ -435,7 +473,9 @@ class TestSchedule_alterDuty(unittest.TestCase):
                                 json=dict(
                                     newId=desiredNewRAID,
                                     oldName=desiredOldName,
-                                    dateStr=desiredDateStr
+                                    dateStr=desiredDateStr,
+                                    flag=desiredFlag,
+                                    pts=desiredPts
                                 ),
                                 base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
 
@@ -445,13 +485,15 @@ class TestSchedule_alterDuty(unittest.TestCase):
         #  it was a query for the RA.
         self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
             """UPDATE duties
-                   SET ra_id = %s
+                   SET ra_id = %s,
+                       point_val = %s,
+                       flagged = %s
                    WHERE hall_id = %s
                    AND day_id = %s
                    AND sched_id = %s
                    AND ra_id = %s
                    """,
-            (desiredNewRAID, self.user_hall_id, expectedDayID,
+            (desiredNewRAID, desiredPts, desiredFlag, self.user_hall_id, expectedDayID,
              expectedScheduleID, expectedOldRAID)
         )
 
