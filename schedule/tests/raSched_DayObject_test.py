@@ -298,23 +298,85 @@ class TestDayObject(unittest.TestCase):
         pass
 
     def test_getRAs_returnsRAsOnDuty(self):
-        ras = self.day.getRAs()
-        self.assertEqual(ras, self.day.ras)
+        # Test to ensure that the getRAs function returns a list of
+        #  the RAs that are assigned for duty.
+
+        # -- Arrange --
+
+        # Create the objects that will be used in this test
+        testRAObject = RA("Test", "User", 1, 2019, date(2017, 1, 1))
+        testDayObject = Day(date(2021, 2, 1), 0, ras=[testRAObject])
+
+        # Create the expected result
+        expectedResult = [slot.getAssignment() for slot in testDayObject.ras]
+
+        # -- Act --
+
+        # Call the appropriate method
+        result = testDayObject.getRAs()
+
+        # -- Assert --
+
+        # Assert that the RAs were returned
+        self.assertEqual(expectedResult, result)
 
     # -------------------------------
     # -- Tests for DutySlot Object --
     # -------------------------------
     def test_DutySlotObject_hasExpectedProperties(self):
+        # Test to ensure that the DutySlot Object has the following properties:
+        #  - slot  :: RA
+        #  - flag  :: boolean
+
         # -- Arrange --
+
+        # Create the RA object to pass in
+        testRA = RA("Test", "User", 1, 2019, date(2017, 1, 1))
+
+        # Create the DutySlot Object
+        testDutySlot = Day.DutySlot(testRA)
+
         # -- Act --
         # -- Assert --
-        self.fail("Incomplete test")
+
+        # Assert that all of the properties are as we would expect
+        self.assertIsInstance(testDutySlot.slot, RA)
+        self.assertIsInstance(testDutySlot.flagged, bool)
 
     def test_DutySlotObject_hasExpectedDefaultValues(self):
+        # Test to ensure that the DutySlot Object has the expected default values
+
         # -- Arrange --
+
+        # Create the DutySlot Object
+        testDutySlot = Day.DutySlot()
+
         # -- Act --
         # -- Assert --
-        self.fail("Incomplete test")
+
+        # Assert that all of the default properties are as we expect
+        self.assertFalse(testDutySlot.flagged)
+        self.assertIsNone(testDutySlot.slot)
+
+    def test_DutySlotObject_hasExpectedMethods(self):
+        # Test to make sure the DutySlot Object has the following methods:
+        #  - isAssigned
+        #  - assignRA
+        #  - setFlag
+        #  - getFlag
+        #  - getAssignment
+        #  - removeAssignment
+
+        #  -- ARRANGE --
+        #  --   ACT   --
+        #  -- ASSERT  --
+
+        self.assertTrue(hasattr(Day.DutySlot, "isAssigned"))
+        self.assertTrue(hasattr(Day.DutySlot, "assignRA"))
+        self.assertTrue(hasattr(Day.DutySlot, "setFlag"))
+        self.assertTrue(hasattr(Day.DutySlot, "getFlag"))
+        self.assertTrue(hasattr(Day.DutySlot, "getAssignment"))
+        self.assertTrue(hasattr(Day.DutySlot, "removeAssignment"))
 
     def test_DutySlotObject_isAssigned_returnsTrueIfAndOnlyIfDutyIsNotAssigned(self):
         # -- Arrange --
