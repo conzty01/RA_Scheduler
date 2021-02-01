@@ -5,7 +5,7 @@ import unittest
 from helperFunctions.helperFunctions import stdRet
 
 
-class TestSchedule_changeRAforDutyDay(unittest.TestCase):
+class TestSchedule_alterDuty(unittest.TestCase):
     def setUp(self):
         # Set up a number of items that will be used for these tests.
 
@@ -154,7 +154,7 @@ class TestSchedule_changeRAforDutyDay(unittest.TestCase):
         # -- Act --
 
         # Make a request to the desired API endpoint
-        resp = self.server.post("/schedule/api/changeRAonDuty",
+        resp = self.server.post("/schedule/api/alterDuty",
                                 base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
 
         # -- Assert --
@@ -202,7 +202,7 @@ class TestSchedule_changeRAforDutyDay(unittest.TestCase):
         # -- Act --
 
         # Make a request to the desired API endpoint
-        resp = self.server.post("/schedule/api/changeRAonDuty",
+        resp = self.server.post("/schedule/api/alterDuty",
                                 json=dict(
                                     newId=desiredNewRAID,
                                     oldName=desiredOldName,
@@ -258,7 +258,7 @@ class TestSchedule_changeRAforDutyDay(unittest.TestCase):
         # -- Act --
 
         # Make a request to the desired API endpoint
-        resp = self.server.post("/schedule/api/changeRAonDuty",
+        resp = self.server.post("/schedule/api/alterDuty",
                                 json=dict(
                                     newId=desiredNewRAID,
                                     oldName=desiredOldName,
@@ -314,7 +314,7 @@ class TestSchedule_changeRAforDutyDay(unittest.TestCase):
         # -- Act --
 
         # Make a request to the desired API endpoint
-        resp = self.server.post("/schedule/api/changeRAonDuty",
+        resp = self.server.post("/schedule/api/alterDuty",
                                 json=dict(
                                     newId=desiredNewRAID,
                                     oldName=desiredOldName,
@@ -372,7 +372,7 @@ class TestSchedule_changeRAforDutyDay(unittest.TestCase):
         # -- Act --
 
         # Make a request to the desired API endpoint
-        resp = self.server.post("/schedule/api/changeRAonDuty",
+        resp = self.server.post("/schedule/api/alterDuty",
                                 json=dict(
                                     newId=desiredNewRAID,
                                     oldName=desiredOldName,
@@ -431,7 +431,7 @@ class TestSchedule_changeRAforDutyDay(unittest.TestCase):
         # -- Act --
 
         # Make a request to the desired API endpoint
-        resp = self.server.post("/schedule/api/changeRAonDuty",
+        resp = self.server.post("/schedule/api/alterDuty",
                                 json=dict(
                                     newId=desiredNewRAID,
                                     oldName=desiredOldName,
