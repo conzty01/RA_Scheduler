@@ -55,6 +55,7 @@ function initEditSchedCal() {
                         allColors: true
                     };
                 },
+                eventDataTransform: displayFlaggedDuties
             },
             {
                 url: '/breaks/api/getBreakDuties',
@@ -74,7 +75,8 @@ function initEditSchedCal() {
         lazyFetching: true,
         showNonCurrentDates: false,
         fixedWeekCount: false,
-        eventClick: eventClicked
+        eventClick: eventClicked,
+        eventOrder: "flagged, title"
     });
 }
 
@@ -90,6 +92,29 @@ function makeBackgroundEvent(event) {
     tmp.classNames = ["bkg-breakDuty"];
     tmp.extendedProps = event.extendedProps;
 
+    return tmp;
+}
+
+function displayFlaggedDuties(event) {
+    // Add the
+
+    // Create a temporary event object
+    let tmp = {};
+
+    // Translate all of the event information
+    //  over to the new event object
+    tmp.id = event.id;
+    tmp.title = event.title;
+    tmp.start = event.start;
+    tmp.color = event.color;
+    tmp.extendedProps = event.extendedProps;
+
+    // Check to see if this event has been flagged
+    if (tmp.extendedProps.flagged) {
+       tmp.display = "list-item";
+    }
+
+    // Return the transformed event object
     return tmp;
 }
 

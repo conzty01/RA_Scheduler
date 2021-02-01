@@ -154,7 +154,8 @@ def getSchedule2(start=None, end=None, hallId=None, showAllColors=None):
 
     # Query the DB for the regularly scheduled duties for the given Res Hall and timeframe.
     cur.execute("""
-        SELECT ra.first_name, ra.last_name, ra.color, ra.id, TO_CHAR(day.date, 'YYYY-MM-DD')
+        SELECT ra.first_name, ra.last_name, ra.color, ra.id, TO_CHAR(day.date, 'YYYY-MM-DD'),
+               duties.flagged
         FROM duties JOIN day ON (day.id=duties.day_id)
                     JOIN RA ON (ra.id=duties.ra_id)
         WHERE duties.hall_id = %s
@@ -216,7 +217,10 @@ def getSchedule2(start=None, end=None, hallId=None, showAllColors=None):
             "title": row[0] + " " + row[1],
             "start": row[4],
             "color": c,
-            "extendedProps": {"dutyType": "std"}
+            "extendedProps": {
+                "dutyType": "std",
+                "flagged": row[5]
+            }
         })
 
     # If this API method was called from the server
