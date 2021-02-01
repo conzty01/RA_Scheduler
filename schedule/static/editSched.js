@@ -142,7 +142,7 @@ function eventClicked(info) {
     prevRA.value = info.event.title;
 
     let selector = document.getElementById("editModalNextRA");
-    selector.value = info.event.backgroundColor;
+    selector.value = info.event.title;
 
     switch (info.event.extendedProps.dutyType) {
         case "std":
@@ -152,6 +152,12 @@ function eventClicked(info) {
 
             // Also hide the break duty message
             document.getElementById("breakDutyWarning").style.display = "none";
+
+            // Load whether or not the duty has already been flagged
+            document.getElementById("editFlag").checked = info.event.extendedProps.flagged;
+
+            // Load the duty's point value
+            document.getElementById("editDatePts").value = info.event.extendedProps.pts;
 
             break;
 
@@ -172,7 +178,7 @@ function eventClicked(info) {
             document.getElementById("editDelButt").disabled = true;
             document.getElementById("editSavButt").disabled = true;
 
-            // Hide the break duty msesage
+            // Hide the break duty message
             document.getElementById("breakDutyWarning").style.display = "none";
 
     }
@@ -202,18 +208,23 @@ function saveModal() {
     // There are 9 characters before the id
     let newId = parseInt(selRAOption.id.slice(9));
 
-    // If the new RA is different than the current RA,
-    if (oldName !== newName) {
+    let dutyFlag = document.getElementById("editFlag").checked;
+    let pts = parseInt(document.getElementById("editDatePts").value);
+
+    // Check to make sure that we have selected an RA.
+    if (typeof selRAOption !== "undefined") {
         // Save the changes
         console.log(dateStr+": Switching RA '"+oldName+"' for '"+newName+"'");
 
         let changeParams = {
             dateStr: dateStr,
             newId: newId,
-            oldName: oldName
+            oldName: oldName,
+            flag: dutyFlag,
+            pts: pts
         }
 
-        appConfig.base.callAPI("changeRAonDuty", changeParams,
+        appConfig.base.callAPI("alterDuty", changeParams,
             function(msg) {
                 passModalSave('#editModal',msg);
             }, "POST",

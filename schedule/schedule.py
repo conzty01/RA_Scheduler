@@ -169,7 +169,7 @@ def getSchedule2(start=None, end=None, hallId=None, showAllColors=None):
     # Query the DB for the regularly scheduled duties for the given Res Hall and timeframe.
     cur.execute("""
         SELECT ra.first_name, ra.last_name, ra.color, ra.id, TO_CHAR(day.date, 'YYYY-MM-DD'),
-               duties.flagged
+               duties.flagged, duties.point_val
         FROM duties JOIN day ON (day.id=duties.day_id)
                     JOIN RA ON (ra.id=duties.ra_id)
         WHERE duties.hall_id = %s
@@ -233,7 +233,8 @@ def getSchedule2(start=None, end=None, hallId=None, showAllColors=None):
             "color": c,
             "extendedProps": {
                 "dutyType": "std",
-                "flagged": row[5]
+                "flagged": row[5],
+                "pts": row[6]
             }
         })
 
@@ -744,9 +745,9 @@ def runScheduler():
     return jsonify(stdRet(1, "successful"))
 
 
-@schedule_bp.route("/api/changeRAonDuty", methods=["POST"])
+@schedule_bp.route("/api/alterDuty", methods=["POST"])
 @login_required
-def changeRAforDutyDay():
+def alterDuty():
     # API Method will change the RA assigned for a given duty
     #  from one RA to another in the same hall.
     #
@@ -881,13 +882,16 @@ def changeRAforDutyDay():
 
     # Execute an UPDATE statement to alter the duty in the DB
     cur.execute("""UPDATE duties
-                   SET ra_id = %s
+                   SET ra_id = %s,
+                       point_val = %s,
+                       flagged = %s
                    WHERE hall_id = %s
                    AND day_id = %s
                    AND sched_id = %s
                    AND ra_id = %s
-                   """, (raParams[0], userDict["hall_id"],
-                         dayID, schedId[0], oldRA[0]))
+                   """, (raParams[0], data["pts"], data["flag"],
+                         userDict["hall_id"], dayID, schedId[0],
+                         oldRA[0]))
 
     # Commit the changes in the DB
     ag.conn.commit()
