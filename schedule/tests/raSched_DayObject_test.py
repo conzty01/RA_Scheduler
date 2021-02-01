@@ -378,11 +378,38 @@ class TestDayObject(unittest.TestCase):
         self.assertTrue(hasattr(Day.DutySlot, "getAssignment"))
         self.assertTrue(hasattr(Day.DutySlot, "removeAssignment"))
 
-    def test_DutySlotObject_isAssigned_returnsTrueIfAndOnlyIfDutyIsNotAssigned(self):
+    def test_DutySlotObject_isAssigned_returnsTrueIfAndOnlyIfDutyIsAssigned(self):
+        # Test to ensure that the isAssigned method returns True if and only if
+        #  the duty has been assigned.
+
         # -- Arrange --
+
+        # Create the DutySlot object
+        testDutySlot = Day.DutySlot()
+
+        # Create a test RA Object
+        testRAObject = RA("Test", "User", 1, 2019, date(2017, 1, 1))
+
         # -- Act --
+
+        # Get the result of the method when there is nothing assigned
+        notAssignedRes = testDutySlot.isAssigned()
+
+        # Assign an RA to the duty slot and get the method result
+        testDutySlot.assignRA(testRAObject)
+        assignedRes = testDutySlot.isAssigned()
+
+        # Remove the duty assignment and get the method result
+        testDutySlot.slot = None
+        removedAssignedRes = testDutySlot.isAssigned()
+
         # -- Assert --
-        self.fail("Incomplete test")
+
+        # Assert that the isAssigned method returns True if and only if
+        #  the duty has been assigned
+        self.assertFalse(notAssignedRes)
+        self.assertTrue(assignedRes)
+        self.assertFalse(removedAssignedRes)
 
     def test_DutySlotObject_assignRA_setsRAToDutySlot(self):
         # -- Arrange --
