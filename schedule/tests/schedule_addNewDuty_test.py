@@ -360,6 +360,9 @@ class TestSchedule_addNewDuty(unittest.TestCase):
             (expectedScheduleID,)               # Third query is for the schedule
         ]
 
+        # Configure the flag that should be passed in
+        desiredFlagState = True
+
         # -- Act --
 
         # Make a request to the desired API endpoint
@@ -367,7 +370,8 @@ class TestSchedule_addNewDuty(unittest.TestCase):
                                 json=dict(
                                     id=desiredRAID,
                                     pts=desiredPointVal,
-                                    dateStr=desiredDateStr
+                                    dateStr=desiredDateStr,
+                                    flag=desiredFlagState
                                 ),
                                 base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
 
@@ -376,10 +380,10 @@ class TestSchedule_addNewDuty(unittest.TestCase):
         # Assert that the last time appGlobals.conn.cursor().execute was called,
         #  it was a query for the RA.
         self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
-            """INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val)
-                    VALUES (%s, %s, %s, %s, %s);""",
+            """INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val, flagged)
+                    VALUES (%s, %s, %s, %s, %s, %s);""",
             (self.user_hall_id, desiredRAID, expectedDayID,
-             expectedScheduleID, desiredPointVal)
+             expectedScheduleID, desiredPointVal, desiredFlagState)
         )
 
         # Assert that we received the expected response
