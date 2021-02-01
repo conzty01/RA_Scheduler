@@ -7,7 +7,7 @@ import logging
 def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2,
              doubleNum=2, doubleDates=set(), doubleDateNum=2, doubleDatePts=1,
              ldaTolerance=8, nddTolerance=.1, prevDuties=[], breakDuties=[],
-             setDDFlag=False):
+             setDDFlag=False, regDutyPts=1, regNumAssigned=1):
     # This algorithm will schedule RAs for duties based on ...
     #
     # The algorithm returns a Schedule object that contains Day objects which, in
@@ -157,10 +157,43 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
                         prevDay = d_
 
                     else:
+                        # Otherwise this is considered to be a regular duty day.
+
                         # Set the previous day to reference the current day
-                        cmd = Day(curMonthDay, curWeekDay, customPointVal=1, isDoubleDay=False)
+                        cmd = Day(
+                            curMonthDay,
+                            curWeekDay,
+                            customPointVal=regDutyPts,
+                            isDoubleDay=False
+                        )
                         dateDict[prevDay] = cmd
-                        prevDay = cmd
+
+                        # If the number of duty slots for regular duties is greater than 1...
+                        #  then create the extra duties.
+                        if regNumAssigned > 1:
+                            d_ = d1
+                            for i in range(1, regNumAssigned):
+                                # Create the sub days such that if d1 = 1,
+                                #  then d_ will equal 1.1, 1.2, 1.3 etc...
+
+                                # Second node for current date and point val
+                                tmp = Day(
+                                    curMonthDay,
+                                    curWeekDay,
+                                    dayID=i,
+                                    customPointVal=regDutyPts,
+                                    isDoubleDay=True
+                                )
+                                dateDict[d_] = tmp
+                                d_ = tmp
+
+                            # Set the previous day
+                            prevDay = d_
+
+                        else:
+                            # Otherwise set the original day as the previous day for the next
+                            #  day to use.
+                            prevDay = cmd
 
                     # Set the last day
                     dateDict[prevDay] = Day(-1, -1)

@@ -265,20 +265,6 @@ def runScheduler():
     # Get the user's information from the database
     userDict = getAuth()
 
-    # Currently unused feature that allows the scheduler to automatically create
-    #  point_modifiers for RAs that have been excluded from being scheduled for
-    #  the given month. This feature is unreleased because if the user sets this
-    #  to true and then runs the scheduler more than once for the same month,
-    #  there is no way for the application to know if it created any
-    #  point_modifiers for the excluded RAs of the previous run so that it can
-    #  remove them from the system/algorithm. As a result, any point_modifiers
-    #  created in this manner will just grow and grow until an HD goes in and
-    #  manually alters the point_modifier.modifier value.
-    # TODO: Figure out how to address the above comment. Possibly implement a
-    #        draft system so that AHD+ users can view a scheduler run before
-    #        publishing it to the rest of staff?
-    autoExcAdj = False  # bool(request.json["autoExcAdj"])
-
     # Check to see if the user is authorized to run the scheduler
     # If the user is not at least an AHD
     if userDict["auth_level"] < 2:
@@ -529,16 +515,44 @@ def runScheduler():
     copy_raList = cp.deepcopy(ra_list)
     copy_noDutyList = cp.copy(noDutyList)
 
+    # Load the Res Hall's settings for the scheduler
+    cur.execute("""SELECT duty_config, auto_adj_excl_ra_pts, flag_multi_duty 
+                   FROM hall_settings
+                   WHERE res_hall_id = %s""", (userDict["hall_id"],))
+    dutyConfig, autoExcAdj, flagMultiDuty = cur.fetchone()
+
+    # AutoExcAdj is a currently unused feature that allows the scheduler to
+    #  automatically create point_modifiers for RAs that have been excluded from
+    #  being scheduled for the given month. This feature is unreleased because
+    #  if the user sets this to true and then runs the scheduler more than once
+    #  for the same month, there is no way for the application to know if it
+    #  created any point_modifiers for the excluded RAs of the previous run so
+    #  that it can remove them from the system/algorithm. As a result, any
+    #  point_modifiers created in this manner will just grow and grow until
+    #  an HD goes in and manually alters the point_modifier.modifier value.
+    # TODO: Figure out how to address the above comment. Possibly implement a
+    #        draft system so that AHD+ users can view a scheduler run before
+    #        publishing it to the rest of staff?
+
+    regNumAssigned = dutyConfig["reg_duty_num_assigned"]
+    mulNumAssigned = dutyConfig["multi_duty_num_assigned"]
+    regDutyPts = dutyConfig["reg_duty_pts"]
+    mulDutyPts = dutyConfig["multi_duty_pts"]
+    mulDutyDays = dutyConfig["multi_duty_days"]
+
     # Set completed to False and successful to False by default. These values
     #  will be manipulated in the while loop below as necessary.
     completed = False
     successful = False
     while not completed:
         # While we are not finished scheduling, create a candidate schedule
-        sched = scheduler4_1.schedule(copy_raList, year, monthNum,
-                                      noDutyDates=copy_noDutyList, ldaTolerance=ldat,
+        sched = scheduler4_1.schedule(copy_raList, year, monthNum, doubleDateNum=mulNumAssigned,
+                                      doubleDatePts=mulDutyPts, noDutyDates=copy_noDutyList,
+                                      doubleDays=mulDutyDays, doublePts=mulDutyPts,
+                                      ldaTolerance=ldat, doubleNum=mulNumAssigned,
                                       prevDuties=prevRADuties, breakDuties=breakDuties,
-                                      setDDFlag=True)
+                                      setDDFlag=flagMultiDuty, regDutyPts=regDutyPts,
+                                      regNumAssigned=regNumAssigned)
 
         # If we were unable to schedule with the previous parameters,
         if len(sched) == 0:
@@ -640,7 +654,7 @@ def runScheduler():
             #  then add the day to the noDutyDayStr
             noDutyDayStr += "({},{},{},{}),".format(hallId, days[d.getDate()], schedId, d.getPoints())
 
-    # Attempt to save the schedule to the DB
+    # Attempt to save the schedule to the DBgit s
     try:
         # If there were days added to the dutyDayStr
         if dutyDayStr != "":
