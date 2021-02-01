@@ -24,15 +24,15 @@ function initEditSchedCal() {
                 click: moveToday
             },
             runSchedulerButton: {
-                text: 'Run Scheduler',
+                text: 'Schedule',
                 click: showRunModal
             },
             addEventButton: {
-                text: 'Add Addtional Duty',
+                text: 'Add Duty',
                 click: showAddDutyModal
             },
             exportScheduleButton: {
-                text: 'Export Schedule',
+                text: 'Export',
                 click: showExportModal
             }
         },
@@ -400,6 +400,7 @@ function addDuty() {
     let dateVal = document.getElementById("addDateDate").value;
     let selRAOption = document.getElementById("addDateRASelect").selectedOptions[0];
     let ptVal = document.getElementById("addDatePts").value;
+    let setFlag = document.getElementById("addFlag").checked;
 
     // id = "selector_xxxxxx"
     // There are 9 characters before the id
@@ -408,7 +409,8 @@ function addDuty() {
     let newParams = {
         id: newId,
         dateStr: dateVal,
-        pts: ptVal
+        pts: ptVal,
+        flag: setFlag
     }
 
     // Pass the parameters to the server and send results passModalSave
@@ -567,3 +569,4 @@ function showExportModal() {
 
     $('#exportModal').modal('show');
 }
+

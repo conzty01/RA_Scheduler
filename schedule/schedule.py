@@ -56,6 +56,20 @@ def editSched():
     # Create a DB cursor
     cur = ag.conn.cursor()
 
+    # Load the necessary hall settings from the DB
+    cur.execute("SELECT duty_flag_label FROM hall_settings WHERE res_hall_id = %s", (userDict["hall_id"],))
+
+    # Create a custom settings dictionary
+    custSettings = {
+        "dutyFlagLabel": cur.fetchone()[0]
+    }
+
+    # Merge the base options into the custom settings dictionary to simplify passing
+    #  settings into the template renderer.
+    custSettings.update(ag.baseOpts)
+
+    logging.debug("Custom Settings Dict: {}".format(custSettings))
+
     # Query the DB for a list of all of the RAs and their information for the user's staff.
     cur.execute("SELECT id, first_name, last_name, color FROM ra WHERE hall_id = %s ORDER BY first_name ASC;",
                 (userDict["hall_id"],))
@@ -64,7 +78,7 @@ def editSched():
     ptDictSorted = sorted(ptDict.items(), key=lambda kv: kv[1]["name"].split(" ")[1])
 
     return render_template("schedule/editSched.html", raList=cur.fetchall(), auth_level=userDict["auth_level"],
-                           ptDict=ptDictSorted, curView=3, opts=ag.baseOpts, hall_name=userDict["hall_name"])
+                           ptDict=ptDictSorted, curView=3, opts=custSettings, hall_name=userDict["hall_name"])
 
 
 # ---------------------
@@ -996,9 +1010,9 @@ def addNewDuty():
         return jsonify(stdRet(0, "Unable to validate schedule."))
 
     # Execute an INSERT statement to have the duty created in the duties table
-    cur.execute("""INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val)
-                    VALUES (%s, %s, %s, %s, %s);""",
-                (userDict["hall_id"], raId[0], dayID, schedId[0], data["pts"]))
+    cur.execute("""INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val, flagged)
+                    VALUES (%s, %s, %s, %s, %s, %s);""",
+                (userDict["hall_id"], raId[0], dayID, schedId[0], data["pts"], data["flag"]))
 
     # Commit the changes to the DB
     ag.conn.commit()
