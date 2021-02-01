@@ -230,6 +230,12 @@ class TestSchedule_editSched(unittest.TestCase):
             (self.helper_getAuth["hall_id"],)
         )
 
+        # Assert that at least one call to the DB was queried as expected.
+        self.mocked_appGlobals.conn.cursor().execute.assert_any_call(
+            "SELECT duty_flag_label FROM hall_settings WHERE res_hall_id = %s",
+            (self.user_hall_id,)
+        )
+
     @patch("schedule.schedule.getRAStats", autospec=True)
     @patch("schedule.schedule.render_template", autospec=True)
     def test_withAuthorizedUser_passesExpectedDataToRenderer(self, mocked_renderTemplate, mocked_getRAStats):
@@ -246,6 +252,14 @@ class TestSchedule_editSched(unittest.TestCase):
 
         # Set the auth_level of this session to 2
         self.mocked_authLevel.return_value = 2
+
+        # Create some of the objects used in this test
+        expectedDutyFlagLabel = "Test Label"
+        expectedCustomSettingsDict = {"dutyFlagLabel": expectedDutyFlagLabel}
+
+        # Configure the expectedCustomSettingsDict so that it is as it would
+        #  appear to the renderer
+        expectedCustomSettingsDict.update(self.mocked_appGlobals.baseOpts)
 
         # Generate the various objects that will be used in this test
         expectedRAList = []
@@ -270,6 +284,12 @@ class TestSchedule_editSched(unittest.TestCase):
             mocked_getRAStats.return_value.items(),
             key=lambda kv: kv[1]["name"].split(" ")[1]
         )
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedDutyFlagLabel, )   # First query is for the call to hall_settings
+        ]
 
         # Configure the appGlobals.conn.cursor.execute mock to return different values
         #  after subsequent calls.
@@ -302,6 +322,12 @@ class TestSchedule_editSched(unittest.TestCase):
             (self.helper_getAuth["hall_id"],)
         )
 
+        # Assert that at least one call to the DB was queried as expected.
+        self.mocked_appGlobals.conn.cursor().execute.assert_any_call(
+            "SELECT duty_flag_label FROM hall_settings WHERE res_hall_id = %s",
+            (self.user_hall_id,)
+        )
+
         # Assert that the appropriate information was passed to the render_template function
         mocked_renderTemplate.assert_called_once_with(
             "schedule/editSched.html",
@@ -309,6 +335,6 @@ class TestSchedule_editSched(unittest.TestCase):
             auth_level=self.mocked_authLevel,
             ptDict=ptDictSorted,
             curView=3,
-            opts=self.mocked_appGlobals.baseOpts,
+            opts=expectedCustomSettingsDict,
             hall_name=self.helper_getAuth["hall_name"]
         )
