@@ -128,7 +128,11 @@ def getSchedule2(start=None, end=None, hallId=None, showAllColors=None):
     #           "title": <ra.first_name> + " " + <ra.last_name>,
     #           "start": <day.date>,
     #           "color": <ra.color or "#2C3E50">,
-    #           "extendedProps": {"dutyType": "std"}
+    #           "extendedProps": {
+    #               "dutyType": "std",
+    #               "flagged": <duties.flagged>,
+    #               "pts": <duties.point_val>
+    #           }
     #        }
     #     ]
 
@@ -950,7 +954,7 @@ def addNewDuty():
         # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
 
-    # Load the provdied data from the request json
+    # Load the provided data from the request json
     data = request.json
 
     logging.debug("New RA id: {}".format(data["id"]))
