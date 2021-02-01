@@ -75,6 +75,7 @@ def migrate(conn):
             duty_config             json    NOT NULL DEFAULT %s::JSON,
             auto_adj_excl_ra_pts    boolean NOT NULL DEFAULT false,
             flag_multi_duty         boolean NOT NULL DEFAULT false,
+            duty_flag_label         VARCHAR(20) NOT NULL DEFAULT 'Secondary Personnel',
             
             PRIMARY KEY (res_hall_id),
             FOREIGN KEY (res_hall_id) REFERENCES res_hall(id)
