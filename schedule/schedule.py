@@ -115,7 +115,7 @@ def getSchedule2(start=None, end=None, hallId=None, showAllColors=None):
     #                                for the returned RA conflicts.
     #     end            <str>   -  a string representing the last day that should be included
     #                                for the returned RA conflicts.
-    #     showAllColors  <bool>  -  a boolean that, if set to True, will associate the
+    #     allColors      <bool>  -  a boolean that, if set to True, will associate the
     #                                returned duties with their RA's respective color.
     #                                Setting this to False will associate each duty
     #                                with the default color of #2C3E50.
