@@ -91,6 +91,47 @@ class TestDayObject(unittest.TestCase):
         self.assertEqual(testDay3.numDutySlots, len(raList3))
         self.assertEqual(testDay4.numDutySlots, len(raList4))
 
+    def test_DayObject_whenRAListProvided_whenFlagDutySlotIsTrue_setsLastDutyAsFlagged(self):
+        # Test to ensure that when an RA list list is provided to a Day object, if the
+        #  flagDutySlot parameter is set to True, the constructor sets flag on the last
+        #  duty slot.
+
+        # -- Arrange --
+
+        # Create the objects to be used in this test
+        iterations = 5 + 1
+
+        # Create a list of RA objects that will be passed in to the Day objects
+        desiredRAList = []
+        for i in range(1, iterations):
+            desiredRAList.append(RA("Test", "User", i, 2019, date(2017, 1, 1)))
+
+        # -- Act --
+
+        # Create Day objects that are passed in lists of RA objects at various lengths
+        testDayList = []
+        for i in range(1, iterations):
+            testDayList.append(Day(date(2021, 2, 2), 1, ras=desiredRAList[:i], flagDutySlot=True))
+
+        # -- Assert --
+
+        # Assert that each of the Day objects have flagged the appropriate duty slot
+
+        # Iterate over all of the Day objects
+        for day in testDayList:
+
+            # Iterate over all of the duty slots in the day object
+            for i, slot in enumerate(day.ras):
+
+                # If this is the last duty slot of the day
+                if i == len(day.ras) - 1:
+                    # Then check to make sure the flag is set
+                    self.assertTrue(slot.getFlag())
+
+                else:
+                    # Otherwise make sure the flag is NOT set
+                    self.assertFalse(slot.getFlag())
+
     def test_withCustomPointVal_usesCustomPointValue(self):
         # -- Arrange --
         # -- Act --
@@ -177,10 +218,29 @@ class TestDayObject(unittest.TestCase):
         pass
 
     def test_magicMethodContains_isTrueIfAndOnlyIfRAIsAssignedForDuty(self):
+        # Test to ensure that the __contains__ method returns True if and only
+        #  if the provided RA object hass been assigned for duty on that day.
+
         # -- Arrange --
+
+        # Create the objects to be used in this test
+        assignedRA = RA("Test1", "User1", 1, 2019, date(2017, 1, 1))
+        notAssignedRA = RA("Test2", "User2", 2, 2019, date(2017, 1, 1))
+        testDayObject = Day(date(2021, 2, 1), 0, ras=[assignedRA])
+
         # -- Act --
+
+        # Execute the __contains__ method for each scenario
+        result1 = assignedRA in testDayObject
+        result2 = notAssignedRA in testDayObject
+
         # -- Assert --
-        self.fail("Incomplete test")
+
+        # Assert that when the RA is assigned for duty, the method returns True
+        self.assertTrue(result1)
+
+        # Assert that when the RA is NOT assigned for duty, the method returns False
+        self.assertFalse(result2)
 
     def test_addRA_withDutySlotsLeft_addsRAToDutySlots(self):
         ra1 = RA("R","E",99,1,date(2017,2,2))
@@ -320,6 +380,113 @@ class TestDayObject(unittest.TestCase):
         # Assert that the RAs were returned
         self.assertEqual(expectedResult, result)
 
+    def test_DayObject_iterDutySlots_iteratesThroughDutySlots(self):
+        # Test to ensure that the iterDutySlots method iterates over the Day's duty slots.
+
+        # -- Arrange --
+
+        # Create the objects ot be used in this test
+
+        # Create a list of RA objects that will be passed in to the Day objects
+        desiredRAList = []
+        for i in range(5):
+            desiredRAList.append(RA("Test", "User", i, 2019, date(2017, 1, 1)))
+
+        testDayObject = Day(date(2021, 2, 2), 1, ras=desiredRAList)
+
+        # -- Act --
+
+        # Execute the iterDutySlots method and save the result
+        results = []
+        for slot in testDayObject.iterDutySlots():
+            results.append(slot)
+
+        # -- Assert --
+
+        # Assert that we iterated over the DutySlot objects
+        #  At this time, the DutySlot objects do not have the __eq__ method defined,
+        #  so we can really only check to make sure we iterated over instances of the
+        #  DutySlot class.
+        for slotCandidate in results:
+            self.assertIsInstance(slotCandidate, Day.DutySlot)
+
+    def test_DayObject_combineDay_ensuresOtherObjectIsDayObject(self):
+        # Test to ensure that then the combineDay method is called, the Day object
+        #  checks to ensure that the other object it is combining with is a Day object.
+        #  If not, a TypeError is thrown.
+
+        # -- Arrange --
+
+        # Create the objects that are to be used in this test
+        testDay1 = Day(date(2021, 2, 2), 1, numDutySlots=5)
+        testDay2 = Day(date(2021, 2, 2), 1, numDutySlots=1)
+        testFalseDay = set()
+
+        # -- Act --
+        # -- Assert --
+
+        # Assert that calling combineDay with another Day object does not throw an error
+        testDay1.combineDay(testDay2)
+
+        # Assert that calling combineDay with a non-Day object throws a TypeError
+        with self.assertRaises(TypeError):
+            testDay1.combineDay(testFalseDay)
+
+    def test_DayObject_combineDay_throwsOverflowErrorWhenTooManyDutiesAreAdded(self):
+        # Test to ensure that when the combineDay method is called, the Day object
+        #  checks to ensure that its duty slot limit has not already been reached.
+        #  If the limit could be exceeded by adding another duty slot, then the Day
+        #  object should raise an overflow error.
+
+        # -- Arrange --
+
+        # Create the objects used in this test
+        desiredRAList = [
+            RA("Test", "User", 1, 2019, date(2017, 1, 1)),
+            RA("Test", "User", 2, 2019, date(2017, 1, 1))
+        ]
+        testDay1 = Day(date(2021, 2, 2), 1, numDutySlots=0)
+        testDay2 = Day(date(2021, 2, 2), 1, ras=desiredRAList)
+
+        # -- Act --
+        # -- Assert --
+
+        # Assert that calling combineDay with another Day object that would exceed
+        #  the first day's number of available duty slots throws an OverflowError
+        with self.assertRaises(OverflowError):
+            testDay1.combineDay(testDay2)
+
+    def test_DayObject_combineDay_appendsOtherDayToOwnDutySlotList(self):
+        # Test to ensure that when the combineDay method is called with another
+        #  Day object, the other Day object's duty slots are appended to the first
+        #  Day object's duty slot list.
+
+        # -- Arrange --
+
+        # Create the objects that are to be used in this test
+        desiredRAList = [
+            RA("Test", "User", 1, 2019, date(2017, 1, 1)),
+            RA("Test", "User", 2, 2019, date(2017, 1, 1)),
+            RA("Test", "User", 3, 2019, date(2017, 1, 1))
+        ]
+        testDay1 = Day(date(2021, 2, 2), 1, numDutySlots=3)
+        # Add an RA to the first day
+        testDay1.addRA(desiredRAList[-1])
+        testDay2 = Day(date(2021, 2, 2), 1, ras=desiredRAList[:-1])
+
+        # -- Act --
+
+        # Execute the combineDay method
+        testDay1.combineDay(testDay2)
+
+        # -- Assert --
+
+        # Test to ensure that the duty slots were added as expected
+        for ra in testDay1:
+            self.assertIn(ra, desiredRAList)
+
+        self.assertEqual(len(desiredRAList), len(testDay1.ras))
+
     # -------------------------------
     # -- Tests for DutySlot Object --
     # -------------------------------
@@ -412,64 +579,112 @@ class TestDayObject(unittest.TestCase):
         self.assertFalse(removedAssignedRes)
 
     def test_DutySlotObject_assignRA_setsRAToDutySlot(self):
+        # Test to ensure that the assignRA method sets the slot attribute
+        #  to object passed in.
+
         # -- Arrange --
+
+        # Create the objects to be used in this test
+        testDutySlot = Day.DutySlot()
+        testRAObject = RA("Test", "User", 1, 2019, date(2017, 1, 1))
+
         # -- Act --
+
+        # Execute the assignRA method
+        testDutySlot.assignRA(testRAObject)
+
         # -- Assert --
-        self.fail("Incomplete test")
+
+        # Assert that the DutySlot's slot attribute has been set as expected
+        self.assertEqual(testRAObject, testDutySlot.slot)
 
     def test_DutySlotObject_setFlag_setsTheFlaggedAttribute(self):
+        # Test to ensure that the setFlag method sets the flag attribute
+        #  to the provided object.
+
         # -- Arrange --
+
+        # Create the objects to be used in this test
+        testDutySlot1 = Day.DutySlot()
+        desiredBoolFlag = True
+
         # -- Act --
+
+        # Execute the setFlag method
+        testDutySlot1.setFlag(desiredBoolFlag)
+
         # -- Assert --
-        self.fail("Incomplete test")
+
+        # Assert that the flag attribute is set as expected
+        self.assertTrue(testDutySlot1.flagged)
 
     def test_DutySlotObject_getFlag_returnsTheValueOfTheFlaggedAttribute(self):
+        # Test to ensure that the getFlag method returns the flagged attribute
+
         # -- Arrange --
+
+        # Create the objects to be used in this test
+        desiredBoolFlag1 = True
+        desiredBoolFlag2 = False
+        testDutySlot1 = Day.DutySlot(flagged=desiredBoolFlag1)
+        testDutySlot2 = Day.DutySlot(flagged=desiredBoolFlag2)
+
         # -- Act --
+
+        # Execute the getFlag method
+        result1 = testDutySlot1.getFlag()
+        result2 = testDutySlot2.getFlag()
+
         # -- Assert --
-        self.fail("Incomplete test")
+
+        # Assert that we received the expected result
+        self.assertTrue(result1)
+        self.assertFalse(result2)
 
     def test_DutySlotObject_getAssignment_returnsRAObjectAssignedToDutySlot(self):
+        # Test to ensure that the getAssignment method returns the slot attribute
+
         # -- Arrange --
+
+        # Create the objects to be used in this test
+        testRAObject = RA("Test", "User", 1, 2019, date(2017, 1, 1))
+        testDutySlot = Day.DutySlot(assignee=testRAObject)
+
         # -- Act --
+
+        # Execute the getAssignment method
+        result = testDutySlot.getAssignment()
+
         # -- Assert --
-        self.fail("Incomplete test")
+
+        # Assert that we received the expected result
+        self.assertEqual(testRAObject, result)
 
     def test_DutySlotObject_removeAssignment_removesAndReturnsRAObjectAssignedToDuty(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        self.fail("Incomplete test")
+        # Test to ensure that the removeAssignment method removes and returns the slot
+        #  attribute.
 
-    def test_DayObject_whenRAListProvided_whenFlagDutySlotIsTrue_setsLastDutyAsFlagged(self):
         # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        self.fail("Incomplete test")
 
-    def test_DayObject_iterDutySlots_iteratesThroughDutySlots(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        self.fail("Incomplete test")
+        # Create the objects to be used in this test
+        testRAObject = RA("Test", "User", 1, 2019, date(2017, 1, 1))
+        testDutySlot = Day.DutySlot(assignee=testRAObject)
 
-    def test_DayObject_combineDay_ensuresOtherObjectIsDayObject(self):
-        # -- Arrange --
         # -- Act --
-        # -- Assert --
-        self.fail("Incomplete test")
 
-    def test_DayObject_combineDay_throwsOverflowErrorWhenTooManyDutiesAreAdded(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        self.fail("Incomplete test")
+        # Execute the removeAssignment method
+        result = testDutySlot.removeAssignment()
 
-    def test_DayObject_combineDay_appendsOtherDayToOwnDutySlotList(self):
-        # -- Arrange --
-        # -- Act --
         # -- Assert --
-        self.fail("Incomplete test")
+
+        # Assert that we received the expected result
+        self.assertEqual(testRAObject, result)
+
+        # Assert that the slot attribute is no longer set
+        self.assertIsNone(testDutySlot.slot)
+
+
+
 
 
 if __name__ == "__main__":
