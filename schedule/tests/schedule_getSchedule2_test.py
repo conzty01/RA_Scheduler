@@ -141,40 +141,506 @@ class TestSchedule_getSchedule2(unittest.TestCase):
     # -- Called from Client Tests --
     # ------------------------------
     def test_whenCalledFromClient_returnsScheduleInExpectedJSONFormat(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
+        # Test to ensure that when called from a remote client, the function
+        #  returns the appropriate schedule in the expected JSON format.
+        #
+        #     [
+        #        {
+        #           "id": <ra.id>,
+        #           "title": <ra.first_name> + " " + <ra.last_name>,
+        #           "start": <day.date>,
+        #           "color": <ra.color or "#2C3E50">,
+        #           "extendedProps": {
+        #               "dutyType": "std",
+        #               "flagged": <duties.flagged>,
+        #               "pts": <duties.point_val>
+        #           }
+        #        }
+        #     ]
 
-    def test_whenCalledFromClient_whenShowAllColorsIsTrue_returnsScheduleWithAllColors(self):
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Create the schedule information that will be returned by the query call
+        expectedScheduleInfoList = []
+        for i in range(1, 7):
+            expectedScheduleInfoList.append(
+                (
+                    "Test {}".format(i),
+                    "User {}".format(i),
+                    "#{:06}".format(i),
+                    i,
+                    '2021-02-{:02}'.format(i),
+                    False,
+                    1
+                )
+            )
+
+        # Create the expected result
+        expectedResult = []
+        for row in expectedScheduleInfoList:
+            expectedResult.append({
+                "id": row[3],
+                "title": row[0] + " " + row[1],
+                "start": row[4],
+                "color": row[2],
+                "extendedProps": {
+                    "dutyType": "std",
+                    "flagged": row[5],
+                    "pts": row[6]
+                }
+            })
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchall.side_effect = [
+            expectedScheduleInfoList,  # First query returns the schedule information
+        ]
+
+        desiredStartStr = '2021-02-01T00:00:00-05:00'
+        desiredEndStr = '2021-03-01T00:00:00-05:00'
+        desiredShowAllColors = "true"
+
         # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/schedule/api/getSchedule",
+                               query_string=dict(
+                                   start=desiredStartStr,
+                                   end=desiredEndStr,
+                                   allColors=desiredShowAllColors
+                               ),
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that the last time appGlobals.conn.cursor().execute was called,
+        #  it was a query for the RA.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_once_with(
+            """
+        SELECT ra.first_name, ra.last_name, ra.color, ra.id, TO_CHAR(day.date, 'YYYY-MM-DD'),
+               duties.flagged, duties.point_val
+        FROM duties JOIN day ON (day.id=duties.day_id)
+                    JOIN RA ON (ra.id=duties.ra_id)
+        WHERE duties.hall_id = %s
+        AND duties.sched_id IN
+                (
+                SELECT DISTINCT ON (schedule.month_id) schedule.id
+                FROM schedule
+                WHERE schedule.hall_id = %s
+                AND schedule.month_id IN
+                    (
+                        SELECT month.id
+                        FROM month
+                        WHERE month.year >= TO_DATE(%s,'YYYY-MM')
+                        AND month.year <= TO_DATE(%s,'YYYY-MM')
+                    )
+                ORDER BY schedule.month_id, schedule.created DESC, schedule.id DESC
+                )
+        AND day.date >= TO_DATE(%s,'YYYY-MM-DD')
+        AND day.date <= TO_DATE(%s,'YYYY-MM-DD')
+        ORDER BY day.date ASC;
+    """, (self.user_hall_id, self.user_hall_id, desiredStartStr[:7], desiredEndStr[:7],
+          desiredStartStr[:10], desiredEndStr[:10])
+        )
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received the expected response
+        self.assertListEqual(expectedResult, resp.json)
+
+    def test_whenCalledFromClient_whenAllColorsIsTrue_returnsScheduleWithAllColors(self):
+        # Test to ensure that when this method is called from a remote client and the showColors
+        #  parameter is set to "true", the result will provide the unique colors for the RAs.
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Create the schedule information that will be returned by the query call
+        expectedScheduleInfoList = []
+        for i in range(1, 7):
+            expectedScheduleInfoList.append(
+                (
+                    "Test {}".format(i),
+                    "User {}".format(i),
+                    "#{:06}".format(i),
+                    i,
+                    '2021-02-{:02}'.format(i),
+                    False,
+                    1
+                )
+            )
+
+        # Create the expected result
+        expectedResult = []
+        for row in expectedScheduleInfoList:
+            expectedResult.append({
+                "id": row[3],
+                "title": row[0] + " " + row[1],
+                "start": row[4],
+                "color": row[2],
+                "extendedProps": {
+                    "dutyType": "std",
+                    "flagged": row[5],
+                    "pts": row[6]
+                }
+            })
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchall.side_effect = [
+            expectedScheduleInfoList,  # First query returns the schedule information
+        ]
+
+        desiredStartStr = '2021-02-01T00:00:00-05:00'
+        desiredEndStr = '2021-03-01T00:00:00-05:00'
+        desiredShowAllColors = "true"
+
+        # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/schedule/api/getSchedule",
+                               query_string=dict(
+                                   start=desiredStartStr,
+                                   end=desiredEndStr,
+                                   allColors=desiredShowAllColors
+                               ),
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that we received the expected response
+        self.assertListEqual(expectedResult, resp.json)
 
     def test_whenCalledFromClient_whenShowAllColorsIsFalse_returnsScheduleWithDefaultColor(self):
+        # Test to ensure that when this method is called from a remote client and the showColors
+        #  parameter is set to False, the result will provide the unique color for only the
+        #  requesting user. Otherwise the default will be used for all other RAs.
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Create the schedule information that will be returned by the query call
+        expectedScheduleInfoList = []
+        for i in range(1, 7):
+            expectedScheduleInfoList.append(
+                (
+                    "Test {}".format(i),
+                    "User {}".format(i),
+                    "#{:06}".format(i),
+                    i,
+                    '2021-02-{:02}'.format(i),
+                    False,
+                    1
+                )
+            )
+
+        # Create the expected result
+        expectedResult = []
+        for row in expectedScheduleInfoList:
+            if row[3] == self.user_ra_id:
+                c = "#{:06}".format(self.user_ra_id)
+            else:
+                c = "#2C3E50"
+
+            expectedResult.append({
+                "id": row[3],
+                "title": row[0] + " " + row[1],
+                "start": row[4],
+                "color": c,
+                "extendedProps": {
+                    "dutyType": "std",
+                    "flagged": row[5],
+                    "pts": row[6]
+                }
+            })
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchall.side_effect = [
+            expectedScheduleInfoList,  # First query returns the schedule information
+        ]
+
+        desiredStartStr = '2021-02-01T00:00:00-05:00'
+        desiredEndStr = '2021-03-01T00:00:00-05:00'
+        desiredShowAllColors = "false"
+
         # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/schedule/api/getSchedule",
+                               query_string=dict(
+                                   start=desiredStartStr,
+                                   end=desiredEndStr,
+                                   allColors=desiredShowAllColors
+                               ),
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
         # -- Assert --
-        pass
+
+        # Assert that we received the expected response
+        self.assertListEqual(expectedResult, resp.json)
 
     # ------------------------------
     # -- Called from Server Tests --
     # ------------------------------
     def test_whenCalledFromServer_returnsScheduleInExpectedFormat(self):
+        # Test to ensure that when called from the server, the function
+        #  returns the appropriate schedule in the expected format.
+        #
+        #     [
+        #        {
+        #           "id": <ra.id>,
+        #           "title": <ra.first_name> + " " + <ra.last_name>,
+        #           "start": <day.date>,
+        #           "color": <ra.color or "#2C3E50">,
+        #           "extendedProps": {
+        #               "dutyType": "std",
+        #               "flagged": <duties.flagged>,
+        #               "pts": <duties.point_val>
+        #           }
+        #        }
+        #     ]
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Create the schedule information that will be returned by the query call
+        expectedScheduleInfoList = []
+        for i in range(1, 7):
+            expectedScheduleInfoList.append(
+                (
+                    "Test {}".format(i),
+                    "User {}".format(i),
+                    "#{:06}".format(i),
+                    i,
+                    '2021-02-{:02}'.format(i),
+                    False,
+                    1
+                )
+            )
+
+        # Create the expected result
+        expectedResult = []
+        for row in expectedScheduleInfoList:
+            expectedResult.append({
+                "id": row[3],
+                "title": row[0] + " " + row[1],
+                "start": row[4],
+                "color": row[2],
+                "extendedProps": {
+                    "dutyType": "std",
+                    "flagged": row[5],
+                    "pts": row[6]
+                }
+            })
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchall.side_effect = [
+            expectedScheduleInfoList,  # First query returns the schedule information
+        ]
+
+        desiredStartStr = '2021-02-01'
+        desiredEndStr = '2021-03-01'
+        desiredShowAllColors = True
+
         # -- Act --
+
+        # Bundle the call up in a test_request_context so that we can test
+        #  the function as if we were calling it from the server.
+
+        with app.test_request_context("/schedule/api/getSchedule",
+                                      base_url=self.mocked_appGlobals.baseOpts["HOST_URL"]):
+
+            # Make our call to the function
+            result = getSchedule2(
+                start=desiredStartStr,
+                end=desiredEndStr,
+                hallId=self.user_hall_id,
+                showAllColors=desiredShowAllColors
+            )
+
         # -- Assert --
-        pass
+
+        # Assert that the last time appGlobals.conn.cursor().execute was called,
+        #  it was a query for the RA.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_once_with(
+            """
+        SELECT ra.first_name, ra.last_name, ra.color, ra.id, TO_CHAR(day.date, 'YYYY-MM-DD'),
+               duties.flagged, duties.point_val
+        FROM duties JOIN day ON (day.id=duties.day_id)
+                    JOIN RA ON (ra.id=duties.ra_id)
+        WHERE duties.hall_id = %s
+        AND duties.sched_id IN
+                (
+                SELECT DISTINCT ON (schedule.month_id) schedule.id
+                FROM schedule
+                WHERE schedule.hall_id = %s
+                AND schedule.month_id IN
+                    (
+                        SELECT month.id
+                        FROM month
+                        WHERE month.year >= TO_DATE(%s,'YYYY-MM')
+                        AND month.year <= TO_DATE(%s,'YYYY-MM')
+                    )
+                ORDER BY schedule.month_id, schedule.created DESC, schedule.id DESC
+                )
+        AND day.date >= TO_DATE(%s,'YYYY-MM-DD')
+        AND day.date <= TO_DATE(%s,'YYYY-MM-DD')
+        ORDER BY day.date ASC;
+    """, (self.user_hall_id, self.user_hall_id, desiredStartStr[:7], desiredEndStr[:7],
+          desiredStartStr[:10], desiredEndStr[:10])
+        )
+
+        # Assert that we received the expected response
+        self.assertListEqual(expectedResult, result)
 
     def test_whenCalledFromServer_whenShowAllColorsIsTrue_returnsScheduleWithAllColors(self):
+        # Test to ensure that when this method is called from the server and the showAllColors
+        #  parameter is set to True, the result will provide the unique colors for the RAs.
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Create the schedule information that will be returned by the query call
+        expectedScheduleInfoList = []
+        for i in range(1, 7):
+            expectedScheduleInfoList.append(
+                (
+                    "Test {}".format(i),
+                    "User {}".format(i),
+                    "#{:06}".format(i),
+                    i,
+                    '2021-02-{:02}'.format(i),
+                    False,
+                    1
+                )
+            )
+
+        # Create the expected result
+        expectedResult = []
+        for row in expectedScheduleInfoList:
+            expectedResult.append({
+                "id": row[3],
+                "title": row[0] + " " + row[1],
+                "start": row[4],
+                "color": row[2],
+                "extendedProps": {
+                    "dutyType": "std",
+                    "flagged": row[5],
+                    "pts": row[6]
+                }
+            })
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchall.side_effect = [
+            expectedScheduleInfoList,  # First query returns the schedule information
+        ]
+
+        desiredStartStr = '2021-02-01'
+        desiredEndStr = '2021-03-01'
+        desiredShowAllColors = True
+
         # -- Act --
+
+        # Bundle the call up in a test_request_context so that we can test
+        #  the function as if we were calling it from the server.
+
+        with app.test_request_context("/schedule/api/getSchedule",
+                                      base_url=self.mocked_appGlobals.baseOpts["HOST_URL"]):
+
+            # Make our call to the function
+            result = getSchedule2(
+                start=desiredStartStr,
+                end=desiredEndStr,
+                hallId=self.user_hall_id,
+                showAllColors=desiredShowAllColors
+            )
+
         # -- Assert --
-        pass
+
+        # Assert that we received the expected response
+        self.assertListEqual(expectedResult, result)
 
     def test_whenCalledFromServer_whenShowAllColorsIsFalse_returnsScheduleWithDefaultColor(self):
+        # Test to ensure that when this method is called from the server and the showAllColors
+        #  parameter is set to False, the result will provide the default color for all RAs.
+
         # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Create the schedule information that will be returned by the query call
+        expectedScheduleInfoList = []
+        for i in range(1, 7):
+            expectedScheduleInfoList.append(
+                (
+                    "Test {}".format(i),
+                    "User {}".format(i),
+                    "#{:06}".format(i),
+                    i,
+                    '2021-02-{:02}'.format(i),
+                    False,
+                    1
+                )
+            )
+
+        # Create the expected result
+        expectedResult = []
+        for row in expectedScheduleInfoList:
+            expectedResult.append({
+                "id": row[3],
+                "title": row[0] + " " + row[1],
+                "start": row[4],
+                "color": "#2C3E50",
+                "extendedProps": {
+                    "dutyType": "std",
+                    "flagged": row[5],
+                    "pts": row[6]
+                }
+            })
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchall.side_effect = [
+            expectedScheduleInfoList,  # First query returns the schedule information
+        ]
+
+        desiredStartStr = '2021-02-01'
+        desiredEndStr = '2021-03-01'
+        desiredShowAllColors = False
+
         # -- Act --
+
+        # Bundle the call up in a test_request_context so that we can test
+        #  the function as if we were calling it from the server.
+
+        with app.test_request_context("/schedule/api/getSchedule",
+                                      base_url=self.mocked_appGlobals.baseOpts["HOST_URL"]):
+
+            # Make our call to the function
+            result = getSchedule2(
+                start=desiredStartStr,
+                end=desiredEndStr,
+                hallId=self.user_hall_id,
+                showAllColors=desiredShowAllColors
+            )
+
         # -- Assert --
-        pass
+
+        # Assert that we received the expected response
+        self.assertListEqual(expectedResult, result)
