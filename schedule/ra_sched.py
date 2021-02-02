@@ -287,7 +287,7 @@ class Day:
         #  we have not gotten to the end of the ra list...
         while not found and i < upperBound:
             # Peek the assigned duties list and see if its the object
-            if ra == self.ras[i].getAssignment():
+            if other == self.ras[i].getAssignment():
                 # If it is, then set found to True
                 found = True
 
