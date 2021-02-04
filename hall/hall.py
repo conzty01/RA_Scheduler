@@ -1,5 +1,7 @@
 from flask import render_template, request, jsonify, Blueprint
 from flask_login import login_required
+from psycopg2.extras import Json
+from calendar import month_name
 import logging
 
 # Import the appGlobals for this blueprint to use
@@ -31,7 +33,8 @@ def manHall():
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
-        logging.info("User Not Authorized - RA: {} attempted to reach Manage Hall page".format(userDict["ra_id"]))
+        logging.info("User Not Authorized - RA: {} attempted to reach Manage Hall page"
+                     .format(userDict["ra_id"]))
 
         # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
@@ -89,12 +92,14 @@ def getHallSettings(hallId=None):
             # Then they are not permitted to see this view.
 
             # Log the occurrence.
-            logging.info("User Not Authorized - RA: {} attempted to get Hall Settings".format(userDict["ra_id"]))
+            logging.info("User Not Authorized - RA: {} attempted to get Hall Settings"
+                         .format(userDict["ra_id"]))
 
             # Notify the user that they are not authorized.
             return jsonify(stdRet(-1, "NOT AUTHORIZED"))
 
-    logging.debug("Retrieving Hall Setting information for Hall: {}, From Server: {}".format(hallId, fromServer))
+    logging.debug("Retrieving Hall Setting information for Hall: {}, From Server: {}"
+                  .format(hallId, fromServer))
 
     # Create the setting list that will be returned
     settingList = []
@@ -102,13 +107,23 @@ def getHallSettings(hallId=None):
     # Create a DB cursor
     cur = ag.conn.cursor()
 
+    # -------------------------------
+    # --   Non-Standard Settings   --
+    # -------------------------------
+
     # Get the hall name
     cur.execute("SELECT name FROM res_hall WHERE id = %s", (hallId,))
 
     # Assemble the Residence Hall Name Setting information in a temporary dict
-    tmp = {"settingName": "Residence Hall Name",
-           "settingDesc": "The name of the Residence Hall.",
-           "settingVal": cur.fetchone()[0]}
+    hallName = cur.fetchone()[0]
+    tmp = {
+        "settingVal": hallName,
+        "settingData": hallName
+    }
+
+    # Update the tmp dict with the setting name and description from the
+    # settingDescMap dictionary
+    tmp.update(settingDescMap["hallName"])
 
     # Add the Hall Name settings to the settingList
     settingList.append(tmp)
@@ -120,16 +135,71 @@ def getHallSettings(hallId=None):
                        WHERE res_hall_id = %s)""", (hallId,))
 
     # Assemble the Google Calendar Integration information in a temporary dict
-    tmp = {"settingName": "Google Calendar Integration",
-           "settingDesc": "Connecting a Google Calendar account allows AHDs and " +
-                          "HDs to export a given month's duty schedule to Google Calendar.",
-           "settingVal": "Connected" if cur.fetchone()[0] else "Not Connected"}
+    connected = "Connected" if cur.fetchone()[0] else "Not Connected"
+    tmp = {
+        "settingVal": connected,
+        "settingData": connected
+    }
+
+    # Update the tmp dict with the setting name and description from the
+    # settingDescMap dictionary
+    tmp.update(settingDescMap["gCalInt"])
 
     # Add the Google Calendar Integration settings to the settingList
     settingList.append(tmp)
 
+    # ---------------------------
+    # --   Standard Settings   --
+    # ---------------------------
+
+    # Query the hall settings from the hall_settings table
+    cur.execute("""
+    SELECT year_start_mon, year_end_mon, duty_config, auto_adj_excl_ra_pts, 
+           flag_multi_duty, duty_flag_label
+    FROM hall_settings
+    WHERE res_hall_id = %s
+    """, (hallId,))
+
+    # Load the query result into appropriate variables so that we can group
+    #  them as desired
+    yearStartMon, yearEndMon, \
+    dutyConfig, autoAdjExclRAPts, \
+    flagMultiDuty, flagLabel = cur.fetchone()
+
+    # Create a dictionary to map the DB results to the settingDescMap keys
+    settingGroupMap = {
+        "yearStartEnd": {
+            "settingVal": "{} - {}".format(month_name[yearStartMon], month_name[yearEndMon]),
+            "settingData": {"start": yearStartMon, "end": yearEndMon}
+        },
+        "dutyConfig": {
+            "settingVal": "Configured",
+            "settingData": dutyConfig
+        },
+        "autoAdjExclRAPts": {
+            "settingVal": "Enabled" if autoAdjExclRAPts else "Disabled",
+            "settingData": autoAdjExclRAPts
+        },
+        "multiDutyFlag": {
+            "settingVal": "'{}' label {}".format(flagLabel, "Enabled" if flagMultiDuty else "Disabled"),
+            "settingData": {"flag": flagMultiDuty, "label": flagLabel}
+        }
+    }
+
     # Close the DB cursor
     cur.close()
+
+    # Iterate through the keys of the settingGroupMap
+    for key in settingGroupMap.keys():
+
+        # Create a dictionary for the respective setting
+        tmp = settingGroupMap[key]
+
+        # Update the dictionary with the appropriate setting name and description
+        tmp.update(settingDescMap[key])
+
+        # Append the setting to the settingList
+        settingList.append(tmp)
 
     # If this API method was called from the server
     if fromServer:
@@ -187,59 +257,169 @@ def saveHallSettings():
     # Create a cursor
     cur = ag.conn.cursor()
 
-    # Figure out what setting we are attempting to change and whether
-    # is should be handled in a special way.
+    # Make sure that the user belongs to the hall whose settings are being changed
+    cur.execute("""SELECT res_hall.id
+                   FROM res_hall JOIN ra ON (ra.hall_id = res_hall.id)
+                   WHERE ra.id = %s;""", (userDict["ra_id"],))
 
+    # Load the query result
+    dbHallId = cur.fetchone()
+
+    # Check to see if we have a valid result
+    if dbHallId is None:
+        # If we returned no values, then something fishy is going on.
+        #  Simply return a not authorized message and stop processing.
+
+        logging.info("User Not Authorized - RA: {} attempted to overwrite Hall Settings for : {}"
+                     .format(userDict["ra_id"], userDict["hall_id"]))
+
+        # Close the DB cursor
+        cur.close()
+
+        # Indicate to the client that the user does not belong to the provided hall
+        return jsonify(stdRet(0, "NOT AUTHORIZED"))
+
+    # Log that the user is updating the provided setting for the given hall
+    logging.info("User: {} is updating Hall Setting: '{}' for Hall: {}"
+                 .format(userDict["ra_id"], setName, userDict["hall_id"]))
+
+    # Otherwise, figure out what setting we are attempting to change and whether
+    #  it should be handled in a special way.
     if setName == "Residence Hall Name":
         # We are attempting to update the res_hall.name field in the DB
 
-        # Make sure that the user belongs to that Hall
-        cur.execute("""SELECT res_hall.id
-                       FROM res_hall JOIN ra ON (ra.hall_id = res_hall.id)
-                       WHERE ra.id = %s;""", (userDict["ra_id"],))
+        # Update the setting
+        cur.execute("UPDATE res_hall SET name = %s WHERE id = %s", (setVal, userDict["hall_id"]))
+        # Commit the change to the DB
+        ag.conn.commit()
 
-        dbHallId = cur.fetchone()
+        # Close the DB cursor
+        cur.close()
 
-        if dbHallId is None:
-            # If we returned no values, then something fishy is going on.
-            #  Simply return a not authorized message and stop processing.
+        # Return a successful result
+        return jsonify(stdRet(1, "successful"))
 
-            logging.info("User Not Authorized - RA: {} attempted to overwrite Hall Settings for : {}"
-                         .format(userDict["ra_id"], userDict["hall_id"]))
+    elif setName == "Duty Configuration":
+        # We are attempting to update the hall_settings.duty_config field in the DB
 
-            # Close the DB cursor
-            cur.close()
+        # Update the setting
+        cur.execute("UPDATE hall_settings SET duty_config = %s WHERE res_hall_id = %s;",
+                    (Json(setVal), userDict["hall_id"]))
 
-            # Indicate to the client that the user does not belong to the provided hall
-            return jsonify(stdRet(0, "NOT AUTHORIZED"))
+        # Commit the change to the DB
+        ag.conn.commit()
 
-        else:
-            # Otherwise go ahead and update the value.
+        # Close the DB cursor
+        cur.close()
 
-            # log that the user is updating the provided setting for the given hall
-            logging.info("User: {} is updating Hall Setting: '{}' for Hall: {}".format(userDict["ra_id"],
-                                                                                       setName, userDict["hall_id"]))
+        # Return a successful result
+        return jsonify(stdRet(1, "successful"))
 
-            # Update the setting
-            cur.execute("UPDATE res_hall SET name = %s WHERE id = %s", (setVal, userDict["hall_id"]))
-            # Commit the change to the DB
-            ag.conn.commit()
+    elif setName == "Defined School Year":
+        # We are attempting to update the hall_settings.year_start_mon and
+        #  hall_settings.year_end_mon fields in the DB.
 
-            # Close the DB cursor
-            cur.close()
+        # Update the setting
+        cur.execute("""UPDATE hall_settings 
+                       SET year_start_mon = %s, year_end_mon = %s
+                       WHERE res_hall_id = %s;""",
+                    (setVal["start"], setVal["end"], userDict["hall_id"]))
 
-            # set the return value to successful
-            return jsonify(stdRet(1, "successful"))
+        # Commit the change to the DB
+        ag.conn.commit()
+
+        # Close the DB cursor
+        cur.close()
+
+        # Return a successful result
+        return jsonify(stdRet(1, "successful"))
+
+    elif setName == "Multi-Duty Day Flag":
+        # We are attempting to update the hall_settings.flag_multi_duty and
+        #  hall_settings.duty_flag_label fields in the DB.
+
+        # Update the setting
+        cur.execute("""UPDATE hall_settings 
+                       SET flag_multi_duty = %s, duty_flag_label = %s
+                       WHERE res_hall_id = %s;""",
+                    (bool(setVal["flag"]), setVal["label"], userDict["hall_id"]))
+
+        # Commit the change to the DB
+        ag.conn.commit()
+
+        # Close the DB cursor
+        cur.close()
+
+        # Return a successful result
+        return jsonify(stdRet(1, "successful"))
+
+    elif setName == "Automatic RA Point Adjustment":
+        # We are attempting to update the hall_settings.auto_adj_excl_ra_pts
+
+        cur.execute("UPDATE hall_settings SET auto_adj_excl_ra_pts = %s WHERE res_hall_id = %s;",
+                    (setVal, userDict["hall_id"]))
+
+        # Commit the change to the DB
+        ag.conn.commit()
+
+        # Close the DB cursor
+        cur.close()
+
+        # Return a successful result
+        return jsonify(stdRet(1, "successful"))
 
     else:
         # We are attempting to update a setting that does not require any special attention.
 
         # Currently there are no other settings to be modified so this is just a placeholder
         #  for future implementation.
-        pass
+
+        logging.warning("Unable to handle Hall Setting: {}".format(setVal))
 
     # Close the DB cursor
     cur.close()
 
     # Indicate to the client that the save was successful
     return jsonify(stdRet(1, "successful"))
+
+
+# ----------------------
+# --  Helper Objects  --
+# ----------------------
+# The settingDescMap is a dictionary object which will be used to store and recall the human-
+#  friendly name and description of each of the hall settings that are stored in the DB.
+#  Effectively, this is a dictionary that describes all of the setting groups that an HD+ can
+#  interact with in the manage hall page.
+settingDescMap = {
+    "hallName": {
+        "settingName": "Residence Hall Name",
+        "settingDesc": "The name of the Residence Hall."
+    },
+    "gCalInt": {
+        "settingName": "Google Calendar Integration",
+        "settingDesc": "Connecting a Google Calendar account allows AHDs and " +
+                       "HDs to export a given month's duty schedule to Google Calendar."
+    },
+    "yearStartEnd": {
+        "settingName": "Defined School Year",
+        "settingDesc": "The start and end dates that outline the beginning and end of "
+                       "the school year."
+    },
+    "dutyConfig": {
+        "settingName": "Duty Configuration",
+        "settingDesc": "The configuration for how the duty scheduler should schedule a given " +
+                       "month's duties."
+    },
+    "autoAdjExclRAPts": {
+        "settingName": "Automatic RA Point Adjustment",
+        "settingDesc": "Automatically create point modifiers for RAs that have been excluded " +
+                       "from being scheduled for duty for a given month. If enabled, the point " +
+                       "modifier will be equal to the average number of points that were awarded " +
+                       "for the month."
+    },
+    "multiDutyFlag": {
+        "settingName": "Multi-Duty Day Flag",
+        "settingDesc": "On days with multiple duties, automatically flag one duty slot with a " +
+                       "customized label."
+    }
+}
