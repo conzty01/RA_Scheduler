@@ -53,7 +53,7 @@ def migrate(conn):
         defaultJSON = {
             "reg_duty_num_assigned": 1,     # Number of RAs to be assigned on regular duty days.
             "multi_duty_num_assigned": 2,   # Number of RAs to be assigned on multi-duty days.
-            "brk_duty_num_assigned": 3,     # Number of RAs to be assigned on break duty days.
+            "brk_duty_num_assigned": 1,     # Number of RAs to be assigned on break duty days.
             "reg_duty_pts": 1,              # Number of points to be awarded for regular duties.
             "multi_duty_pts": 2,            # Number of points to be awarded for multi-day duties.
             "brk_duty_pts": 3,              # Number of points to be awarded for break duties.
