@@ -3,6 +3,7 @@ from scheduleServer import app
 import unittest
 
 from schedule.schedule import getSchedule2
+from helperFunctions.helperFunctions import AuthenticatedUser
 
 
 class TestSchedule_getSchedule2(unittest.TestCase):
@@ -73,16 +74,22 @@ class TestSchedule_getSchedule2(unittest.TestCase):
         # Set the ra_id and hall_id to values that can be used throughout
         self.user_ra_id = 1
         self.user_hall_id = 1
+        self.associatedResHalls = [
+            {
+                "id": self.user_hall_id,
+                "auth_level": self.mocked_authLevel,
+                "name": "Test Hall"
+            }
+        ]
 
-        # Assemble all of the desired values into a dict object.
-        self.helper_getAuth = {
-            "uEmail": "test@email.com",
-            "ra_id": self.user_ra_id,
-            "name": "Test User",
-            "hall_id": self.user_hall_id,
-            "auth_level": self.mocked_authLevel,
-            "hall_name": "Test Hall"
-        }
+        # Assemble all of the desired values into an Authenticated User Object
+        self.helper_getAuth = AuthenticatedUser(
+            "test@email.com",
+            self.user_ra_id,
+            "Test",
+            "User",
+            self.associatedResHalls
+        )
 
         # Create the patcher for the getAuth() method
         self.patcher_getAuth = patch("schedule.schedule.getAuth", autospec=True)

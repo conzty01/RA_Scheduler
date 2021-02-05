@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock, patch
 import unittest
 
-from helperFunctions.helperFunctions import getAuth
+from helperFunctions.helperFunctions import getAuth, AuthenticatedUser
 
 
 class TestHallBP_getAuth(unittest.TestCase):
