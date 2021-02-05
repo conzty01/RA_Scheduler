@@ -219,7 +219,12 @@ class TestSchedule_deleteDuty(unittest.TestCase):
         # Assert that the last time appGlobals.conn.cursor().execute was called,
         #  it was a query for the RA.
         self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
-            "SELECT id FROM ra WHERE first_name LIKE %s AND last_name LIKE %s AND hall_id = %s;",
+            """
+        SELECT ra.id 
+        FROM ra JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
+        WHERE ra.first_name LIKE %s 
+        AND ra.last_name LIKE %s 
+        AND sm.res_hall_id = %s;""",
             (expectedfName, expectedlName, self.user_hall_id)
         )
 

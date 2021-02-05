@@ -226,14 +226,17 @@ class TestSchedule_editSched(unittest.TestCase):
         self.assertFalse(resp.is_json)
 
         # Assert that the getRABreakStats Function was called as expected
-        mocked_getRAStats.assert_called_once_with(self.helper_getAuth["hall_id"], start, end)
+        mocked_getRAStats.assert_called_once_with(self.helper_getAuth.hall_id(), start, end)
 
         # Assert that the last call to the DB was queried as expected.
         #  In this instance, we are unable to use the assert_called_once_with
         #  method as this function calls out to
         self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
-            "SELECT id, first_name, last_name, color FROM ra WHERE hall_id = %s ORDER BY first_name ASC;",
-            (self.helper_getAuth["hall_id"],)
+            """
+        SELECT ra.id, ra.first_name, ra.last_name, ra.color 
+        FROM ra JOIN staff_membership AS sm ON (ra.id = sm.ra_id)
+        WHERE sm.res_hall_id = %s 
+        ORDER BY ra.first_name ASC;""", (self.helper_getAuth.hall_id(),)
         )
 
         # Assert that at least one call to the DB was queried as expected.
@@ -324,8 +327,11 @@ class TestSchedule_editSched(unittest.TestCase):
         #  In this instance, we are unable to use the assert_called_once_with
         #  method as this function calls out to
         self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
-            "SELECT id, first_name, last_name, color FROM ra WHERE hall_id = %s ORDER BY first_name ASC;",
-            (self.helper_getAuth["hall_id"],)
+            """
+        SELECT ra.id, ra.first_name, ra.last_name, ra.color 
+        FROM ra JOIN staff_membership AS sm ON (ra.id = sm.ra_id)
+        WHERE sm.res_hall_id = %s 
+        ORDER BY ra.first_name ASC;""", (self.helper_getAuth.hall_id(),)
         )
 
         # Assert that at least one call to the DB was queried as expected.
@@ -342,5 +348,5 @@ class TestSchedule_editSched(unittest.TestCase):
             ptDict=ptDictSorted,
             curView=3,
             opts=expectedCustomSettingsDict,
-            hall_name=self.helper_getAuth["hall_name"]
+            hall_name=self.helper_getAuth.hall_name()
         )
