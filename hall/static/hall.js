@@ -448,7 +448,7 @@ function generateGoogleRow(alreadyConnected) {
     // Set the Connect/Reconnect Attributes
     connectButton.setAttribute("type", "button");
     connectButton.setAttribute("class", "btn btn-primary");
-    connectButton.setAttribute("onclick", "location.href='../integration/int/GCalRedirect'");
+    connectButton.setAttribute("onclick", "location.href='../int/GCalRedirect'");
     connectButton.innerHTML = alreadyConnected ? "Reconnect Account" : "Connect Account";
 
     // Assemble the valDiv
