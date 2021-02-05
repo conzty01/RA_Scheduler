@@ -162,7 +162,7 @@ class TestBreakBP_editBreaks(unittest.TestCase):
         #  be thoroughly tested in another test class.
         mocked_getRABreakStats.return_value = {
            1: {
-              "name": self.helper_getAuth["name"],
+              "name": self.helper_getAuth.name(),
               "count": 0
            }
         }
@@ -184,14 +184,17 @@ class TestBreakBP_editBreaks(unittest.TestCase):
         self.assertFalse(resp.is_json)
 
         # Assert that the getRABreakStats Function was called as expected
-        mocked_getRABreakStats.assert_called_once_with(self.helper_getAuth["hall_id"], start, end)
+        mocked_getRABreakStats.assert_called_once_with(self.helper_getAuth.hall_id(), start, end)
 
         # Assert that the last call to the DB was queried as expected.
         #  In this instance, we are unable to use the assert_called_once_with
         #  method as this function calls out to
         self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
-            "SELECT id, first_name, last_name, color FROM ra WHERE hall_id = %s ORDER BY first_name ASC;",
-            (self.helper_getAuth["hall_id"],)
+            """
+        SELECT ra.id, ra.first_name, ra.last_name, ra.color
+        FROM ra JOIN staff_membership AS sm ON (ra.id = sm.ra_id)
+        WHERE sm.res_hall_id = %s ORDER BY ra.first_name ASC;
+        """, (self.helper_getAuth.hall_id(),)
         )
 
     @patch("breaks.breaks.getRABreakStats", autospec=True)
@@ -214,7 +217,7 @@ class TestBreakBP_editBreaks(unittest.TestCase):
         #  be thoroughly tested in another test class.
         mocked_getRABreakStats.return_value = {
            1: {
-              "name": self.helper_getAuth["name"],
+              "name": self.helper_getAuth.name(),
               "count": 0
            }
         }
@@ -236,14 +239,17 @@ class TestBreakBP_editBreaks(unittest.TestCase):
         self.assertFalse(resp.is_json)
 
         # Assert that the getRABreakStats Function was called as expected
-        mocked_getRABreakStats.assert_called_once_with(self.helper_getAuth["hall_id"], start, end)
+        mocked_getRABreakStats.assert_called_once_with(self.helper_getAuth.hall_id(), start, end)
 
         # Assert that the last call to the DB was queried as expected.
         #  In this instance, we are unable to use the assert_called_once_with
         #  method as this function calls out to
         self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
-            "SELECT id, first_name, last_name, color FROM ra WHERE hall_id = %s ORDER BY first_name ASC;",
-            (self.helper_getAuth["hall_id"],)
+            """
+        SELECT ra.id, ra.first_name, ra.last_name, ra.color
+        FROM ra JOIN staff_membership AS sm ON (ra.id = sm.ra_id)
+        WHERE sm.res_hall_id = %s ORDER BY ra.first_name ASC;
+        """, (self.helper_getAuth.hall_id(),)
         )
 
     @patch("breaks.breaks.getRABreakStats", autospec=True)
@@ -305,7 +311,7 @@ class TestBreakBP_editBreaks(unittest.TestCase):
                           key=lambda x: x[1]["name"].split(" ")[1]),
             curView=3,
             opts=self.mocked_appGlobals.baseOpts,
-            hall_name=self.helper_getAuth["hall_name"]
+            hall_name=self.helper_getAuth.hall_name()
         )
 
     def test_WithUnauthorizedUser_ReturnsNotAuthorizedJSON(self):
