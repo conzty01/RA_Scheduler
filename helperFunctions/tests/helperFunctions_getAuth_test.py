@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock, patch
 import unittest
 
-from helperFunctions.helperFunctions import getAuth, AuthenticatedUser
+from helperFunctions.helperFunctions import getAuth
 
 
 class TestHallBP_getAuth(unittest.TestCase):
@@ -99,9 +99,9 @@ class TestHallBP_getAuth(unittest.TestCase):
         self.patcher_loggingCRITICAL.stop()
         self.patcher_loggingERROR.stop()
 
-    def test_whenCurrentUsernameIsInDB_returnsExpectedDictionary(self):
+    def test_whenCurrentUsernameIsInDB_returnsExpectedAuthenticatedUserObject(self):
         # Test to ensure that when this method is called with a username that
-        #  is in the DB, the method returns the expected dictionary
+        #  is in the DB, the method returns the expected Authenticated User Object.
 
         # -- Arrange --
 
@@ -111,7 +111,6 @@ class TestHallBP_getAuth(unittest.TestCase):
 
         # Configure the results that should be returned by the DB lookup
         expectedRAID = 1
-        expectedUsername = self.username
         expectedFirstName = "Trumpets"
         expectedLastName = "Are Cool"
         expectedHallID = 42
@@ -121,21 +120,11 @@ class TestHallBP_getAuth(unittest.TestCase):
         # Configure the appGlobals.conn.cursor.execute mock to return different values
         #  after subsequent calls.
 
-        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
-            # First call returns the desired information
-            (expectedRAID, expectedUsername, expectedFirstName,
-             expectedLastName, expectedHallID, expectedAuthLevel, expectedResHallName)
+        self.mocked_appGlobals.conn.cursor().fetchall.side_effect = [
+            # First call returns the desired information which has one row
+            ((expectedRAID, expectedFirstName, expectedLastName,
+             expectedHallID, expectedAuthLevel, expectedResHallName),)
         ]
-
-        # Create the expected result
-        expectedResult = {
-            "uEmail": expectedUsername,
-            "ra_id": expectedRAID,
-            "name": expectedFirstName + " " + expectedLastName,
-            "hall_id": expectedHallID,
-            "auth_level": expectedAuthLevel,
-            "hall_name": expectedResHallName
-        }
 
         # -- Act --
 
@@ -149,10 +138,13 @@ class TestHallBP_getAuth(unittest.TestCase):
         #  the whitespace must match exactly.
         self.mocked_appGlobals.conn.cursor().execute.assert_called_once_with(
             """
-            SELECT ra.id, username, first_name, last_name, hall_id, auth_level, res_hall.name
+            SELECT ra.id, ra.first_name, ra.last_name, 
+                   sm.res_hall_id, sm.auth_level, res_hall.name
             FROM "user" JOIN ra ON ("user".ra_id = ra.id)
-                        JOIN res_hall ON (ra.hall_id = res_hall.id)
-            WHERE username = %s;""", (self.username,)
+                        JOIN staff_membership AS sm ON (ra.id = sm.ra_id)
+                        JOIN res_hall ON (sm.res_hall_id = res_hall.id)
+            WHERE username = %s
+            ORDER BY sm.selected DESC""", (self.username,)
         )
 
         # Assert that appGlobals.conn.commit was never called
@@ -161,8 +153,10 @@ class TestHallBP_getAuth(unittest.TestCase):
         # Assert that appGlobals.conn.cursor().close was called
         self.mocked_appGlobals.conn.cursor().close.assert_called_once()
 
-        # Assert that the result is as expected
-        self.assertDictEqual(expectedResult, result)
+        # Assert that the result has the correctly selected default res hall
+        self.assertEqual(result.hall_name(), expectedResHallName)
+        self.assertEqual(result.hall_id(), expectedHallID)
+        self.assertEqual(result.auth_level(), expectedAuthLevel)
 
     def test_whenCurrentUsernameIsNotInDB_returnsRedirectForErrorPage(self):
         # Test to ensure that when this method is called with a username that
@@ -178,9 +172,9 @@ class TestHallBP_getAuth(unittest.TestCase):
 
         # Configure the appGlobals.conn.cursor.execute mock to return different values
         #  after subsequent calls.
-        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+        self.mocked_appGlobals.conn.cursor().fetchall.side_effect = [
             # First call returns the desired information
-            None
+            []
         ]
 
         # -- Act --
@@ -195,10 +189,13 @@ class TestHallBP_getAuth(unittest.TestCase):
         #  the whitespace must match exactly.
         self.mocked_appGlobals.conn.cursor().execute.assert_called_once_with(
             """
-            SELECT ra.id, username, first_name, last_name, hall_id, auth_level, res_hall.name
+            SELECT ra.id, ra.first_name, ra.last_name, 
+                   sm.res_hall_id, sm.auth_level, res_hall.name
             FROM "user" JOIN ra ON ("user".ra_id = ra.id)
-                        JOIN res_hall ON (ra.hall_id = res_hall.id)
-            WHERE username = %s;""", (self.username,)
+                        JOIN staff_membership AS sm ON (ra.id = sm.ra_id)
+                        JOIN res_hall ON (sm.res_hall_id = res_hall.id)
+            WHERE username = %s
+            ORDER BY sm.selected DESC""", (self.username,)
         )
 
         # Assert that appGlobals.conn.commit was never called
@@ -218,3 +215,87 @@ class TestHallBP_getAuth(unittest.TestCase):
 
         # Assert that the redirect that was created was returned by the method
         self.assertEqual(self.mocked_redirect(""), result)
+
+    def test_whenCurrentUsernameIsInDB_ifAssociatedWithMultipleHalls_returnsExpectedAuthenticatedUser(self):
+        # Test to ensure that when this method is called with a username that
+        #  is in the DB, and the ra record has multiple Res Halls that it is
+        #  associated with, the method returns an Authenticated User Object
+        #  with all of those halls in it and the expected one as the selected
+        #  default hall.
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_currentUser.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Configure the results that should be returned by the DB lookup
+        expectedRAID = 1
+        expectedFirstName = "Trumpets"
+        expectedLastName = "Are Cool"
+        expectedHallID1 = 42
+        expectedAuthLevel1 = 68
+        expectedResHallName1 = "Test Hall 1"
+        expectedHallID2 = 43
+        expectedAuthLevel2 = 1
+        expectedResHallName2 = "Test Hall 2"
+
+        expectedResHallList = [
+            {
+                "id": expectedHallID1,
+                "auth_level": expectedAuthLevel1,
+                "name": expectedResHallName1
+            },
+            {
+                "id": expectedHallID2,
+                "auth_level": expectedAuthLevel2,
+                "name": expectedResHallName2
+            },
+        ]
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        self.mocked_appGlobals.conn.cursor().fetchall.side_effect = [
+            # First call returns the desired information which will have two rows
+            ((expectedRAID, expectedFirstName, expectedLastName, expectedHallID1,
+              expectedAuthLevel1, expectedResHallName1),
+             (expectedRAID, expectedFirstName, expectedLastName, expectedHallID2,
+              expectedAuthLevel2, expectedResHallName2)
+             )
+        ]
+
+        # -- Act --
+
+        # Call getAuth()
+        result = getAuth()
+
+        # -- Assert --
+
+        # Assert that the when the appGlobals.conn.cursor().execute was called,
+        #  it was a select statement. Since this line is using triple-quote strings,
+        #  the whitespace must match exactly.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_once_with(
+            """
+            SELECT ra.id, ra.first_name, ra.last_name, 
+                   sm.res_hall_id, sm.auth_level, res_hall.name
+            FROM "user" JOIN ra ON ("user".ra_id = ra.id)
+                        JOIN staff_membership AS sm ON (ra.id = sm.ra_id)
+                        JOIN res_hall ON (sm.res_hall_id = res_hall.id)
+            WHERE username = %s
+            ORDER BY sm.selected DESC""", (self.username,)
+        )
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that the result has the correctly selected default res hall
+        self.assertEqual(result.hall_name(), expectedResHallName1)
+        self.assertEqual(result.hall_id(), expectedHallID1)
+        self.assertEqual(result.auth_level(), expectedAuthLevel1)
+
+        # Assert that all of the res hall associations were returned
+        self.assertListEqual(expectedResHallList, result.getAllAssociatedResHalls())
