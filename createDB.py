@@ -33,14 +33,11 @@ def createRaDB(conn):
             id				serial UNIQUE,
             first_name		varchar(20),
             last_name		varchar(50),
-            hall_id			int,
-            date_started	date,
             color			varchar(7),
             email			varchar(256) UNIQUE,
             auth_level		int DEFAULT 1,
 
-            PRIMARY KEY (id, hall_id),
-            FOREIGN KEY (hall_id) REFERENCES res_hall(id)
+            PRIMARY KEY (id, hall_id)
         );""")
 
 def createConflictDB(conn):
@@ -198,7 +195,6 @@ def createHallSettingsDB(conn):
         CREATE TABLE hall_settings(
             id				        serial UNIQUE,
             res_hall_id		        int NOT NULL,
-
             year_start_mon          int     NOT NULL DEFAULT 8 CHECK (year_start_mon >= 1 AND 
                                                                         year_start_mon <= 12),
             year_end_mon            int     NOT NULL DEFAULT 7 CHECK (year_end_mon >= 1 AND 
@@ -211,6 +207,20 @@ def createHallSettingsDB(conn):
             PRIMARY KEY (res_hall_id),
             FOREIGN KEY (res_hall_id) REFERENCES res_hall(id)
         );""", (Json(defaultJSON),))
+
+def createStaffMembershipDB(conn):
+    conn.execute("DROP TABLE IF EXISTS staff_membership CASCADE;")
+    conn.execute("""
+        CREATE TABLE staff_membership(
+            id              serial UNIQUE,
+            ra_id           int NOT NULL,
+            res_hall_id     int NOT NULL,
+            start_date      date NOT NULL DEFAULT NOW(),
+            
+            PRIMARY KEY (ra_id, res_hall_id),
+            FOREIGN KEY (ra_id) REFERENCES ra(id),
+            FOREIGN KEY (res_hall_id) REFERENCES res_hall(id)
+        );""")
 
 
 def main():
@@ -228,6 +238,7 @@ def main():
     createGoogleCalendarDB(conn.cursor())
     createPointModifierDB(conn.cursor())
     createHallSettingsDB(conn.cursor())
+    createStaffMembershipDB(conn.cursor())
 
     conn.commit()
 
