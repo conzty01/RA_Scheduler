@@ -211,5 +211,5 @@ class TestConflictBP_conflicts(unittest.TestCase):
             auth_level=self.mocked_authLevel,
             curView=2,
             opts=self.mocked_appGlobals.baseOpts,
-            hall_name=self.helper_getAuth["hall_name"]
+            hall_name=self.helper_getAuth.hall_name()
         )
