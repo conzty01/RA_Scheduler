@@ -18,7 +18,7 @@ def migrate(conn):
         (
             SELECT column_name 
             FROM information_schema.columns 
-            WHERE table_name='duties' and column_name='flagged'
+            WHERE table_name='duties' AND column_name='flagged'
         );"""
     )
 
@@ -80,6 +80,103 @@ def migrate(conn):
             PRIMARY KEY (res_hall_id),
             FOREIGN KEY (res_hall_id) REFERENCES res_hall(id)
         );""", (Json(defaultJSON),))
+
+    # ------------------------
+    # --  staff_membership  --
+    # ------------------------
+
+    # Check to see if the staff_membership table exists
+    cur.execute("SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'staff_membership');")
+
+    exists = cur.fetchone()
+
+    logging.info("  'staff_membership' Table Exists: {}".format(exists))
+
+    if not exists[0]:
+        # If the table does not exist, create the table
+
+        logging.info("  Creating 'staff_membership' Table.")
+
+        # Create the staff_membership table
+        cur.execute("""
+        CREATE TABLE staff_membership(
+            id              serial UNIQUE,
+            ra_id           int NOT NULL,
+            res_hall_id     int NOT NULL,
+            start_date      date NOT NULL DEFAULT NOW(),
+
+            PRIMARY KEY (ra_id, res_hall_id),
+            FOREIGN KEY (ra_id) REFERENCES ra(id),
+            FOREIGN KEY (res_hall_id) REFERENCES res_hall(id)
+        );""")
+
+    # Check to see if the hall_id and date_started columns exist in the ra table.
+    cur.execute("""
+        SELECT COUNT(*) != 2
+        FROM (
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name='ra' AND (column_name='hall_id' OR column_name='date_started')
+        ) AS subquery;""")
+
+    alreadyFullyMigrated = cur.fetchone()
+
+    logging.info("  Previously migrated data from <ra> table to <staff_membership> table: {}"
+                 .format(alreadyFullyMigrated[0]))
+
+    # Check to see what state we are in
+    if not alreadyFullyMigrated[0]:
+        # If we have not already fully migrated (meaning the hall_id and date_started columns of
+        #  the <ra> table have not been dropped), then we need to move this data from the <ra>
+        #  table to the staff_membership table.
+
+        logging.info("  Migrating data from <ra> table to <staff_membership> table")
+
+        # Query the DB for all of the records in the <ra> table
+        cur.execute("SELECT id, hall_id, date_started FROM ra;")
+
+        # Iterate over our results
+        rows = cur.fetchall()
+        for row in rows:
+            # Attempt to insert a record into the <staff_membership> table
+            try:
+
+                # Insert a record into the staff_membership table
+                cur.execute("""
+                    INSERT INTO staff_membership (ra_id, res_hall_id, start_date)
+                    VALUES (%s, %s, %s);
+                    """, (row[0], row[1], row[2]))
+
+                # Commit the change to the DB
+                conn.commit()
+
+            except psycopg2.IntegrityError:
+                # If we encounter an IntegrityError, then that means we have already
+                #  created a record in the <staff_membership> table for this RA.
+
+                logging.info("    Record already exists: {}, {}, {}".format(row[0], row[1], row[2]))
+
+                # Rollback the change
+                conn.rollback()
+
+        logging.info("  Migration Complete")
+
+        # Once we have gotten out of the for loop, we will have moved all of the data from the
+        #  <ra> table to the <staff_membership> table.
+
+        logging.info("  Dropping ra.hall_id and ra.date_started columns")
+
+        # Delete the hall_id and date_started columns from the <ra> table
+        cur.execute("""
+            ALTER TABLE ra
+            DROP COLUMN hall_id,
+            DROP COLUMN date_started;
+        """)
+
+        # Commit the change to the DB
+        conn.commit()
+
+        logging.info("  <ra> Table Alteration Complete")
 
 
 if __name__ == "__main__":
