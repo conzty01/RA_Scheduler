@@ -196,8 +196,8 @@ class TestHallBP_saveHallSettings(unittest.TestCase):
         #  to the hall that whose settings they are manipulating.
         self.mocked_appGlobals.conn.cursor().execute.assert_any_call(
             """SELECT res_hall.id
-                   FROM res_hall JOIN ra ON (ra.hall_id = res_hall.id)
-                   WHERE ra.id = %s;""", (self.user_ra_id,)
+                   FROM res_hall JOIN staff_membership AS sm ON (sm.res_hall_id = res_hall.id)
+                   WHERE sm.ra_id = %s;""", (self.user_ra_id,)
         )
 
         # Assert that appGlobals.conn.commit was never called
@@ -255,8 +255,8 @@ class TestHallBP_saveHallSettings(unittest.TestCase):
         #  to the hall that whose settings they are manipulating.
         self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
             """SELECT res_hall.id
-                   FROM res_hall JOIN ra ON (ra.hall_id = res_hall.id)
-                   WHERE ra.id = %s;""", (self.user_ra_id,)
+                   FROM res_hall JOIN staff_membership AS sm ON (sm.res_hall_id = res_hall.id)
+                   WHERE sm.ra_id = %s;""", (self.user_ra_id,)
         )
 
         # Assert that appGlobals.conn.cursor().close was called
@@ -366,8 +366,8 @@ class TestHallBP_saveHallSettings(unittest.TestCase):
         #  to the hall that whose settings they are manipulating.
         self.mocked_appGlobals.conn.cursor().execute.assert_any_call(
             """SELECT res_hall.id
-                   FROM res_hall JOIN ra ON (ra.hall_id = res_hall.id)
-                   WHERE ra.id = %s;""", (self.user_ra_id,)
+                   FROM res_hall JOIN staff_membership AS sm ON (sm.res_hall_id = res_hall.id)
+                   WHERE sm.ra_id = %s;""", (self.user_ra_id,)
         )
 
         # Assert that appGlobals.conn.commit was never called
@@ -438,8 +438,8 @@ class TestHallBP_saveHallSettings(unittest.TestCase):
         #  to the hall that whose settings they are manipulating.
         self.mocked_appGlobals.conn.cursor().execute.assert_any_call(
             """SELECT res_hall.id
-                   FROM res_hall JOIN ra ON (ra.hall_id = res_hall.id)
-                   WHERE ra.id = %s;""", (self.user_ra_id,)
+                   FROM res_hall JOIN staff_membership AS sm ON (sm.res_hall_id = res_hall.id)
+                   WHERE sm.ra_id = %s;""", (self.user_ra_id,)
         )
 
         # Assert that appGlobals.conn.commit was never called
@@ -510,8 +510,8 @@ class TestHallBP_saveHallSettings(unittest.TestCase):
         #  to the hall that whose settings they are manipulating.
         self.mocked_appGlobals.conn.cursor().execute.assert_any_call(
             """SELECT res_hall.id
-                   FROM res_hall JOIN ra ON (ra.hall_id = res_hall.id)
-                   WHERE ra.id = %s;""", (self.user_ra_id,)
+                   FROM res_hall JOIN staff_membership AS sm ON (sm.res_hall_id = res_hall.id)
+                   WHERE sm.ra_id = %s;""", (self.user_ra_id,)
         )
 
         # Assert that appGlobals.conn.commit was never called
@@ -577,8 +577,8 @@ class TestHallBP_saveHallSettings(unittest.TestCase):
         #  to the hall that whose settings they are manipulating.
         self.mocked_appGlobals.conn.cursor().execute.assert_any_call(
             """SELECT res_hall.id
-                   FROM res_hall JOIN ra ON (ra.hall_id = res_hall.id)
-                   WHERE ra.id = %s;""", (self.user_ra_id,)
+                   FROM res_hall JOIN staff_membership AS sm ON (sm.res_hall_id = res_hall.id)
+                   WHERE sm.ra_id = %s;""", (self.user_ra_id,)
         )
 
         # Assert that appGlobals.conn.commit was never called
@@ -638,8 +638,8 @@ class TestHallBP_saveHallSettings(unittest.TestCase):
         #  to the hall that whose settings they are manipulating.
         self.mocked_appGlobals.conn.cursor().execute.assert_any_call(
             """SELECT res_hall.id
-                   FROM res_hall JOIN ra ON (ra.hall_id = res_hall.id)
-                   WHERE ra.id = %s;""", (self.user_ra_id,)
+                   FROM res_hall JOIN staff_membership AS sm ON (sm.res_hall_id = res_hall.id)
+                   WHERE sm.ra_id = %s;""", (self.user_ra_id,)
         )
 
         # Assert that the event was logged
