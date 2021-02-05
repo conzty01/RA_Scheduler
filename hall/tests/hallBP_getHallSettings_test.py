@@ -1,4 +1,5 @@
 from unittest.mock import MagicMock, patch
+from calendar import month_name
 from scheduleServer import app
 import unittest
 
@@ -137,6 +138,56 @@ class TestHallBP_getHallSettings(unittest.TestCase):
         #  to the default value which is 1.
         self.mocked_authLevel.return_value = 1
 
+    def buildExpectedHallSettingsDict(self, expectedHallName, expectedGCalTokenSetup, expectedStartMon, expectedEndMon,
+                                      expectedDutyConfig, expectedAutoAdjPts, expectedMDDLabel, expectedMDDFlag):
+        # This function will build and return the expected settings list
+        #  that can be used throughout this test.
+        return [
+            {
+                "settingName": "Residence Hall Name",
+                "settingDesc": "The name of the Residence Hall.",
+                "settingVal": expectedHallName,
+                "settingData": expectedHallName
+            },
+            {
+                "settingName": "Google Calendar Integration",
+                "settingDesc": "Connecting a Google Calendar account allows AHDs and " +
+                               "HDs to export a given month's duty schedule to Google Calendar.",
+                "settingVal": "Connected" if expectedGCalTokenSetup else "Not Connected",
+                "settingData": "Connected" if expectedGCalTokenSetup else "Not Connected"
+            },
+            {
+                "settingName": "Defined School Year",
+                "settingDesc": "The start and end dates that outline the beginning and end of " +
+                               "the school year.",
+                "settingVal": "{} - {}".format(month_name[expectedStartMon], month_name[expectedEndMon]),
+                "settingData": {"start": expectedStartMon, "end": expectedEndMon}
+            },
+            {
+                "settingName": "Duty Configuration",
+                "settingDesc": "The configuration for how the duty scheduler should schedule a given " +
+                               "month's duties.",
+                "settingVal": "Configured",
+                "settingData": expectedDutyConfig
+            },
+            {
+                "settingName": "Automatic RA Point Adjustment",
+                "settingDesc": "Automatically create point modifiers for RAs that have been excluded " +
+                               "from being scheduled for duty for a given month. If enabled, the point " +
+                               "modifier will be equal to the average number of points that were awarded " +
+                               "for the month.",
+                "settingVal": "Enabled" if expectedAutoAdjPts else "Disabled",
+                "settingData": expectedAutoAdjPts
+            },
+            {
+                "settingName": "Multi-Duty Day Flag",
+                "settingDesc": "On days with multiple duties, automatically flag one duty slot with a " +
+                               "customized label.",
+                "settingVal": "'{}' label {}".format(expectedMDDLabel, "Enabled" if expectedMDDFlag else "Disabled"),
+                "settingData": {"flag": expectedMDDFlag, "label": expectedMDDLabel}
+            }
+        ]
+
     # ------------------------------
     # -- Called from Client Tests --
     # ------------------------------
@@ -167,6 +218,14 @@ class TestHallBP_getHallSettings(unittest.TestCase):
         # Set various items to be used in this test
         expectedHallName = "Test Hall"
         expectedGCalTokenSetup = True
+        expectedStartMon = 8
+        expectedEndMon = 5
+        expectedDutyConfig = {
+            "test1": 1
+        }
+        expectedAutoAdjPts = True
+        expectedMDDFlag = False
+        expectedMDDLabel = "Secondary"
 
         # Configure the appGlobals.conn.cursor.execute mock to return different values
         #  after subsequent calls.
@@ -174,24 +233,16 @@ class TestHallBP_getHallSettings(unittest.TestCase):
         # Fetchall() config
         self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
             (expectedHallName,),  # First call returns the Res Hall name
-            (expectedGCalTokenSetup,)  # Second call returns whether GCal Integration
-                                       #  has been set up.
+            (expectedGCalTokenSetup,),  # Second call returns whether GCal Integration
+                                        #  has been set up.
+            (expectedStartMon, expectedEndMon, expectedDutyConfig, expectedAutoAdjPts,
+             expectedMDDFlag, expectedMDDLabel)     # Third call is for the hall_setting items
         ]
 
         # Build the expected returned Settings List
-        expectedSettingsList = [
-            {
-                "settingName": "Residence Hall Name",
-                "settingDesc": "The name of the Residence Hall.",
-                "settingVal": expectedHallName
-            },
-            {
-                "settingName": "Google Calendar Integration",
-                "settingDesc": "Connecting a Google Calendar account allows AHDs and " +
-                               "HDs to export a given month's duty schedule to Google Calendar.",
-                "settingVal": "Connected" if expectedGCalTokenSetup else "Not Connected"
-            }
-        ]
+        expectedSettingsList = self.buildExpectedHallSettingsDict(expectedHallName, expectedGCalTokenSetup,
+                                                                  expectedStartMon, expectedEndMon, expectedDutyConfig,
+                                                                  expectedAutoAdjPts, expectedMDDLabel, expectedMDDFlag)
 
         # -- Act --
 
@@ -232,6 +283,14 @@ class TestHallBP_getHallSettings(unittest.TestCase):
         # Set various items to be used in this test
         expectedHallName = "Test Hall"
         expectedGCalTokenSetup = False
+        expectedStartMon = 8
+        expectedEndMon = 5
+        expectedDutyConfig = {
+            "test1": 1
+        }
+        expectedAutoAdjPts = True
+        expectedMDDFlag = False
+        expectedMDDLabel = "Secondary"
 
         # Configure the appGlobals.conn.cursor.execute mock to return different values
         #  after subsequent calls.
@@ -239,24 +298,16 @@ class TestHallBP_getHallSettings(unittest.TestCase):
         # Fetchall() config
         self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
             (expectedHallName,),  # First call returns the Res Hall name
-            (expectedGCalTokenSetup,)  # Second call returns whether GCal Integration
-                                       #  has been set up.
+            (expectedGCalTokenSetup,),  # Second call returns whether GCal Integration
+            #  has been set up.
+            (expectedStartMon, expectedEndMon, expectedDutyConfig, expectedAutoAdjPts,
+             expectedMDDFlag, expectedMDDLabel)  # Third call is for the hall_setting items
         ]
 
         # Build the expected returned Settings List
-        expectedSettingsList = [
-            {
-                "settingName": "Residence Hall Name",
-                "settingDesc": "The name of the Residence Hall.",
-                "settingVal": expectedHallName
-            },
-            {
-                "settingName": "Google Calendar Integration",
-                "settingDesc": "Connecting a Google Calendar account allows AHDs and " +
-                               "HDs to export a given month's duty schedule to Google Calendar.",
-                "settingVal": "Connected" if expectedGCalTokenSetup else "Not Connected"
-            }
-        ]
+        expectedSettingsList = self.buildExpectedHallSettingsDict(expectedHallName, expectedGCalTokenSetup,
+                                                                  expectedStartMon, expectedEndMon, expectedDutyConfig,
+                                                                  expectedAutoAdjPts, expectedMDDLabel, expectedMDDFlag)
 
         # -- Act --
 
@@ -307,10 +358,266 @@ class TestHallBP_getHallSettings(unittest.TestCase):
         # Assert that we received our expected result
         self.assertEqual(stdRet(-1, "NOT AUTHORIZED"), resp.json)
 
+    def test_whenCalledFromClient_withAuthorizedUser_withAutoAdjRAPts_returnsSettingListInExpectedJSONFormat(self):
+        # Test to ensure that when this API is called from a remote client with an
+        #  authorized user, it returns the settings list in the expected JSON format.
+        #  In this test, the Auto Adjust RA Pts setting is being marked as enabled.
+        #  An authorized user is considered a user whose "auth_level" is at least 3 (HD).
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 3
+
+        # Set various items to be used in this test
+        expectedHallName = "Test Hall"
+        expectedGCalTokenSetup = False
+        expectedStartMon = 8
+        expectedEndMon = 5
+        expectedDutyConfig = {
+            "test1": 1
+        }
+        expectedAutoAdjPts = True
+        expectedMDDFlag = False
+        expectedMDDLabel = "Secondary"
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        # Fetchall() config
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedHallName,),  # First call returns the Res Hall name
+            (expectedGCalTokenSetup,),  # Second call returns whether GCal Integration
+            #  has been set up.
+            (expectedStartMon, expectedEndMon, expectedDutyConfig, expectedAutoAdjPts,
+             expectedMDDFlag, expectedMDDLabel)  # Third call is for the hall_setting items
+        ]
+
+        # Build the expected returned Settings List
+        expectedSettingsList = self.buildExpectedHallSettingsDict(expectedHallName, expectedGCalTokenSetup,
+                                                                  expectedStartMon, expectedEndMon, expectedDutyConfig,
+                                                                  expectedAutoAdjPts, expectedMDDLabel, expectedMDDFlag)
+
+        # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/hall/api/getHallSettings",
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received our expected result
+        self.assertListEqual(expectedSettingsList, resp.json)
+
+    def test_whenCalledFromClient_withAuthorizedUser_withoutAutoAdjRAPts_returnsSettingListInExpectedJSONFormat(self):
+        # Test to ensure that when this API is called from a remote client with an
+        #  authorized user, it returns the settings list in the expected JSON format.
+        #  In this test, the Auto Adjust RA Pts setting is being marked as disabled.
+        #  An authorized user is considered a user whose "auth_level" is at least 3 (HD).
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 3
+
+        # Set various items to be used in this test
+        expectedHallName = "Test Hall"
+        expectedGCalTokenSetup = False
+        expectedStartMon = 8
+        expectedEndMon = 5
+        expectedDutyConfig = {
+            "test1": 1
+        }
+        expectedAutoAdjPts = False
+        expectedMDDFlag = False
+        expectedMDDLabel = "Secondary"
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        # Fetchall() config
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedHallName,),  # First call returns the Res Hall name
+            (expectedGCalTokenSetup,),  # Second call returns whether GCal Integration
+            #  has been set up.
+            (expectedStartMon, expectedEndMon, expectedDutyConfig, expectedAutoAdjPts,
+             expectedMDDFlag, expectedMDDLabel)  # Third call is for the hall_setting items
+        ]
+
+        # Build the expected returned Settings List
+        expectedSettingsList = self.buildExpectedHallSettingsDict(expectedHallName, expectedGCalTokenSetup,
+                                                                  expectedStartMon, expectedEndMon, expectedDutyConfig,
+                                                                  expectedAutoAdjPts, expectedMDDLabel, expectedMDDFlag)
+
+        # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/hall/api/getHallSettings",
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received our expected result
+        self.assertListEqual(expectedSettingsList, resp.json)
+
+    def test_whenCalledFromClient_withAuthorizedUser_withMultiDutyFlags_returnsSettingListInExpectedJSONFormat(self):
+        # Test to ensure that when this API is called from a remote client with an
+        #  authorized user, it returns the settings list in the expected JSON format.
+        #  In this test, the Multi-Duty Day Flag setting is being marked as enabled.
+        #  An authorized user is considered a user whose "auth_level" is at least 3 (HD).
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 3
+
+        # Set various items to be used in this test
+        expectedHallName = "Test Hall"
+        expectedGCalTokenSetup = False
+        expectedStartMon = 8
+        expectedEndMon = 5
+        expectedDutyConfig = {
+            "test1": 1
+        }
+        expectedAutoAdjPts = True
+        expectedMDDFlag = True
+        expectedMDDLabel = "Secondary"
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        # Fetchall() config
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedHallName,),  # First call returns the Res Hall name
+            (expectedGCalTokenSetup,),  # Second call returns whether GCal Integration
+            #  has been set up.
+            (expectedStartMon, expectedEndMon, expectedDutyConfig, expectedAutoAdjPts,
+             expectedMDDFlag, expectedMDDLabel)  # Third call is for the hall_setting items
+        ]
+
+        # Build the expected returned Settings List
+        expectedSettingsList = self.buildExpectedHallSettingsDict(expectedHallName, expectedGCalTokenSetup,
+                                                                  expectedStartMon, expectedEndMon, expectedDutyConfig,
+                                                                  expectedAutoAdjPts, expectedMDDLabel, expectedMDDFlag)
+
+        # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/hall/api/getHallSettings",
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received our expected result
+        self.assertListEqual(expectedSettingsList, resp.json)
+
+    def test_whenCalledFromClient_withAuthorizedUser_withoutMultiDutyFlags_returnsSettingListInExpectedJSONFormat(self):
+        # Test to ensure that when this API is called from a remote client with an
+        #  authorized user, it returns the settings list in the expected JSON format.
+        #  In this test, the Multi-Duty Day Flag setting is being marked as disabled.
+        #  An authorized user is considered a user whose "auth_level" is at least 3 (HD).
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 3
+
+        # Set various items to be used in this test
+        expectedHallName = "Test Hall"
+        expectedGCalTokenSetup = False
+        expectedStartMon = 8
+        expectedEndMon = 5
+        expectedDutyConfig = {
+            "test1": 1
+        }
+        expectedAutoAdjPts = True
+        expectedMDDFlag = False
+        expectedMDDLabel = "On Call"
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        # Fetchall() config
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedHallName,),  # First call returns the Res Hall name
+            (expectedGCalTokenSetup,),  # Second call returns whether GCal Integration
+            #  has been set up.
+            (expectedStartMon, expectedEndMon, expectedDutyConfig, expectedAutoAdjPts,
+             expectedMDDFlag, expectedMDDLabel)  # Third call is for the hall_setting items
+        ]
+
+        # Build the expected returned Settings List
+        expectedSettingsList = self.buildExpectedHallSettingsDict(expectedHallName, expectedGCalTokenSetup,
+                                                                  expectedStartMon, expectedEndMon, expectedDutyConfig,
+                                                                  expectedAutoAdjPts, expectedMDDLabel, expectedMDDFlag)
+
+        # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/hall/api/getHallSettings",
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received our expected result
+        self.assertListEqual(expectedSettingsList, resp.json)
+
     # ------------------------------
-    # -- Called from Client Tests --
+    # -- Called from Server Tests --
     # ------------------------------
-    def test_whenCalledFromServer_withoutGCalSetup_returnsSettingListInExpectedFormatFor(self):
+    def test_whenCalledFromServer_withoutGCalSetup_returnsSettingListInExpectedFormat(self):
         # Test to ensure that when this API is called from a remote client with an
         #  authorized user, it returns the settings list in the expected JSON format.
         #  In this test, the Google Calendar Integration is being marked as NOT
@@ -325,6 +632,14 @@ class TestHallBP_getHallSettings(unittest.TestCase):
         # Set various items to be used in this test
         expectedHallName = "Test Hall"
         expectedGCalTokenSetup = False
+        expectedStartMon = 8
+        expectedEndMon = 5
+        expectedDutyConfig = {
+            "test1": 1
+        }
+        expectedAutoAdjPts = True
+        expectedMDDFlag = False
+        expectedMDDLabel = "Secondary"
 
         # Configure the appGlobals.conn.cursor.execute mock to return different values
         #  after subsequent calls.
@@ -332,24 +647,16 @@ class TestHallBP_getHallSettings(unittest.TestCase):
         # Fetchall() config
         self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
             (expectedHallName,),  # First call returns the Res Hall name
-            (expectedGCalTokenSetup,)  # Second call returns whether GCal Integration
+            (expectedGCalTokenSetup,),  # Second call returns whether GCal Integration
             #  has been set up.
+            (expectedStartMon, expectedEndMon, expectedDutyConfig, expectedAutoAdjPts,
+             expectedMDDFlag, expectedMDDLabel)  # Third call is for the hall_setting items
         ]
 
         # Build the expected returned Settings List
-        expectedSettingsList = [
-            {
-                "settingName": "Residence Hall Name",
-                "settingDesc": "The name of the Residence Hall.",
-                "settingVal": expectedHallName
-            },
-            {
-                "settingName": "Google Calendar Integration",
-                "settingDesc": "Connecting a Google Calendar account allows AHDs and " +
-                               "HDs to export a given month's duty schedule to Google Calendar.",
-                "settingVal": "Connected" if expectedGCalTokenSetup else "Not Connected"
-            }
-        ]
+        expectedSettingsList = self.buildExpectedHallSettingsDict(expectedHallName, expectedGCalTokenSetup,
+                                                                  expectedStartMon, expectedEndMon, expectedDutyConfig,
+                                                                  expectedAutoAdjPts, expectedMDDLabel, expectedMDDFlag)
 
         # -- Act --
 
@@ -372,7 +679,7 @@ class TestHallBP_getHallSettings(unittest.TestCase):
         # Assert that we received our expected result
         self.assertListEqual(expectedSettingsList, result)
 
-    def test_whenCalledFromServer_withGCalSetup_returnsSettingListInExpectedFormatFor(self):
+    def test_whenCalledFromServer_withGCalSetup_returnsSettingListInExpectedFormat(self):
         # Test to ensure that when this API is called from a remote client with an
         #  authorized user, it returns the settings list in the expected JSON format.
         #  In this test, the Google Calendar Integration is being marked as being set
@@ -387,6 +694,14 @@ class TestHallBP_getHallSettings(unittest.TestCase):
         # Set various items to be used in this test
         expectedHallName = "Test Hall"
         expectedGCalTokenSetup = True
+        expectedStartMon = 8
+        expectedEndMon = 5
+        expectedDutyConfig = {
+            "test1": 1
+        }
+        expectedAutoAdjPts = True
+        expectedMDDFlag = False
+        expectedMDDLabel = "Secondary"
 
         # Configure the appGlobals.conn.cursor.execute mock to return different values
         #  after subsequent calls.
@@ -394,24 +709,255 @@ class TestHallBP_getHallSettings(unittest.TestCase):
         # Fetchall() config
         self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
             (expectedHallName,),  # First call returns the Res Hall name
-            (expectedGCalTokenSetup,)  # Second call returns whether GCal Integration
+            (expectedGCalTokenSetup,),  # Second call returns whether GCal Integration
             #  has been set up.
+            (expectedStartMon, expectedEndMon, expectedDutyConfig, expectedAutoAdjPts,
+             expectedMDDFlag, expectedMDDLabel)  # Third call is for the hall_setting items
         ]
 
         # Build the expected returned Settings List
-        expectedSettingsList = [
-            {
-                "settingName": "Residence Hall Name",
-                "settingDesc": "The name of the Residence Hall.",
-                "settingVal": expectedHallName
-            },
-            {
-                "settingName": "Google Calendar Integration",
-                "settingDesc": "Connecting a Google Calendar account allows AHDs and " +
-                               "HDs to export a given month's duty schedule to Google Calendar.",
-                "settingVal": "Connected" if expectedGCalTokenSetup else "Not Connected"
-            }
+        expectedSettingsList = self.buildExpectedHallSettingsDict(expectedHallName, expectedGCalTokenSetup,
+                                                                  expectedStartMon, expectedEndMon, expectedDutyConfig,
+                                                                  expectedAutoAdjPts, expectedMDDLabel, expectedMDDFlag)
+
+        # -- Act --
+
+        # Bundle the call up in a test_request_context so that we can test
+        #  the function as if we were calling it from the server.
+
+        with app.test_request_context("/conflicts/api/getRAConflicts",
+                                      base_url=self.mocked_appGlobals.baseOpts["HOST_URL"]):
+            # Make our call to the function
+            result = getHallSettings(self.user_hall_id)
+
+        # -- Assert --
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received our expected result
+        self.assertListEqual(expectedSettingsList, result)
+
+    def test_whenCalledFromServer_withAutoAdjRAPts_returnsSettingListInExpectedFormat(self):
+        # Test to ensure that when this API is called from the server it returns the
+        #  settings list in the expected JSON format. In this test, the Auto Adjust RA
+        #  Pts Flag setting is being marked as enabled.
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set various items to be used in this test
+        expectedHallName = "Test Hall"
+        expectedGCalTokenSetup = True
+        expectedStartMon = 8
+        expectedEndMon = 5
+        expectedDutyConfig = {
+            "test1": 1
+        }
+        expectedAutoAdjPts = True
+        expectedMDDFlag = False
+        expectedMDDLabel = "Primary"
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        # Fetchall() config
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedHallName,),  # First call returns the Res Hall name
+            (expectedGCalTokenSetup,),  # Second call returns whether GCal Integration
+            #  has been set up.
+            (expectedStartMon, expectedEndMon, expectedDutyConfig, expectedAutoAdjPts,
+             expectedMDDFlag, expectedMDDLabel)  # Third call is for the hall_setting items
         ]
+
+        # Build the expected returned Settings List
+        expectedSettingsList = self.buildExpectedHallSettingsDict(expectedHallName, expectedGCalTokenSetup,
+                                                                  expectedStartMon, expectedEndMon, expectedDutyConfig,
+                                                                  expectedAutoAdjPts, expectedMDDLabel, expectedMDDFlag)
+
+        # -- Act --
+
+        # Bundle the call up in a test_request_context so that we can test
+        #  the function as if we were calling it from the server.
+
+        with app.test_request_context("/conflicts/api/getRAConflicts",
+                                      base_url=self.mocked_appGlobals.baseOpts["HOST_URL"]):
+            # Make our call to the function
+            result = getHallSettings(self.user_hall_id)
+
+        # -- Assert --
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received our expected result
+        self.assertListEqual(expectedSettingsList, result)
+
+    def test_whenCalledFromServer_withoutAutoAdjRAPts_returnsSettingListInExpectedFormat(self):
+        # Test to ensure that when this API is called from the server it returns the
+        #  settings list in the expected JSON format. In this test, the Auto Adjust RA
+        #  Pts Flag setting is being marked as disabled.
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set various items to be used in this test
+        expectedHallName = "Test Hall"
+        expectedGCalTokenSetup = True
+        expectedStartMon = 8
+        expectedEndMon = 5
+        expectedDutyConfig = {
+            "test1": 1
+        }
+        expectedAutoAdjPts = False
+        expectedMDDFlag = False
+        expectedMDDLabel = "Primary"
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        # Fetchall() config
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedHallName,),  # First call returns the Res Hall name
+            (expectedGCalTokenSetup,),  # Second call returns whether GCal Integration
+            #  has been set up.
+            (expectedStartMon, expectedEndMon, expectedDutyConfig, expectedAutoAdjPts,
+             expectedMDDFlag, expectedMDDLabel)  # Third call is for the hall_setting items
+        ]
+
+        # Build the expected returned Settings List
+        expectedSettingsList = self.buildExpectedHallSettingsDict(expectedHallName, expectedGCalTokenSetup,
+                                                                  expectedStartMon, expectedEndMon, expectedDutyConfig,
+                                                                  expectedAutoAdjPts, expectedMDDLabel, expectedMDDFlag)
+
+        # -- Act --
+
+        # Bundle the call up in a test_request_context so that we can test
+        #  the function as if we were calling it from the server.
+
+        with app.test_request_context("/conflicts/api/getRAConflicts",
+                                      base_url=self.mocked_appGlobals.baseOpts["HOST_URL"]):
+            # Make our call to the function
+            result = getHallSettings(self.user_hall_id)
+
+        # -- Assert --
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received our expected result
+        self.assertListEqual(expectedSettingsList, result)
+
+    def test_whenCalledFromServer_withMultiDutyFlags_returnsSettingListInExpectedFormat(self):
+        # Test to ensure that when this API is called from the server it returns the
+        #  settings list in the expected JSON format. In this test, the Multi-Duty Day
+        #  Flag setting is being marked as enabled.
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set various items to be used in this test
+        expectedHallName = "Test Hall"
+        expectedGCalTokenSetup = True
+        expectedStartMon = 8
+        expectedEndMon = 5
+        expectedDutyConfig = {
+            "test1": 1
+        }
+        expectedAutoAdjPts = True
+        expectedMDDFlag = True
+        expectedMDDLabel = "At Desk"
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        # Fetchall() config
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedHallName,),  # First call returns the Res Hall name
+            (expectedGCalTokenSetup,),  # Second call returns whether GCal Integration
+            #  has been set up.
+            (expectedStartMon, expectedEndMon, expectedDutyConfig, expectedAutoAdjPts,
+             expectedMDDFlag, expectedMDDLabel)  # Third call is for the hall_setting items
+        ]
+
+        # Build the expected returned Settings List
+        expectedSettingsList = self.buildExpectedHallSettingsDict(expectedHallName, expectedGCalTokenSetup,
+                                                                  expectedStartMon, expectedEndMon, expectedDutyConfig,
+                                                                  expectedAutoAdjPts, expectedMDDLabel, expectedMDDFlag)
+
+        # -- Act --
+
+        # Bundle the call up in a test_request_context so that we can test
+        #  the function as if we were calling it from the server.
+
+        with app.test_request_context("/conflicts/api/getRAConflicts",
+                                      base_url=self.mocked_appGlobals.baseOpts["HOST_URL"]):
+            # Make our call to the function
+            result = getHallSettings(self.user_hall_id)
+
+        # -- Assert --
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received our expected result
+        self.assertListEqual(expectedSettingsList, result)
+
+    def test_whenCalledFromServer_withoutMultiDutyFlags_returnsSettingListInExpectedFormat(self):
+        # Test to ensure that when this API is called from the server it returns the
+        #  settings list in the expected JSON format. In this test, the Multi-Duty Day
+        #  Flag setting is being marked as disabled.
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set various items to be used in this test
+        expectedHallName = "Test Hall"
+        expectedGCalTokenSetup = True
+        expectedStartMon = 8
+        expectedEndMon = 5
+        expectedDutyConfig = {
+            "test1": 1
+        }
+        expectedAutoAdjPts = True
+        expectedMDDFlag = False
+        expectedMDDLabel = "Primary"
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        # Fetchall() config
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedHallName,),  # First call returns the Res Hall name
+            (expectedGCalTokenSetup,),  # Second call returns whether GCal Integration
+            #  has been set up.
+            (expectedStartMon, expectedEndMon, expectedDutyConfig, expectedAutoAdjPts,
+             expectedMDDFlag, expectedMDDLabel)  # Third call is for the hall_setting items
+        ]
+
+        # Build the expected returned Settings List
+        expectedSettingsList = self.buildExpectedHallSettingsDict(expectedHallName, expectedGCalTokenSetup,
+                                                                  expectedStartMon, expectedEndMon, expectedDutyConfig,
+                                                                  expectedAutoAdjPts, expectedMDDLabel, expectedMDDFlag)
 
         # -- Act --
 
