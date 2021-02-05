@@ -35,9 +35,8 @@ def createRaDB(conn):
             last_name		varchar(50),
             color			varchar(7),
             email			varchar(256) UNIQUE,
-            auth_level		int DEFAULT 1,
 
-            PRIMARY KEY (id, hall_id)
+            PRIMARY KEY (id)
         );""")
 
 def createConflictDB(conn):
@@ -216,6 +215,8 @@ def createStaffMembershipDB(conn):
             ra_id           int NOT NULL,
             res_hall_id     int NOT NULL,
             start_date      date NOT NULL DEFAULT NOW(),
+            auth_level		int NOT NULL DEFAULT 1,
+            selected        boolean NOT NULL DEFAULT false,
             
             PRIMARY KEY (ra_id, res_hall_id),
             FOREIGN KEY (ra_id) REFERENCES ra(id),
