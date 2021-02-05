@@ -216,11 +216,11 @@ class TestConflictBP_getRAConflicts(unittest.TestCase):
         FROM conflicts JOIN day ON (conflicts.day_id = day.id)
                        JOIN month ON (month.id=day.month_id) 
                        JOIN ra ON (ra.id = conflicts.ra_id)
-        WHERE ra.hall_id = %s
+                       JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
+        WHERE sm.res_hall_id = %s
         AND month.year >= TO_DATE(%s, 'YYYY-MM')
         AND month.year <= TO_DATE(%s, 'YYYY-MM') 
-        AND conflicts.ra_id = {};""".format(desiredRAID),
-        (self.user_hall_id, desiredStartDate[:10], desiredEndDate[:10]))
+        AND conflicts.ra_id = {};""".format(desiredRAID), (self.user_hall_id, desiredStartDate[:10], desiredEndDate[:10]))
 
         # Assert that appGlobals.conn.commit was never called
         self.mocked_appGlobals.conn.commit.assert_not_called()
@@ -297,7 +297,8 @@ class TestConflictBP_getRAConflicts(unittest.TestCase):
         FROM conflicts JOIN day ON (conflicts.day_id = day.id)
                        JOIN month ON (month.id=day.month_id) 
                        JOIN ra ON (ra.id = conflicts.ra_id)
-        WHERE ra.hall_id = %s
+                       JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
+        WHERE sm.res_hall_id = %s
         AND month.year >= TO_DATE(%s, 'YYYY-MM')
         AND month.year <= TO_DATE(%s, 'YYYY-MM') 
         ;""", (self.user_hall_id, desiredStartDate[:10], desiredEndDate[:10]))
@@ -425,11 +426,11 @@ class TestConflictBP_getRAConflicts(unittest.TestCase):
         FROM conflicts JOIN day ON (conflicts.day_id = day.id)
                        JOIN month ON (month.id=day.month_id) 
                        JOIN ra ON (ra.id = conflicts.ra_id)
-        WHERE ra.hall_id = %s
+                       JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
+        WHERE sm.res_hall_id = %s
         AND month.year >= TO_DATE(%s, 'YYYY-MM')
         AND month.year <= TO_DATE(%s, 'YYYY-MM') 
-        AND conflicts.ra_id = {};""".format(desiredRAID),
-        (desiredHallID, desiredStartDateStr, desiredEndDateStr))
+        AND conflicts.ra_id = {};""".format(desiredRAID), (desiredHallID, desiredStartDateStr, desiredEndDateStr))
 
         # Assert that appGlobals.conn.commit was never called
         self.mocked_appGlobals.conn.commit.assert_not_called()
@@ -500,7 +501,8 @@ class TestConflictBP_getRAConflicts(unittest.TestCase):
         FROM conflicts JOIN day ON (conflicts.day_id = day.id)
                        JOIN month ON (month.id=day.month_id) 
                        JOIN ra ON (ra.id = conflicts.ra_id)
-        WHERE ra.hall_id = %s
+                       JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
+        WHERE sm.res_hall_id = %s
         AND month.year >= TO_DATE(%s, 'YYYY-MM')
         AND month.year <= TO_DATE(%s, 'YYYY-MM') 
         ;""", (desiredHallID, desiredStartDateStr, desiredEndDateStr))

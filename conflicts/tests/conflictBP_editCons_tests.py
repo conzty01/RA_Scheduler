@@ -250,7 +250,7 @@ class TestConflictBP_editCons(unittest.TestCase):
             auth_level=self.mocked_authLevel,
             curView=3,
             opts=self.mocked_appGlobals.baseOpts,
-            hall_name=self.helper_getAuth["hall_name"]
+            hall_name=self.helper_getAuth.hall_name()
         )
 
     @patch("conflicts.conflicts.render_template", autospec=True)
@@ -302,7 +302,7 @@ class TestConflictBP_editCons(unittest.TestCase):
             auth_level=self.mocked_authLevel,
             curView=3,
             opts=self.mocked_appGlobals.baseOpts,
-            hall_name=self.helper_getAuth["hall_name"]
+            hall_name=self.helper_getAuth.hall_name()
         )
 
     @patch("conflicts.conflicts.render_template", autospec=True)

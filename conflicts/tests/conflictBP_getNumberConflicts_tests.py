@@ -204,7 +204,8 @@ class TestConflictBP_getNumberConflicts(unittest.TestCase):
             WHERE month.num = %s
             AND EXTRACT(YEAR FROM month.year) = %s
         ) AS cons ON (cons.ra_id = ra.id)
-        WHERE ra.hall_id = %s
+        JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
+        WHERE sm.res_hall_id  = %s
         GROUP BY ra.id;
     """,
             (desiredMonthNum, desiredYear, self.user_hall_id))
@@ -326,7 +327,8 @@ class TestConflictBP_getNumberConflicts(unittest.TestCase):
             WHERE month.num = %s
             AND EXTRACT(YEAR FROM month.year) = %s
         ) AS cons ON (cons.ra_id = ra.id)
-        WHERE ra.hall_id = %s
+        JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
+        WHERE sm.res_hall_id  = %s
         GROUP BY ra.id;
     """, (desiredMonthNum, desiredYear, desiredHallID))
 
