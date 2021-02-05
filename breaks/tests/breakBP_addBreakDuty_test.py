@@ -294,7 +294,7 @@ class TestBreakBP_addBreakDuty(unittest.TestCase):
         # Assert that the last time appGlobals.conn.cursor().execute was called,
         #  it was a query for the RA.
         self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
-            "SELECT id FROM ra WHERE id = %s AND hall_id = %s;",
+            "SELECT ra_id FROM staff_membership WHERE ra_id = %s AND res_hall_id = %s;",
             (raID, self.user_hall_id)
         )
 
