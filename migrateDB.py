@@ -104,6 +104,8 @@ def migrate(conn):
             ra_id           int NOT NULL,
             res_hall_id     int NOT NULL,
             start_date      date NOT NULL DEFAULT NOW(),
+            auth_level      int NOT NULL DEFAULT 1,
+            selected        boolean NOT NULL DEFAULT false,
 
             PRIMARY KEY (ra_id, res_hall_id),
             FOREIGN KEY (ra_id) REFERENCES ra(id),
@@ -112,11 +114,11 @@ def migrate(conn):
 
     # Check to see if the hall_id and date_started columns exist in the ra table.
     cur.execute("""
-        SELECT COUNT(*) != 2
+        SELECT COUNT(*) != 3
         FROM (
             SELECT column_name 
             FROM information_schema.columns 
-            WHERE table_name='ra' AND (column_name='hall_id' OR column_name='date_started')
+            WHERE table_name='ra' AND (column_name='hall_id' OR column_name='date_started' OR column_name='auth_level')
         ) AS subquery;""")
 
     alreadyFullyMigrated = cur.fetchone()
@@ -133,7 +135,7 @@ def migrate(conn):
         logging.info("  Migrating data from <ra> table to <staff_membership> table")
 
         # Query the DB for all of the records in the <ra> table
-        cur.execute("SELECT id, hall_id, date_started FROM ra;")
+        cur.execute("SELECT id, hall_id, date_started, auth_level FROM ra;")
 
         # Iterate over our results
         rows = cur.fetchall()
@@ -143,9 +145,9 @@ def migrate(conn):
 
                 # Insert a record into the staff_membership table
                 cur.execute("""
-                    INSERT INTO staff_membership (ra_id, res_hall_id, start_date)
-                    VALUES (%s, %s, %s);
-                    """, (row[0], row[1], row[2]))
+                    INSERT INTO staff_membership (ra_id, res_hall_id, start_date, auth_level, selected)
+                    VALUES (%s, %s, %s, %s, true);
+                    """, (row[0], row[1], row[2], row[3]))
 
                 # Commit the change to the DB
                 conn.commit()
@@ -154,29 +156,30 @@ def migrate(conn):
                 # If we encounter an IntegrityError, then that means we have already
                 #  created a record in the <staff_membership> table for this RA.
 
-                logging.info("    Record already exists: {}, {}, {}".format(row[0], row[1], row[2]))
+                logging.info("    Record already exists: {}, {}".format(row[0], row[1]))
 
                 # Rollback the change
                 conn.rollback()
 
-        logging.info("  Migration Complete")
+        logging.info("    Migration Complete")
 
         # Once we have gotten out of the for loop, we will have moved all of the data from the
         #  <ra> table to the <staff_membership> table.
 
-        logging.info("  Dropping ra.hall_id and ra.date_started columns")
+        logging.info("  Dropping ra.hall_id, ra.date_started and ra.auth_level columns")
 
         # Delete the hall_id and date_started columns from the <ra> table
         cur.execute("""
             ALTER TABLE ra
             DROP COLUMN hall_id,
-            DROP COLUMN date_started;
+            DROP COLUMN date_started,
+            DROP COLUMN auth_level;
         """)
 
         # Commit the change to the DB
         conn.commit()
 
-        logging.info("  <ra> Table Alteration Complete")
+        logging.info("    <ra> Table Alteration Complete")
 
 
 if __name__ == "__main__":
