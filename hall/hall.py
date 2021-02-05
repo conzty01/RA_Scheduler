@@ -374,13 +374,13 @@ def saveHallSettings():
         # Currently there are no other settings to be modified so this is just a placeholder
         #  for future implementation.
 
-        logging.warning("Unable to handle Hall Setting: {}".format(setVal))
+        logging.warning("Unable to handle Hall Setting: {}".format(setName))
 
     # Close the DB cursor
     cur.close()
 
     # Indicate to the client that the save was successful
-    return jsonify(stdRet(1, "successful"))
+    return jsonify(stdRet(0, "Unknown Setting Provided"))
 
 
 # ----------------------
