@@ -19,9 +19,15 @@ def getAuth():
     #     uEmail      <str>  -  the user's email
     #     ra_id       <int>  -  the id of the user's ra table record
     #     name        <str>  -  the combined first_name and last_name of the user in the ra table
-    #     hall_id     <int>  -  the id of the res_hall record that is associated with the user
-    #     auth_level  <int>  -  the numeric value corresponding with the user's authorization level
-    #     hall_name   <str>  -  the name of the res_hall record that is associated with the user
+    #     res_halls   <lst>  -  a list containing dicts with info about the Res Halls that the user is associated with.
+    #       |
+    #       |- name         <str>  - the name of the res_hall record
+    #       |- id           <int>  - the id of the res_hall record
+    #       |- auth_level   <int>  - the numeric value corresponding with the user's authorization level for this hall
+    #       |- primary      <bool> - a boolean denoting whether this is the hall currently being used by the user.
+
+    #  NOTE: The first hall in the res_halls dictionary should be used as the currently
+    #         selected hall by the user.
 
     logging.debug("Start getAuth")
 
@@ -33,32 +39,49 @@ def getAuth():
 
     # Query the DB for the user
     cur.execute("""
-            SELECT ra.id, username, first_name, last_name, hall_id, auth_level, res_hall.name
+            SELECT ra.id, ra.first_name, ra.last_name, 
+                   sm.res_hall_id, sm.auth_level, res_hall.name
             FROM "user" JOIN ra ON ("user".ra_id = ra.id)
-                        JOIN res_hall ON (ra.hall_id = res_hall.id)
-            WHERE username = %s;""", (uEmail,))
+                        JOIN staff_membership AS sm ON (ra.id = sm.ra_id)
+                        JOIN res_hall ON (sm.res_hall_id = res_hall.id)
+            WHERE username = %s
+            ORDER BY sm.selected DESC""", (uEmail,))
 
     # Get user info from the database
-    res = cur.fetchone()
+    res = cur.fetchall()
 
-    # If user does not exist, go to error url
-    if res is None:
+    # Check to see if we found any records for the user
+    if len(res) == 0:
+        # If the user does not exist, go to error url
         logging.warning("No user found with email: {}".format(uEmail))
 
-        # Be sure to close the cursor before leaving
+        # Close the DB cursor
         cur.close()
+
+        # Redirect to the error page
         return redirect(url_for("err", msg="No user found with email: {}".format(uEmail)))
 
-    # Otherwise, close the cursor and return the userDict
+    # Otherwise, pull the RA's information from the first record and create the dictionary
+    #  to be returned
+    uEmail = uEmail
+    ra_id = res[0][0]
+    fName = res[0][1]
+    lName = res[0][2]
+    res_halls = []
+
+    # Iterate through the records and pull the res_hall data from them
+    for row in res:
+        res_halls.append({
+            "id": row[3],
+            "auth_level": row[4],
+            "name": row[5]
+        })
+
+    # Close the DB cursor
     cur.close()
-    return {
-        "uEmail": uEmail,
-        "ra_id": res[0],
-        "name": res[2]+" "+res[3],
-        "hall_id": res[4],
-        "auth_level": res[5],
-        "hall_name": res[6]
-    }
+
+    # Return our authentication dictionary
+    return AuthenticatedUser(uEmail, ra_id, fName, lName, res_halls)
 
 
 def stdRet(status, msg):
@@ -218,3 +241,73 @@ def formatDateStr(day, month, year, format="YYYY-MM-DD", divider="-"):
     # Return the resulting date string excluding the lingering divider symbol
     #  at the end.
     return result[:-1]
+
+
+class AuthenticatedUser:
+    """ Object for abstracting the idea of an Authenticated User in the RA Duty Scheduler Application
+
+        This class is intended to be used to pass organized data regarding authenticated users to
+        various parts of the application.
+
+        Args:
+            email      (str):   A string representing the "user".username field for this user.
+            raID       (int):   An integer representing the ra.id field for this user.
+            fName      (str):   A string representing the ra.first_name field for this user.
+            lName      (str):   A string representing the ra.last_name field for this user.
+            resHalls   (lst):   A list containing dicts with info about the Res Halls that the user is associated with.
+               |- name         <str>  - the name of the res_hall record
+               |- id           <int>  - the id of the res_hall record
+               |- auth_level   <int>  - the numeric value corresponding with the user's auth_level for this hall
+               |- primary      <bool> - a boolean denoting whether this is the hall currently being used by the user
+
+        NOTE: The first hall in the res_halls list will be used as user's currently selected Res Hall.
+
+    """
+    def __init__(self, email, raID, fName, lName, resHalls):
+        self.__email = email
+        self.__ra_id = raID
+        self.__fName = fName
+        self.__lName = lName
+        self.__resHalls = resHalls
+        self.__selectedHall = resHalls[0]
+
+    def email(self):
+        # Return the email associated with the user
+        return self.__email
+
+    def ra_id(self):
+        # Return the ID associated with the user's RA record
+        return self.__ra_id
+
+    def first_name(self):
+        # Return the first name associated with the user's RA record
+        return self.__fName
+
+    def last_name(self):
+        # Return the last name associated with the user's RA record
+        return self.__lName
+
+    def name(self):
+        # Return the full name associated with the user's RA record
+        return self.__fName + " " + self.__lName
+
+    def hall_id(self):
+        # Return the ID associated with the user's currently selected Res Hall
+        return self.__selectedHall["id"]
+
+    def auth_level(self):
+        # Return the auth_level associated with the user's currently selected Res Hall
+        return self.__selectedHall["auth_level"]
+
+    def hall_name(self):
+        # Return the name associated with the user's currently selected Res Hall
+        return self.__selectedHall["name"]
+
+    def getAllAssociatedResHalls(self):
+        # Return all halls that the user's RA record is associated with
+        return self.__resHalls
+
+    def selectResHall(self, index):
+        # Mark the Res Hall at the provided index as being the user's currently selected
+        #  Res Hall.
+        self.__selectedHall = self.__resHalls[index]

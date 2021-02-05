@@ -26,23 +26,23 @@ def manHall():
     #  to the user and provide a way for them to edit said settings.
 
     # Authenticate the user against the DB
-    userDict = getAuth()
+    authedUser = getAuth()
 
     # If the user is not at least an HD
-    if userDict["auth_level"] < 3:
+    if authedUser.auth_level() < 3:
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
         logging.info("User Not Authorized - RA: {} attempted to reach Manage Hall page"
-                     .format(userDict["ra_id"]))
+                     .format(authedUser.ra_id()))
 
         # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
 
     # Render and return the appropriate template.
     return render_template("hall/hall.html", opts=ag.baseOpts, curView=4,
-                           settingList=getHallSettings(userDict["hall_id"]),
-                           auth_level=userDict["auth_level"], hall_name=userDict["hall_name"])
+                           settingList=getHallSettings(authedUser.hall_id()),
+                           auth_level=authedUser.auth_level(), hall_name=authedUser.hall_name())
 
 
 # ---------------------
@@ -80,20 +80,20 @@ def getHallSettings(hallId=None):
         # If hallId is None, then this method was called from a remote client.
 
         # Get the user's information from the database
-        userDict = getAuth()
+        authedUser = getAuth()
         # Set the value of hallId from the userDict
-        hallId = userDict["hall_id"]
+        hallId = authedUser.hall_id()
         # Mark that this method was not called from the server
         fromServer = False
 
         # Check to see if the user is authorized to view these settings
         # If the user is not at least an HD
-        if userDict["auth_level"] < 3:
+        if authedUser.auth_level() < 3:
             # Then they are not permitted to see this view.
 
             # Log the occurrence.
             logging.info("User Not Authorized - RA: {} attempted to get Hall Settings"
-                         .format(userDict["ra_id"]))
+                         .format(authedUser.ra_id()))
 
             # Notify the user that they are not authorized.
             return jsonify(stdRet(-1, "NOT AUTHORIZED"))
@@ -232,16 +232,16 @@ def saveHallSettings():
 
 
     # Get the user's information from the database
-    userDict = getAuth()
+    authedUser = getAuth()
 
     # Check to see if the user is authorized to alter these settings
     # If the user is not at least an HD
-    if userDict["auth_level"] < 3:
+    if authedUser.auth_level() < 3:
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
         logging.info("User Not Authorized - RA: {} attempted to overwrite Hall Settings for : {}"
-                     .format(userDict["ra_id"], userDict["hall_id"]))
+                     .format(authedUser.ra_id(), authedUser.hall_id()))
 
         # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
@@ -259,8 +259,8 @@ def saveHallSettings():
 
     # Make sure that the user belongs to the hall whose settings are being changed
     cur.execute("""SELECT res_hall.id
-                   FROM res_hall JOIN ra ON (ra.hall_id = res_hall.id)
-                   WHERE ra.id = %s;""", (userDict["ra_id"],))
+                   FROM res_hall JOIN staff_membership AS sm ON (sm.res_hall_id = res_hall.id)
+                   WHERE sm.ra_id = %s;""", (authedUser.ra_id(),))
 
     # Load the query result
     dbHallId = cur.fetchone()
@@ -271,7 +271,7 @@ def saveHallSettings():
         #  Simply return a not authorized message and stop processing.
 
         logging.info("User Not Authorized - RA: {} attempted to overwrite Hall Settings for : {}"
-                     .format(userDict["ra_id"], userDict["hall_id"]))
+                     .format(authedUser.ra_id(), authedUser.hall_id()))
 
         # Close the DB cursor
         cur.close()
@@ -281,7 +281,7 @@ def saveHallSettings():
 
     # Log that the user is updating the provided setting for the given hall
     logging.info("User: {} is updating Hall Setting: '{}' for Hall: {}"
-                 .format(userDict["ra_id"], setName, userDict["hall_id"]))
+                 .format(authedUser.ra_id(), setName, authedUser.hall_id()))
 
     # Otherwise, figure out what setting we are attempting to change and whether
     #  it should be handled in a special way.
@@ -289,7 +289,7 @@ def saveHallSettings():
         # We are attempting to update the res_hall.name field in the DB
 
         # Update the setting
-        cur.execute("UPDATE res_hall SET name = %s WHERE id = %s", (setVal, userDict["hall_id"]))
+        cur.execute("UPDATE res_hall SET name = %s WHERE id = %s", (setVal, authedUser.hall_id()))
         # Commit the change to the DB
         ag.conn.commit()
 
@@ -304,7 +304,7 @@ def saveHallSettings():
 
         # Update the setting
         cur.execute("UPDATE hall_settings SET duty_config = %s WHERE res_hall_id = %s;",
-                    (Json(setVal), userDict["hall_id"]))
+                    (Json(setVal), authedUser.hall_id()))
 
         # Commit the change to the DB
         ag.conn.commit()
@@ -323,7 +323,7 @@ def saveHallSettings():
         cur.execute("""UPDATE hall_settings 
                        SET year_start_mon = %s, year_end_mon = %s
                        WHERE res_hall_id = %s;""",
-                    (setVal["start"], setVal["end"], userDict["hall_id"]))
+                    (setVal["start"], setVal["end"], authedUser.hall_id()))
 
         # Commit the change to the DB
         ag.conn.commit()
@@ -342,7 +342,7 @@ def saveHallSettings():
         cur.execute("""UPDATE hall_settings 
                        SET flag_multi_duty = %s, duty_flag_label = %s
                        WHERE res_hall_id = %s;""",
-                    (bool(setVal["flag"]), setVal["label"], userDict["hall_id"]))
+                    (bool(setVal["flag"]), setVal["label"], authedUser.hall_id()))
 
         # Commit the change to the DB
         ag.conn.commit()
@@ -357,7 +357,7 @@ def saveHallSettings():
         # We are attempting to update the hall_settings.auto_adj_excl_ra_pts
 
         cur.execute("UPDATE hall_settings SET auto_adj_excl_ra_pts = %s WHERE res_hall_id = %s;",
-                    (setVal, userDict["hall_id"]))
+                    (setVal, authedUser.hall_id()))
 
         # Commit the change to the DB
         ag.conn.commit()

@@ -31,14 +31,14 @@ def editSched():
     #  Required Auth Level: >= AHD
 
     # Authenticate the user against the DB
-    userDict = getAuth()
+    authedUser = getAuth()
 
     # If the user is not at least an AHD
-    if userDict["auth_level"] < 2:
+    if authedUser.auth_level() < 2:
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
-        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
+        logging.info("User Not Authorized - RA: {}".format(authedUser.ra_id()))
 
         # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
@@ -49,7 +49,7 @@ def editSched():
 
     # Call getRAStats to get information on the number of Duty
     # points each RA has for the current school year
-    ptDict = getRAStats(userDict["hall_id"], start, end)
+    ptDict = getRAStats(authedUser.hall_id(), start, end)
 
     logging.debug("Point Dict: {}".format(ptDict))
 
@@ -57,7 +57,7 @@ def editSched():
     cur = ag.conn.cursor()
 
     # Load the necessary hall settings from the DB
-    cur.execute("SELECT duty_flag_label FROM hall_settings WHERE res_hall_id = %s", (userDict["hall_id"],))
+    cur.execute("SELECT duty_flag_label FROM hall_settings WHERE res_hall_id = %s", (authedUser.hall_id(),))
 
     # Create a custom settings dictionary
     custSettings = {
@@ -71,14 +71,17 @@ def editSched():
     logging.debug("Custom Settings Dict: {}".format(custSettings))
 
     # Query the DB for a list of all of the RAs and their information for the user's staff.
-    cur.execute("SELECT id, first_name, last_name, color FROM ra WHERE hall_id = %s ORDER BY first_name ASC;",
-                (userDict["hall_id"],))
+    cur.execute("""
+        SELECT ra.id, ra.first_name, ra.last_name, ra.color 
+        FROM ra JOIN staff_membership AS sm ON (ra.id = sm.ra_id)
+        WHERE sm.res_hall_id = %s 
+        ORDER BY ra.first_name ASC;""", (authedUser.hall_id(),))
 
     # Sort alphabetically by last name of RA
     ptDictSorted = sorted(ptDict.items(), key=lambda kv: kv[1]["name"].split(" ")[1])
 
-    return render_template("schedule/editSched.html", raList=cur.fetchall(), auth_level=userDict["auth_level"],
-                           ptDict=ptDictSorted, curView=3, opts=custSettings, hall_name=userDict["hall_name"])
+    return render_template("schedule/editSched.html", raList=cur.fetchall(), auth_level=authedUser.auth_level(),
+                           ptDict=ptDictSorted, curView=3, opts=custSettings, hall_name=authedUser.hall_name())
 
 
 # ---------------------
@@ -143,10 +146,10 @@ def getSchedule2(start=None, end=None, hallId=None, showAllColors=None):
         #  this method was called from a remote client.
 
         # Get the user's information from the database
-        userDict = getAuth()
+        authedUser = getAuth()
 
         # Set the value of hallId from the userDict
-        hallId = userDict["hall_id"]
+        hallId = authedUser.hall_id()
 
         # Get the start and end string values from the request arguments.
         #  Since we utilize the fullCal.js library, we know that the request
@@ -215,7 +218,7 @@ def getSchedule2(start=None, end=None, hallId=None, showAllColors=None):
             #  added. If this method was called from the server, then there is no
             #  concept of the current user and thus the default color should be used.
 
-            if not fromServer and userDict["ra_id"] == row[3]:
+            if not fromServer and authedUser.ra_id() == row[3]:
                 # If it is the RA, then show their unique color
                 c = row[2]
 
@@ -286,16 +289,16 @@ def runScheduler():
     #     -1 : an error occurred while scheduling
 
     # Get the user's information from the database
-    userDict = getAuth()
+    authedUser = getAuth()
 
     # Check to see if the user is authorized to run the scheduler
     # If the user is not at least an AHD
-    if userDict["auth_level"] < 2:
+    if authedUser.auth_level() < 2:
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
         logging.info("User Not Authorized - RA: {} attempted to run scheduler."
-                     .format(userDict["ra_id"]))
+                     .format(authedUser.ra_id()))
 
         # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
@@ -358,7 +361,7 @@ def runScheduler():
         return jsonify(stdRet(-1, "Missing Scheduler Parameters"))
 
     # Set the value of the hallId from the userDict
-    hallId = userDict["hall_id"]
+    hallId = authedUser.hall_id()
 
     # Create a DB cursor
     cur = ag.conn.cursor()
@@ -390,7 +393,7 @@ def runScheduler():
     #  conflicts for the given month excluding any ra table records with
     #  an auth_level of 3 or higher.
     cur.execute("""
-        SELECT first_name, last_name, id, hall_id, date_started,
+        SELECT ra.first_name, ra.last_name, ra.id, sm.res_hall_id, sm.start_date,
                COALESCE(cons.array_agg, ARRAY[]::date[])
         FROM ra LEFT OUTER JOIN (
             SELECT ra_id, ARRAY_AGG(days.date)
@@ -403,8 +406,9 @@ def runScheduler():
             GROUP BY ra_id
             ) AS cons
         ON (ra.id = cons.ra_id)
-        WHERE ra.hall_id = %s
-        AND ra.auth_level < 3 {}
+        JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
+        WHERE sm.res_hall_id = %s
+        AND sm.auth_level < 3 {}
     """.format(eligibleRAStr), (monthId, hallId))
 
     # Load the result from the DB
@@ -422,7 +426,7 @@ def runScheduler():
     maxBreadDuty = "{:04d}-{:02d}-{:02d}".format(date.year, date.month, dateNum)
 
     # Get the RA statistics for the given hall
-    ptsDict = getRAStats(userDict["hall_id"], start, end, maxBreakDay=maxBreadDuty)
+    ptsDict = getRAStats(hallId, start, end, maxBreakDay=maxBreadDuty)
 
     logging.debug("ptsDict: {}".format(ptsDict))
 
@@ -476,17 +480,18 @@ def runScheduler():
     # Log this information for the debugger!
     logging.debug("StartMonthStr: {}".format(startMonthStr))
     logging.debug("EndMonthStr: {}".format(endMonthStr))
-    logging.debug("Hall Id: {}".format(userDict["hall_id"]))
+    logging.debug("Hall Id: {}".format(hallId))
     logging.debug("Year: {}".format(date.year))
     logging.debug('MonthNum: {0:02d}'.format(monthNum))
     logging.debug("LDAT: {}".format(ldat))
 
     # Query the DB for the last 'x' number of duties from the previous month so that we
     #  do not schedule RAs back-to-back between months.
-    cur.execute("""SELECT ra.first_name, ra.last_name, ra.id, ra.hall_id,
-                          ra.date_started, day.date - TO_DATE(%s, 'YYYY-MM-DD')
+    cur.execute("""SELECT ra.first_name, ra.last_name, ra.id, sm.res_hall_id,
+                          sm.start_date, day.date - TO_DATE(%s, 'YYYY-MM-DD')
                   FROM duties JOIN day ON (day.id=duties.day_id)
                               JOIN ra ON (ra.id=duties.ra_id)
+                              JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
                   WHERE duties.hall_id = %s
                   AND duties.sched_id IN (
                         SELECT DISTINCT ON (schedule.month_id) schedule.id
@@ -525,7 +530,7 @@ def runScheduler():
         FROM break_duties JOIN day ON (break_duties.day_id = day.id)
         WHERE break_duties.month_id = {}
         AND break_duties.hall_id = {}
-    """.format(monthId, userDict["hall_id"]))
+    """.format(monthId, hallId))
 
     # Load the results from the DB and convert the value to an int.
     breakDuties = [int(row[0]) for row in cur.fetchall()]
@@ -541,7 +546,7 @@ def runScheduler():
     # Load the Res Hall's settings for the scheduler
     cur.execute("""SELECT duty_config, auto_adj_excl_ra_pts, flag_multi_duty 
                    FROM hall_settings
-                   WHERE res_hall_id = %s""", (userDict["hall_id"],))
+                   WHERE res_hall_id = %s""", (hallId,))
     dutyConfig, autoExcAdj, flagMultiDuty = cur.fetchone()
 
     # AutoExcAdj is a currently unused feature that allows the scheduler to
@@ -612,7 +617,7 @@ def runScheduler():
     if not successful:
         # Log the occurrence
         logging.info("Unable to Generate Schedule for Hall: {} MonthNum: {} Year: {}"
-                     .format(userDict["hall_id"], monthNum, year))
+                     .format(hallId, monthNum, year))
 
         # Notify the user of this result
         return jsonify(stdRet(0, "Unable to Generate Schedule"))
@@ -715,8 +720,11 @@ def runScheduler():
 
         # Select all RAs in the given hall whose auth_level is below 3 (HD)
         #  that were not included in the eligibleRAs list
-        cur.execute("""SELECT id FROM ra WHERE id NOT IN %s AND hall_id = %s""",
-                    (tuple(eligibleRAs), hallId))
+        cur.execute("""
+            SELECT ra_id 
+            FROM staff_membership 
+            WHERE ra_id NOT IN %s 
+            AND res_hall_id = %s""", (tuple(eligibleRAs), hallId))
 
         raAdjList = cur.fetchall()
 
@@ -780,16 +788,16 @@ def alterDuty():
     #     -1 : an error occurred while scheduling
 
     # Get the user's information from the database
-    userDict = getAuth()
+    authedUser = getAuth()
 
     # Check to see if the user is authorized to alter duties
     # If the user is not at least an AHD
-    if userDict["auth_level"] < 2:
+    if authedUser.auth_level() < 2:
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
         logging.info("User Not Authorized - RA: {} attempted to alter duty for Hall: {}"
-                     .format(userDict["ra_id"], userDict["hall_id"]))
+                     .format(authedUser.ra_id(), authedUser.hall_id()))
 
         # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
@@ -799,7 +807,7 @@ def alterDuty():
 
     logging.debug("New RA id: {}".format(data["newId"]))
     logging.debug("Old RA Name: {}".format(data["oldName"]))
-    logging.debug("HallID: {}".format(userDict["hall_id"]))
+    logging.debug("HallID: {}".format(authedUser.hall_id()))
     # Expected as x/x/xxxx
     logging.debug("DateStr: {}".format(data["dateStr"]))
 
@@ -810,8 +818,8 @@ def alterDuty():
     cur = ag.conn.cursor()
 
     # Query the DB for the RA that is to be assigned for this duty.
-    cur.execute("SELECT id FROM ra WHERE id = %s AND hall_id = %s;",
-                (data["newId"], userDict["hall_id"]))
+    cur.execute("SELECT ra_id FROM staff_membership WHERE ra_id = %s AND res_hall_id = %s;",
+                (data["newId"], authedUser.hall_id()))
 
     # Load the query results
     raParams = cur.fetchone()
@@ -820,7 +828,7 @@ def alterDuty():
     if raParams is None:
         # If we did not, log the occurrence.
         logging.warning("Alter Duty - unable to locate RA: {} for Hall: {}"
-                        .format(data["newId"], userDict["hall_id"]))
+                        .format(data["newId"], authedUser.hall_id()))
 
         # Close the DB cursor
         cur.close()
@@ -829,8 +837,12 @@ def alterDuty():
         return jsonify(stdRet(0, "New Assigned RA is Not a Valid Selection"))
 
     # Query the DB for the RA that is currently assigned for the duty.
-    cur.execute("SELECT id FROM ra WHERE first_name LIKE %s AND last_name LIKE %s AND hall_id = %s",
-                (fName, lName, userDict["hall_id"]))
+    cur.execute("""
+        SELECT ra.id 
+        FROM ra JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
+        WHERE ra.first_name LIKE %s 
+        AND ra.last_name LIKE %s 
+        AND sm.res_hall_id = %s""", (fName, lName, authedUser.hall_id()))
 
     # Load the query results
     oldRA = cur.fetchone()
@@ -839,7 +851,7 @@ def alterDuty():
     if oldRA is None:
         # If we did not, log the occurrence.
         logging.warning("Alter Duty - unable to locate RA: {} {} for Hall: {}"
-                        .format(fName, lName, userDict["hall_id"]))
+                        .format(fName, lName, authedUser.hall_id()))
 
         # Close the DB cursor
         cur.close()
@@ -871,7 +883,7 @@ def alterDuty():
 
     # Query the DB for the schedule that the duty belongs to
     cur.execute("SELECT id FROM schedule WHERE hall_id = %s AND month_id = %s ORDER BY created DESC, id DESC;",
-                (userDict["hall_id"], monthId))
+                (authedUser.hall_id(), monthId))
 
     # Load the query results
     schedId = cur.fetchone()
@@ -880,7 +892,7 @@ def alterDuty():
     if schedId is None:
         # If we did not, log the occurrence.
         logging.warning("Alter Duty - unable to locate schedule for Month: {}, Hall: {}"
-                        .format(monthId, userDict["hall_id"]))
+                        .format(monthId, authedUser.hall_id()))
 
         # Close the DB cursor
         cur.close()
@@ -898,7 +910,7 @@ def alterDuty():
                    AND sched_id = %s
                    AND ra_id = %s
                    """, (raParams[0], data["pts"], data["flag"],
-                         userDict["hall_id"], dayID, schedId[0],
+                         authedUser.hall_id(), dayID, schedId[0],
                          oldRA[0]))
 
     # Commit the changes in the DB
@@ -940,16 +952,16 @@ def addNewDuty():
     #     -1 : an error occurred while scheduling
 
     # Get the user's information from the database
-    userDict = getAuth()
+    authedUser = getAuth()
 
     # Check to see if the user is authorized to add duties
     # If the user is not at least an AHD
-    if userDict["auth_level"] < 2:
+    if authedUser.auth_level() < 2:
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
         logging.info("User Not Authorized - RA: {} attempted to add a duty for Hall: {}"
-                     .format(userDict["ra_id"], userDict["hall_id"]))
+                     .format(authedUser.ra_id(), authedUser.hall_id()))
 
         # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
@@ -958,7 +970,7 @@ def addNewDuty():
     data = request.json
 
     logging.debug("New RA id: {}".format(data["id"]))
-    logging.debug("HallID: {}".format(userDict["hall_id"]))
+    logging.debug("HallID: {}".format(authedUser.hall_id()))
     # Expected as x-x-xxxx
     logging.debug("DateStr: {}".format(data["dateStr"]))
 
@@ -966,7 +978,8 @@ def addNewDuty():
     cur = ag.conn.cursor()
 
     # Query the DB for the given RA
-    cur.execute("SELECT id FROM ra WHERE id = %s AND hall_id = %s;", (data["id"], userDict["hall_id"]))
+    cur.execute("SELECT ra_id FROM staff_membership WHERE ra_id = %s AND res_hall_id = %s;",
+                (data["id"], authedUser.hall_id()))
 
     # Load the query result
     raId = cur.fetchone()
@@ -976,7 +989,7 @@ def addNewDuty():
     if raId is None:
         # If not, then log the occurrence.
         logging.warning("Add Duty - unable to locate RA: {} for Hall: {}"
-                        .format(data["id"], userDict["hall_id"]))
+                        .format(data["id"], authedUser.hall_id()))
 
         # Close the DB cursor
         cur.close()
@@ -1008,7 +1021,7 @@ def addNewDuty():
 
     # Query the DB for the schedule that this duty should belong to.
     cur.execute("SELECT id FROM schedule WHERE hall_id = %s AND month_id = %s ORDER BY created DESC, id DESC;",
-                (userDict["hall_id"], monthId))
+                (authedUser.hall_id(), monthId))
 
     # Load the query results
     schedId = cur.fetchone()
@@ -1017,7 +1030,7 @@ def addNewDuty():
     if schedId is None:
         # If we did not, log the occurrence.
         logging.warning("Add Duty - unable to locate schedule for Month: {}, Hall: {}"
-                        .format(monthId, userDict["hall_id"]))
+                        .format(monthId, authedUser.hall_id()))
 
         # Close the DB cursor
         cur.close()
@@ -1028,7 +1041,7 @@ def addNewDuty():
     # Execute an INSERT statement to have the duty created in the duties table
     cur.execute("""INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val, flagged)
                     VALUES (%s, %s, %s, %s, %s, %s);""",
-                (userDict["hall_id"], raId[0], dayID, schedId[0], data["pts"], data["flag"]))
+                (authedUser.hall_id(), raId[0], dayID, schedId[0], data["pts"], data["flag"]))
 
     # Commit the changes to the DB
     ag.conn.commit()
@@ -1067,16 +1080,16 @@ def deleteDuty():
     #     -1 : an error occurred while scheduling
 
     # Get the user's information from the database
-    userDict = getAuth()
+    authedUser = getAuth()
 
     # Check to see if the user is authorized to delete duties
     # If the user is not at least an AHD
-    if userDict["auth_level"] < 2:
+    if authedUser.auth_level() < 2:
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
         logging.info("User Not Authorized - RA: {} attempted to delete duty for Hall: {}"
-                     .format(userDict["ra_id"], userDict["hall_id"]))
+                     .format(authedUser.ra_id(), authedUser.hall_id()))
 
         # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
@@ -1085,7 +1098,7 @@ def deleteDuty():
     data = request.json
 
     logging.debug("Deleted Duty RA Name: {}".format(data["raName"]))
-    logging.debug("HallID: {}".format(userDict["hall_id"]))
+    logging.debug("HallID: {}".format(authedUser.hall_id()))
     # Expected as x-x-xxxx
     logging.debug("DateStr: {}".format(data["dateStr"]))
 
@@ -1096,8 +1109,12 @@ def deleteDuty():
     cur = ag.conn.cursor()
 
     # Query the DB for the given RA
-    cur.execute("SELECT id FROM ra WHERE first_name LIKE %s AND last_name LIKE %s AND hall_id = %s;",
-                (fName, lName, userDict["hall_id"]))
+    cur.execute("""
+        SELECT ra.id 
+        FROM ra JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
+        WHERE ra.first_name LIKE %s 
+        AND ra.last_name LIKE %s 
+        AND sm.res_hall_id = %s;""", (fName, lName, authedUser.hall_id()))
 
     # Load the query results
     raId = cur.fetchone()
@@ -1106,7 +1123,7 @@ def deleteDuty():
     if raId is None:
         # If we did not, log the occurrence.
         logging.warning("Delete Duty - unable to locate RA: {} {} for Hall: {}"
-                        .format(fName, lName, userDict["hall_id"]))
+                        .format(fName, lName, authedUser.hall_id()))
 
         # Close the DB cursor
         cur.close()
@@ -1138,7 +1155,7 @@ def deleteDuty():
 
     # Query the DB for the schedule that the duty belongs to
     cur.execute("SELECT id FROM schedule WHERE hall_id = %s AND month_id = %s ORDER BY created DESC, id DESC;",
-                (userDict["hall_id"], monthId))
+                (authedUser.hall_id(), monthId))
 
     # Load the result from the DB
     schedId = cur.fetchone()
@@ -1147,7 +1164,7 @@ def deleteDuty():
     if schedId is None:
         # If we did not, log the occurrence.
         logging.warning("Delete Duty - unable to locate schedule for Month: {}, Hall: {}"
-                        .format(monthId, userDict["hall_id"]))
+                        .format(monthId, authedUser.hall_id()))
 
         # Close the DB cursor
         cur.close()
@@ -1161,7 +1178,7 @@ def deleteDuty():
                     AND hall_id = %s
                     AND day_id = %s
                     AND sched_id = %s""",
-                (raId[0], userDict["hall_id"], dayID, schedId[0]))
+                (raId[0], authedUser.hall_id(), dayID, schedId[0]))
 
     # Commit the changes to the DB
     ag.conn.commit()
@@ -1170,7 +1187,7 @@ def deleteDuty():
     cur.close()
 
     logging.info("Successfully deleted Duty: {} for Hall: {}"
-                 .format(data["dateStr"], userDict["hall_id"]))
+                 .format(data["dateStr"], authedUser.hall_id()))
 
     # Notify the user that the delete was successful
     return jsonify(stdRet(1, "successful"))

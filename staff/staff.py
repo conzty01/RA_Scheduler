@@ -28,14 +28,14 @@ def manStaff():
     #
 
     # Get the user's info from our database
-    userDict = getAuth()
+    authedUser = getAuth()
 
     # If the user is not at least an HD
-    if userDict["auth_level"] < 3:
+    if authedUser.auth_level() < 3:
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
-        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
+        logging.info("User Not Authorized - RA: {}".format(authedUser.ra_id()))
 
         # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
@@ -48,17 +48,20 @@ def manStaff():
     cur = ag.conn.cursor()
 
     # Query the DB for a list of all of the RAs for the hall and their information.
-    cur.execute("""SELECT ra.id, first_name, last_name, email, date_started, res_hall.name, color, auth_level 
-                   FROM ra JOIN res_hall ON (ra.hall_id = res_hall.id) 
-                   WHERE hall_id = %s ORDER BY ra.id ASC;
-                """, (userDict["hall_id"],))
+    cur.execute("""SELECT ra.id, ra.first_name, ra.last_name, ra.email, sm.start_date, 
+                          res_hall.name, ra.color, sm.auth_level
+                   FROM ra JOIN staff_membership AS sm ON (ra.id = sm.ra_id)
+                           JOIN res_hall ON (sm.res_hall_id = res_hall.id)
+                   WHERE sm.res_hall_id = %s 
+                   ORDER BY ra.id ASC;
+                """, (authedUser.hall_id(),))
 
     # Get each of the RA's duty statistics for the current school year.
-    ptStats = getRAStats(userDict["hall_id"], start, end)
+    ptStats = getRAStats(authedUser.hall_id(), start, end)
 
     # Render and return the appropriate template.
-    return render_template("staff/staff.html", raList=cur.fetchall(), auth_level=userDict["auth_level"],
-                           opts=ag.baseOpts, curView=4, hall_name=userDict["hall_name"], pts=ptStats)
+    return render_template("staff/staff.html", raList=cur.fetchall(), auth_level=authedUser.auth_level(),
+                           opts=ag.baseOpts, curView=4, hall_name=authedUser.hall_name(), pts=ptStats)
 
 
 # ---------------------
@@ -112,9 +115,9 @@ def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None
         #  this method was called from a remote client.
 
         # Get the user's information from the database
-        userDict = getAuth()
+        authedUser = getAuth()
         # Set the value of hallId from the userDict
-        hallId = userDict["hall_id"]
+        hallId = authedUser.hall_id()
         # Get the startDateStr and endDateStr from the request arguments
         startDateStr = request.args.get("start")
         endDateStr = request.args.get("end")
@@ -195,9 +198,9 @@ def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None
                ) ptQuery
                RIGHT JOIN ra ON (ptQuery.rid = ra.id)
                LEFT JOIN point_modifier ON (ra.id = point_modifier.ra_id)
-               WHERE ra.hall_id = %s;""", (hallId, hallId, startDateStr,
-                                           endDateStr, hallId, breakDutyStart,
-                                           breakDutyEnd, hallId))
+               JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
+               WHERE sm.res_hall_id = %s;""",
+                (hallId, hallId, startDateStr, endDateStr, hallId, breakDutyStart, breakDutyEnd, hallId))
 
     # Get the result from the DB
     raList = cur.fetchall()
@@ -244,7 +247,7 @@ def getStaffStats():
     #     {
     #        raList : [
     #           [<ra.id 1>,<ra.first_name 1>,<ra.last_name 1>,<ra.email 1>,
-    #            <ra.date_started 1>,<res_hall.name>,<ra.color 1>,<ra.auth_level 1>],
+    #            <staff_membership.start_date 1>,<res_hall.name>,<ra.color 1>,<staff_membership.auth_level 1>],
     #           [...],
     #           ...
     #        ],
@@ -262,15 +265,15 @@ def getStaffStats():
     #     }
 
     # Get the user's information from the database
-    userDict = getAuth()
+    authedUser = getAuth()
 
     # Check to see if the user is authorized to view this information
     # If the user is not at least an HD
-    if userDict["auth_level"] < 3:
+    if authedUser.auth_level() < 3:
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
-        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
+        logging.info("User Not Authorized - RA: {}".format(authedUser.ra_id()))
 
         # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
@@ -279,16 +282,19 @@ def getStaffStats():
     cur = ag.conn.cursor()
 
     # Query the DB for the list of RAs for the given res hall.
-    cur.execute("""SELECT ra.id, first_name, last_name, email, date_started, res_hall.name, color, auth_level
-                 FROM ra JOIN res_hall ON (ra.hall_id = res_hall.id)
-                 WHERE hall_id = %s ORDER BY ra.id DESC;""", (userDict["hall_id"],))
+    cur.execute("""SELECT ra.id, ra.first_name, ra.last_name, ra.email, sm.start_date, 
+                          res_hall.name, ra.color, sm.auth_level
+                 FROM ra JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
+                         JOIN res_hall ON (sm.res_hall_id = res_hall.id)
+                 WHERE sm.res_hall_id = %s 
+                 ORDER BY ra.id DESC;""", (authedUser.hall_id(),))
 
     # Get the information for the current school year.
     #  This will be used to calculate duty points for the RAs.
     start, end = getCurSchoolYear()
 
     # Get each of the RA's duty statistics for the current school year.
-    pts = getRAStats(userDict["hall_id"], start, end)
+    pts = getRAStats(authedUser.hall_id(), start, end)
 
     # Assemble the return result object.
     ret = {"raList": cur.fetchall(), "pts": pts}
@@ -327,15 +333,15 @@ def changeStaffInfo():
     #     -1 : the save was unsuccessful
 
     # Get the user's information from the database
-    userDict = getAuth()
+    authedUser = getAuth()
 
     # Check to see if the user is authorized to alter RA information
     # If the user is not at least an HD
-    if userDict["auth_level"] < 3:
+    if authedUser.auth_level() < 3:
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
-        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
+        logging.info("User Not Authorized - RA: {}".format(authedUser.ra_id()))
 
         # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
@@ -348,14 +354,17 @@ def changeStaffInfo():
 
     # Check to ensure that the client belongs on the same staff as the
     #  RA whose information is being altered.
-    cur.execute("SELECT hall_id = %s FROM ra WHERE ra.id = %s;", (userDict["hall_id"], data["raID"]))
+    cur.execute("""SELECT res_hall_id = %s AS res
+                   FROM staff_membership 
+                   WHERE ra_id = %s
+                   ORDER BY res DESC;""", (authedUser.hall_id(), data["raID"]))
 
     if not cur.fetchone()[0]:
         # If the client does not belong to the same hall, then something fishy is going on.
         #  Simply return a not authorized message and stop processing.
 
         logging.info("User Not Authorized - RA: {} attempted to overwrite RA Info for : {}"
-                     .format(userDict["ra_id"], data["raID"]))
+                     .format(authedUser.ra_id(), data["raID"]))
 
         # Close the DB cursor
         cur.close()
@@ -365,17 +374,22 @@ def changeStaffInfo():
 
     else:
         # Otherwise go ahead and update the RA's information
-
         cur.execute("""UPDATE ra
                        SET first_name = %s, last_name = %s,
-                           date_started = TO_DATE(%s, 'YYYY-MM-DD'),
-                           color = %s, email = %s, auth_level = %s
+                           color = %s, email = %s
                        WHERE id = %s;
-                    """, (data["fName"], data["lName"], data["startDate"], data["color"],
-                          data["email"], data["authLevel"], data["raID"]))
+                    """, (data["fName"], data["lName"], data["color"], data["email"], data["raID"]))
+
+        # Also update the staff_membership record associated with the RA.
+        cur.execute("""UPDATE staff_membership
+                       SET start_date = TO_DATE(%s, 'YYYY-MM-DD'),
+                           auth_level = %s
+                       WHERE ra_id = %s
+                       AND res_hall_id = %s;""",
+                    (data["startDate"], data["authLevel"], data["raID"], authedUser.hall_id()))
 
         # Add the point modifier to the DB
-        addRAPointModifier(data["raID"], userDict["hall_id"], data["modPts"], set=True)
+        addRAPointModifier(data["raID"], authedUser.hall_id(), data["modPts"], set=True)
 
         # Commit the changes to the DB
         ag.conn.commit()
@@ -411,15 +425,15 @@ def removeStaffer():
     #     -1 : the removal was unsuccessful
 
     # Get the user's information from the database
-    userDict = getAuth()
+    authedUser = getAuth()
 
     # Check to see if the user is authorized to remove the staff member
     # If the user is not at least an HD
-    if userDict["auth_level"] < 3:
+    if authedUser.auth_level() < 3:
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
-        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
+        logging.info("User Not Authorized - RA: {}".format(authedUser.ra_id()))
 
         # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
@@ -434,14 +448,17 @@ def removeStaffer():
     cur = ag.conn.cursor()
 
     # Query the DB for the provided RA
-    cur.execute("SELECT hall_id = %s FROM ra WHERE ra.id = %s;", (userDict["hall_id"], raID))
+    cur.execute("""SELECT res_hall_id = %s AS res
+                       FROM staff_membership 
+                       WHERE ra_id = %s
+                       ORDER BY res DESC;""", (authedUser.hall_id(), raID))
 
     if not cur.fetchone()[0]:
         # If the client does not belong to the same hall, then something fishy is going on.
         #  Simply return a not authorized message and stop processing.
 
         logging.info("User Not Authorized - RA: {} attempted to overwrite RA Info for : {}"
-                     .format(userDict["ra_id"], raID))
+                     .format(authedUser.ra_id(), raID))
 
         # Close the DB cursor
         cur.close()
@@ -451,7 +468,11 @@ def removeStaffer():
 
     else:
         # Otherwise go ahead and remove the RA from the hall
-        cur.execute("UPDATE ra SET hall_id = 0 WHERE id = %s;", (raID,))
+        cur.execute("""
+            UPDATE staff_membership 
+            SET res_hall_id = 0 
+            WHERE ra_id = %s
+            AND res_hall_id = %s;""", (raID, authedUser.hall_id()))
 
         # Commit the change to the DB
         ag.conn.commit()
@@ -489,16 +510,16 @@ def addStaffer():
     #     -1 : the addition was unsuccessful
 
     # Get the user's information from the database
-    userDict = getAuth()
+    authedUser = getAuth()
 
     # Check to see if the user is authorized to add a staffer
     # If the user is not at least an HD
-    if userDict["auth_level"] < 3:
+    if authedUser.auth_level() < 3:
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
         logging.info("User Not Authorized - RA: {} attempted to add Staff Member for Hall: {}"
-                     .format(userDict["ra_id"], userDict["hall_id"]))
+                     .format(authedUser.ra_id(), authedUser.hall_id()))
 
         # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
@@ -515,32 +536,40 @@ def addStaffer():
     # Load the result from the DB
     checkRes = cur.fetchone()
 
-    # Initialize the query string and supplemental tuple for use below
-    queryStr = ""
-    queryTup = tuple()
-
     # If there is a user with the provided email already
     if checkRes is not None:
         # Then set the query string to update RA record to be associated with the new hall
-        queryStr = "UPDATE ra SET hall_id = %s WHERE email = %s RETURNING id;"
-        queryTup = (userDict["hall_id"], data["email"])
+        cur.execute("""
+            UPDATE staff_membership
+            SET res_hall_id = %s 
+            WHERE ra_id = %s 
+            RETURNING ra_id;""", (authedUser.hall_id(), checkRes[0]))
+
+        # Fetch the returned ID of the RA record
+        raID = cur.fetchone()
 
     else:
         # Otherwise set the query string create a new RA record in the ra table with
         # the provided information.
-        queryStr = """INSERT INTO ra (first_name, last_name, hall_id, date_started, color, email, auth_level)
-                   VALUES (%s, %s, %s, NOW(), %s, %s, %s) RETURNING id"""
-        queryTup = (data["fName"], data["lName"], userDict["hall_id"],
-                    data["color"], data["email"], data["authLevel"])
 
-    # Execute the query string
-    cur.execute(queryStr, queryTup)
+        # Insert a record into the RA table
+        cur.execute(
+            """INSERT INTO ra (first_name, last_name, color, email)
+               VALUES (%s, %s, %s, %s) RETURNING id;""",
+            (data["fName"], data["lName"], data["color"], data["email"]))
 
-    # Fetch the returned ID of the RA record
-    raID = cur.fetchone()
+        # Fetch the returned ID of the RA record
+        raID = cur.fetchone()[0]
+
+        # Create an entry into the staff_membership table for this new member
+        cur.execute(
+            """INSERT INTO staff_membership (ra_id, res_hall_id, auth_level, selected)
+               VALUES (%s, %s, %s, %s);""",
+            (raID, authedUser.hall_id(), data["authLevel"], True)
+        )
 
     # Add the point modifier to the DB
-    addRAPointModifier(raID, userDict["hall_id"], data["modPts"], set=True)
+    addRAPointModifier(raID, authedUser.hall_id(), data["modPts"], set=True)
 
     # Commit the changes to the DB
     ag.conn.commit()
@@ -575,21 +604,21 @@ def importStaff():
     #     -1 : the import was unsuccessful
 
     # Get the user's information from the database
-    userDict = getAuth()
+    authedUser = getAuth()
 
     # Check to see if the user is authorized to import staff members
     # If the user is not at least an HD
-    if userDict["auth_level"] < 3:
+    if authedUser.auth_level() < 3:
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
         logging.info("User Not Authorized - RA: {} attempted to import staff to Hall: {}"
-                     .format(userDict["ra_id"], userDict["hall_id"]))
+                     .format(authedUser.ra_id(), authedUser.hall_id()))
 
         # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
 
-    logging.info("Import File: {} for Hall: {}".format(request.files, userDict["hall_id"]))
+    logging.info("Import File: {} for Hall: {}".format(request.files, authedUser.hall_id()))
 
     # If the key 'file' is not in the request.files object
     if 'file' not in request.files:
@@ -660,7 +689,7 @@ def importStaff():
 
                     # Log the instance
                     logging.info("Invalid Import Staff Formatting for Hall: {}"
-                                 .format(userDict["hall_id"]))
+                                 .format(authedUser.hall_id()))
 
                     # Notify the client of this issue.
                     return jsonify(ret)
@@ -685,11 +714,22 @@ def importStaff():
                 logging.debug(str(auth))
 
                 try:
-                    # Attempt to add insert the new staff member into the RA table.
+                    # Attempt to insert the new staff member into the RA table.
                     cur.execute("""
-                        INSERT INTO ra (first_name,last_name,hall_id,date_started,color,email,auth_level)
-                        VALUES (%s, %s, %s,TO_DATE(%s, 'MM/DD/YYYY'), %s, %s, %s);
-                        """, (pl[0], pl[1], userDict["hall_id"], pl[3], pl[4], pl[2], auth))
+                        INSERT INTO ra (first_name, last_name, color, email)
+                        VALUES (%s, %s, %s, %s)
+                        RETURNING id;
+                        """, (pl[0], pl[1], pl[4], pl[2]))
+
+                    # Load the new RA's ID from the query
+                    newRAID = cur.fetchone()
+
+                    # Add a record in the staff_membership table
+                    cur.execute(
+                        """INSERT INTO staff_membership (ra_id, res_hall_id, start_date, auth_level, selected)
+                           VALUES (%s, %s, TO_DATE(%s, 'MM/DD/YYYY'), %s, %s)""",
+                        (newRAID, authedUser.hall_id(), pl[3], auth, True)
+                    )
 
                     # Commit the changes to the DB
                     ag.conn.commit()
