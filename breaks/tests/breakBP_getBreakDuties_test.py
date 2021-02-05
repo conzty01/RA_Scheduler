@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 from scheduleServer import app
 import unittest
 
-
+from helperFunctions.helperFunctions import AuthenticatedUser
 from breaks.breaks import getBreakDuties
 
 
