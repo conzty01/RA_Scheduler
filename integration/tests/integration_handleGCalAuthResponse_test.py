@@ -306,7 +306,7 @@ class TestIntegration_handleGCalAuthResponse(unittest.TestCase):
         # Assert that this method called the gCalIntegratinator.handleAuthResponse() method
         self.mocked_integrationPart.handleAuthResponse.assert_called_once_with(
             expectedRequestURL,
-            self.mocked_appGlobals.baseOpts["HOST_URL"] + "int/GCalAuth"
+            self.mocked_appGlobals.baseOpts["HOST_URL"] + "/int/GCalAuth"
         )
 
     @patch("integration.integrations.redirect", autospec=True)
