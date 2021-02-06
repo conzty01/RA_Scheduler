@@ -684,8 +684,5 @@ class TestDayObject(unittest.TestCase):
         self.assertIsNone(testDutySlot.slot)
 
 
-
-
-
 if __name__ == "__main__":
     unittest.main()
