@@ -24,7 +24,6 @@ def getAuth():
     #       |- name         <str>  - the name of the res_hall record
     #       |- id           <int>  - the id of the res_hall record
     #       |- auth_level   <int>  - the numeric value corresponding with the user's authorization level for this hall
-    #       |- primary      <bool> - a boolean denoting whether this is the hall currently being used by the user.
 
     #  NOTE: The first hall in the res_halls dictionary should be used as the currently
     #         selected hall by the user.
@@ -258,7 +257,6 @@ class AuthenticatedUser:
                |- name         <str>  - the name of the res_hall record
                |- id           <int>  - the id of the res_hall record
                |- auth_level   <int>  - the numeric value corresponding with the user's auth_level for this hall
-               |- primary      <bool> - a boolean denoting whether this is the hall currently being used by the user
 
         NOTE: The first hall in the res_halls list will be used as user's currently selected Res Hall.
 
