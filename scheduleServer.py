@@ -277,8 +277,8 @@ def index():
     authedUser = getAuth()
 
     # Render the appropriate template
-    return render_template("index.html", auth_level=authedUser.auth_level(),
-                           curView=1, opts=ag.baseOpts, hall_name=authedUser.hall_name())
+    return render_template("index.html", auth_level=authedUser.auth_level(), curView=1, opts=ag.baseOpts,
+                           hall_name=authedUser.hall_name(), linkedHalls=authedUser.getAllAssociatedResHalls())
 
 
 # ------------------------------

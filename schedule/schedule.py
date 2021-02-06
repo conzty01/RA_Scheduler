@@ -81,7 +81,8 @@ def editSched():
     ptDictSorted = sorted(ptDict.items(), key=lambda kv: kv[1]["name"].split(" ")[1])
 
     return render_template("schedule/editSched.html", raList=cur.fetchall(), auth_level=authedUser.auth_level(),
-                           ptDict=ptDictSorted, curView=3, opts=custSettings, hall_name=authedUser.hall_name())
+                           ptDict=ptDictSorted, curView=3, opts=custSettings, hall_name=authedUser.hall_name(),
+                           linkedHalls=authedUser.getAllAssociatedResHalls())
 
 
 # ---------------------

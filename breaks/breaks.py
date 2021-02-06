@@ -65,7 +65,8 @@ def editBreaks():
     # Render and return the appropriate template
     return render_template("breaks/editBreaks.html", raList=cur.fetchall(), auth_level=authedUser.auth_level(),
                            bkDict=sorted(bkDict.items(), key=lambda x: x[1]["name"].split(" ")[1]),
-                           curView=3, opts=ag.baseOpts, hall_name=authedUser.hall_name())
+                           curView=3, opts=ag.baseOpts, hall_name=authedUser.hall_name(),
+                           linkedHalls=authedUser.getAllAssociatedResHalls())
 
 
 # ---------------------

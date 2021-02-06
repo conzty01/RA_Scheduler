@@ -42,7 +42,8 @@ def manHall():
     # Render and return the appropriate template.
     return render_template("hall/hall.html", opts=ag.baseOpts, curView=4,
                            settingList=getHallSettings(authedUser.hall_id()),
-                           auth_level=authedUser.auth_level(), hall_name=authedUser.hall_name())
+                           auth_level=authedUser.auth_level(), hall_name=authedUser.hall_name(),
+                           linkedHalls=authedUser.getAllAssociatedResHalls())
 
 
 # ---------------------

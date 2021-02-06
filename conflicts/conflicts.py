@@ -31,7 +31,8 @@ def conflicts():
 
     # Render and return the appropriate template.
     return render_template("conflicts/conflicts.html", auth_level=authedUser.auth_level(), curView=2,
-                           opts=ag.baseOpts, hall_name=authedUser.hall_name())
+                           opts=ag.baseOpts, hall_name=authedUser.hall_name(),
+                           linkedHalls=authedUser.getAllAssociatedResHalls())
 
 
 @conflicts_bp.route("/editCons")
@@ -69,7 +70,8 @@ def editCons():
 
     # Render and return the appropriate template.
     return render_template("conflicts/editCons.html", raList=cur.fetchall(), auth_level=authedUser.auth_level(),
-                           curView=3, opts=ag.baseOpts, hall_name=authedUser.hall_name())
+                           curView=3, opts=ag.baseOpts, hall_name=authedUser.hall_name(),
+                           linkedHalls=authedUser.getAllAssociatedResHalls())
 
 
 # ---------------------
