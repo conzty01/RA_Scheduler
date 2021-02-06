@@ -22,7 +22,7 @@
         {%- block body %}
         {%- block navbar %}
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-            <a class="navbar-brand dropdown-toggle" href="#" id="hallSelector" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            <a class="navbar-brand {{ 'dropdown-toggle' if linkedHalls|length > 1 }}" href="#" id="hallSelector" {{ 'data-toggle="dropdown"' if linkedHalls|length > 1 }} aria-haspopup="true" aria-expanded="false">
                 {{ hall_name }}
             </a>
             {% if linkedHalls|length > 1: %}
