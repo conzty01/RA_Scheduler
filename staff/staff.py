@@ -61,7 +61,8 @@ def manStaff():
 
     # Render and return the appropriate template.
     return render_template("staff/staff.html", raList=cur.fetchall(), auth_level=authedUser.auth_level(),
-                           opts=ag.baseOpts, curView=4, hall_name=authedUser.hall_name(), pts=ptStats)
+                           opts=ag.baseOpts, curView=4, hall_name=authedUser.hall_name(), pts=ptStats,
+                           linkedHalls=authedUser.getAllAssociatedResHalls())
 
 
 # ---------------------
@@ -764,6 +765,72 @@ def importStaff():
         return redirect(url_for(".err", msg="Unable to Import Staff\n\nAn error has occurred during the "
                                             "import process. Either a file was not received by the server "
                                             "or the file extension that was received was not allowed."))
+
+
+@staff_bp.route("/api/changeHallView/<int:newHallID>", methods=["GET"])
+@login_required
+def changeHallView(newHallID):
+    # API Method that changes the user's default selected Res Hall to the one
+    #  provided in the URL and redirect them to the home page. This API will
+    #  only make this change if the user belongs to the requested Res Hall.
+    #  If not, then they will simply receive a redirect to the home page.
+    #
+    #  Required Auth Level: None
+    #
+    #  This method is currently unable to be called from the server.
+    #
+    #  If called from a client, this function does not accept any parameters, but
+    #  rather, uses the hall id that is associated with the user and the hall id
+    #  provided in the URL.
+    #
+    #  This method returns a redirect to the home page.
+
+    # Get the user's information
+    authedUser = getAuth()
+
+    # Get a list of all of the Res Halls associated with the user
+    hallList =  authedUser.getAllAssociatedResHalls()
+
+    # Create a DB cursor
+    cur = ag.conn.cursor()
+
+    # Iterate through the user's associated halls
+    i = 0
+    foundHallSelection = False
+    while not foundHallSelection and i < len(hallList):
+
+        # If the user belongs to the requested Res Hall
+        if hallList[i]["id"] == newHallID:
+
+            # Then mark that we have found the Hall
+            foundHallSelection = True
+
+            # Update the DB to clear out the previously selected halls
+            cur.execute("""
+                UPDATE staff_membership
+                SET selected = false
+                WHERE ra_id = %s
+            """, (authedUser.ra_id(),))
+
+            # Update the DB to set the new Res Hall as the selected default
+            cur.execute("""
+                UPDATE staff_membership
+                SET selected = true
+                WHERE ra_id = %s
+                AND res_hall_id = %s
+            """, (authedUser.ra_id(), newHallID))
+
+        # Otherwise increment i
+        i += 1
+
+    # If the user is not associated with the requested hall, then log the
+    #  occurrence for future review.
+    if not foundHallSelection:
+        logging.warning("No hall association found for RA: {} and Hall: {}"
+                        .format(authedUser.ra_id(), newHallID))
+
+    # Return a redirect to the home page
+    return redirect(url_for("index"))
 
 
 # ------------------------
