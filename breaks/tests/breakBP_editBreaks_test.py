@@ -311,7 +311,8 @@ class TestBreakBP_editBreaks(unittest.TestCase):
                           key=lambda x: x[1]["name"].split(" ")[1]),
             curView=3,
             opts=self.mocked_appGlobals.baseOpts,
-            hall_name=self.helper_getAuth.hall_name()
+            hall_name=self.helper_getAuth.hall_name(),
+            linkedHalls=self.helper_getAuth.getAllAssociatedResHalls()
         )
 
     def test_WithUnauthorizedUser_ReturnsNotAuthorizedJSON(self):

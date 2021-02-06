@@ -245,5 +245,6 @@ class TestHallBP_manHall(unittest.TestCase):
             curView=4,
             settingList=mocked_hallSettings(),
             auth_level=self.mocked_authLevel,
-            hall_name=self.helper_getAuth.hall_name()
+            hall_name=self.helper_getAuth.hall_name(),
+            linkedHalls=self.helper_getAuth.getAllAssociatedResHalls()
         )
