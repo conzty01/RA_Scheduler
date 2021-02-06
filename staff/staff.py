@@ -789,7 +789,7 @@ def changeHallView(newHallID):
     authedUser = getAuth()
 
     # Get a list of all of the Res Halls associated with the user
-    hallList =  authedUser.getAllAssociatedResHalls()
+    hallList = authedUser.getAllAssociatedResHalls()
 
     # Create a DB cursor
     cur = ag.conn.cursor()
