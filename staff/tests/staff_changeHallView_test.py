@@ -279,6 +279,7 @@ class TestHallBP_getHallSettings(unittest.TestCase):
 
         # Reset all of the mocked objects that will be used in this test
         self.mocked_appGlobals.conn.reset_mock()
+        self.mocked_loggingWARNING.reset_mock()
 
         # Set the various items to be used in this test
         desiredHallID = 999
@@ -302,6 +303,12 @@ class TestHallBP_getHallSettings(unittest.TestCase):
 
         # Assert that appGlobals.conn.cursor().close was called
         self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that the method logged the occurrence of the missing hall association
+        self.mocked_loggingWARNING.assert_called_once_with(
+            "No hall association found for RA: {} and Hall: {}"
+            .format(self.user_ra_id, desiredHallID)
+        )
 
     @patch("staff.staff.redirect", autospec=True)
     @patch("staff.staff.url_for", autospec=True)
