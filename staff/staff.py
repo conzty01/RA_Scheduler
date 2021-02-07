@@ -829,6 +829,13 @@ def changeHallView(newHallID):
         logging.warning("No hall association found for RA: {} and Hall: {}"
                         .format(authedUser.ra_id(), newHallID))
 
+    else:
+        # Commit the changes to the DB
+        ag.conn.commit()
+
+    # Close the DB cursor
+    cur.close()
+
     # Return a redirect to the home page
     return redirect(url_for("index"))
 
