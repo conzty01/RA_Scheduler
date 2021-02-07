@@ -42,22 +42,122 @@ class TestDayObject(unittest.TestCase):
     # -- Tests for Day Object --
     # --------------------------
     def test_hasExpectedMethods(self):
+        # Test to ensure the Day Object has the following methods:
+        #  - addRA
+        #  - addRaWithoutPoints
+        #  - removeRA
+        #  - removeAllRAs
+        #  - numberDutySlots
+        #  - addDutySlot
+        #  - getPoints
+        #  - getDate
+        #  - getDoW
+        #  - getId
+        #  - numberOnDuty
+        #  - isDoubleDay
+        #  - getRAs
+        #  - setReview
+        #  - review
+        #  - combineDay
+        #  - iterDutySlots
+        
         # -- Arrange --
         # -- Act --
         # -- Assert --
-        pass
+
+        self.assertTrue(hasattr(Day, "addRA"))
+        self.assertTrue(hasattr(Day, "addRaWithoutPoints"))
+        self.assertTrue(hasattr(Day, "removeRA"))
+        self.assertTrue(hasattr(Day, "removeAllRAs"))
+        self.assertTrue(hasattr(Day, "numberDutySlots"))
+        self.assertTrue(hasattr(Day, "addDutySlot"))
+        self.assertTrue(hasattr(Day, "getPoints"))
+        self.assertTrue(hasattr(Day, "getDate"))
+        self.assertTrue(hasattr(Day, "getDoW"))
+        self.assertTrue(hasattr(Day, "getId"))
+        self.assertTrue(hasattr(Day, "numberOnDuty"))
+        self.assertTrue(hasattr(Day, "isDoubleDay"))
+        self.assertTrue(hasattr(Day, "getRAs"))
+        self.assertTrue(hasattr(Day, "setReview"))
+        self.assertTrue(hasattr(Day, "review"))
+        self.assertTrue(hasattr(Day, "combineDay"))
+        self.assertTrue(hasattr(Day, "iterDutySlots"))
 
     def test_DayObject_hasExpectedProperties(self):
+        # Test to ensure that the Day object has the following properties:
+        # - date
+        # - dow
+        # - isdd
+        # - id
+        # - review
+        # - flagDutySlot
+        # - ras
+        # - numDutySlots
+        # - pointVal
+
         # -- Arrange --
+
+        # Create the objects used in this test
+        desiredDate = date(2021, 2, 7)
+        desiredDOW = 6
+
+        # Create the Day object being tested
+        testDayObject = Day(
+            desiredDate,
+            desiredDOW
+        )
+
         # -- Act --
         # -- Assert --
-        pass
+
+        # Assert that the above properties exist and are as we expect
+        self.assertIsInstance(testDayObject.date, date)
+        self.assertIsInstance(testDayObject.dow, int)
+        self.assertIsInstance(testDayObject.isdd, bool)
+        self.assertIsInstance(testDayObject.id, int)
+        self.assertIsInstance(testDayObject.review, bool)
+        self.assertIsInstance(testDayObject.flagDutySlot, bool)
+        self.assertIsInstance(testDayObject.ras, list)
+        self.assertIsInstance(testDayObject.numDutySlots, int)
+        self.assertIsInstance(testDayObject.pointVal, int)
 
     def test_DayObject_hasExpectedDefaultValues(self):
+        # Test to ensure that when omitting non-required parameters
+        #  when constructing a Day object, the default values are as
+        #  we would expect.
+
         # -- Arrange --
+
+        # Create the objects used in this test
+        desiredDate = date(2021, 2, 7)
+        desiredDOW = 6
+        expectedNumDutySlots = 1
+        expectedRAs = []
+        expectedPointVal = 1
+        expectedDayID = 0
+        expectedIsDoubleDay = False
+        expectedFlagDutySlot = False
+        expectedReview = False
+
         # -- Act --
+
+        # Create the Day object being tested
+        testDayObject = Day(
+            desiredDate,
+            desiredDOW
+        )
+
         # -- Assert --
-        pass
+
+        # Assert that the values that weren't provided are set to the
+        #  expected default.
+        self.assertEqual(expectedIsDoubleDay, testDayObject.isdd)
+        self.assertEqual(expectedDayID, testDayObject.id)
+        self.assertEqual(expectedReview, testDayObject.review)
+        self.assertEqual(expectedFlagDutySlot, testDayObject.flagDutySlot)
+        self.assertEqual(expectedNumDutySlots, testDayObject.numDutySlots)
+        self.assertEqual(expectedRAs, testDayObject.ras)
+        self.assertEqual(expectedPointVal, testDayObject.pointVal)
 
     def test_whenProvidedRAList_setsNumDutySlotsToLengthOfProvidedList(self):
         # Test to ensure that when a list is provided as the ras parameter,
@@ -69,6 +169,7 @@ class TestDayObject(unittest.TestCase):
         # The date to be used for this test
         desiredDate = date(2021, 1, 25)
 
+        # Create RA lists for multiple Day Objects
         raList1 = [1]
         raList2 = [1, 2]
         raList3 = [1, 2, 3]
@@ -133,28 +234,109 @@ class TestDayObject(unittest.TestCase):
                     self.assertFalse(slot.getFlag())
 
     def test_withCustomPointVal_usesCustomPointValue(self):
+        # Test to ensure that when a customPointVal is provided, the constructor
+        #  will use that value regardless of the number of duty slots provided.
+
         # -- Arrange --
+
+        # Create the objects used in this test
+        desiredDate = date(2021, 2, 7)
+        desiredDOW = 6
+        desiredCustomPointVal = 99
+
         # -- Act --
+
+        # Create the Day Objects to be tested
+        testDay1 = Day(desiredDate, desiredDOW,
+                       customPointVal=desiredCustomPointVal,
+                       numDutySlots=1)
+        testDay2 = Day(desiredDate, desiredDOW,
+                       customPointVal=desiredCustomPointVal,
+                       numDutySlots=2)
+
         # -- Assert --
-        pass
+
+        # Assert that the pointVal is set as we would expect
+        self.assertEqual(desiredCustomPointVal, testDay1.pointVal)
+        self.assertEqual(desiredCustomPointVal, testDay2.pointVal)
 
     def test_withoutCustomPointVal_setsPointValueBasedOnNumDutySlots(self):
+        # Test to ensure that when a customPointVal is not provided, the constructor
+        #  will set a point value based on the number of duty slots provided
+
         # -- Arrange --
+
+        # Create the objects used in this test
+        desiredDate = date(2021, 2, 7)
+        desiredDOW = 6
+
         # -- Act --
+
+        # Create the Day Objects to be tested
+        testDay1 = Day(desiredDate, desiredDOW, numDutySlots=0)
+        testDay2 = Day(desiredDate, desiredDOW, numDutySlots=1)
+        testDay3 = Day(desiredDate, desiredDOW, numDutySlots=2)
+        testDay4 = Day(desiredDate, desiredDOW, numDutySlots=3)
+
         # -- Assert --
-        pass
+
+        # Assert that the pointVal is set as we would expect
+        self.assertEqual(1, testDay1.pointVal)
+        self.assertEqual(1, testDay2.pointVal)
+        self.assertEqual(2, testDay3.pointVal)
+        self.assertEqual(2, testDay4.pointVal)
 
     def test_magicMethodStr_returnsExpectedStr(self):
+        # Test to ensure that the __str__ magic method returns the expected result.
+
         # -- Arrange --
+
+        # Create the Day Object being tested
+        dateObj = date(2021, 2, 7)
+        dow = 6
+        testDayObject1 = Day(dateObj, dow, dayID=9)
+        testDayObject2 = Day(dateObj, dow)
+
+        expectedResult1 = "Day({}.{})".format(dateObj, 9)
+        expectedResult2 = "Day({}.{})".format(dateObj, 0)
+
         # -- Act --
+
+        # Call the method being tested
+        result1 = testDayObject1.__str__()
+        result2 = testDayObject2.__str__()
+
         # -- Assert --
-        pass
+
+        # Assert that the results are as we would expect
+        self.assertEqual(expectedResult1, result1)
+        self.assertEqual(expectedResult2, result2)
 
     def test_magicMethodRepr_returnsExpectedStr(self):
+        # Test to ensure that the __repr__ magic method returns the expected result.
+
         # -- Arrange --
+
+        # Create the Day Object being tested
+        dateObj = date(2021, 2, 7)
+        dow = 6
+        testDayObject1 = Day(dateObj, dow, dayID=9)
+        testDayObject2 = Day(dateObj, dow)
+
+        expectedResult1 = "Day({}.{})".format(dateObj, 9)
+        expectedResult2 = "Day({}.{})".format(dateObj, 0)
+
         # -- Act --
+
+        # Call the method being tested
+        result1 = testDayObject1.__repr__()
+        result2 = testDayObject2.__repr__()
+
         # -- Assert --
-        pass
+
+        # Assert that the results are as we would expect
+        self.assertEqual(expectedResult1, result1)
+        self.assertEqual(expectedResult2, result2)
 
     def test_magicMethodIter_iteratesOverRAsOnDuty(self):
         # Test to ensure that the __iter__ method of the Day Object
