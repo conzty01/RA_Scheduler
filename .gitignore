@@ -5,3 +5,6 @@
 *.dump
 *.dump.*
 credentials.json
+coverage.json
+coverage.xml
+.coverage
