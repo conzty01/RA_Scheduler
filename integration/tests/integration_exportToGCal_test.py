@@ -376,6 +376,13 @@ class TestIntegration_exportToGCal(unittest.TestCase):
 
         # -- Assert --
 
+        # Assert that when the appGlobals.conn.cursor().execute was last called,
+        #  it was querying for the Flagged Duty Label
+        self.mocked_appGlobals.conn.cursor().execute.assert_any_call(
+            "SELECT duty_flag_label FROM hall_settings WHERE res_hall_id = %s",
+            (self.user_hall_id,)
+        )
+
         # Assert that appGlobals.conn.commit was never called
         self.mocked_appGlobals.conn.commit.assert_not_called()
 
