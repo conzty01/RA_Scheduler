@@ -753,6 +753,7 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         # Create the calendarId and schedule objects that get passed in
         calendarId = "TEST CALENDAR ID"
         schedule = []
+        desiredFlagLabel = "On-Call"
 
         #  -- ACT --
 
@@ -760,7 +761,7 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         gCalIntObj = gCalIntegratinator()
 
         # Call the createGoogleCalendar method
-        result = gCalIntObj.exportScheduleToGoogleCalendar(mocked_creds, calendarId, schedule)
+        result = gCalIntObj.exportScheduleToGoogleCalendar(mocked_creds, calendarId, schedule, desiredFlagLabel)
 
         #  -- ASSERT --
         self.assertEqual(-3, result)
@@ -781,6 +782,7 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         # Create the calendarId and schedule objects that get passed in
         calendarId = "TEST CALENDAR ID"
         schedule = []
+        desiredFlagLabel = "On-Call"
 
         # Create the gCalIntObj
         gCalIntObj = gCalIntegratinator()
@@ -788,7 +790,7 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         #  -- ACT --
 
         # Call the createGoogleCalendar method
-        gCalIntObj.exportScheduleToGoogleCalendar(mocked_creds, calendarId, schedule)
+        gCalIntObj.exportScheduleToGoogleCalendar(mocked_creds, calendarId, schedule, desiredFlagLabel)
 
         #  -- ASSERT --
         self.mocked_build.assert_called_once_with("calendar", "v3", credentials=mocked_creds)
@@ -813,7 +815,16 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
 
         # Create the calendarId and schedule objects that get passed in
         calendarId = "TEST CALENDAR ID"
-        schedule = [{"start": "00/00/0000", "title": "TEST EVENT TITLE"}]
+        schedule = [{
+            "start": "00/00/0000",
+            "title": "TEST EVENT TITLE",
+            "extendedProps": {
+                  "dutyType": "std",
+                  "flagged": True,
+                  "pts": 1
+            }
+        }]
+        desiredFlagLabel = "On-Call"
 
         # Create the gCalIntObj
         gCalIntObj = gCalIntegratinator()
@@ -821,7 +832,7 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         #  -- ACT --
 
         # Call the createGoogleCalendar method
-        gCalIntObj.exportScheduleToGoogleCalendar(mocked_creds, calendarId, schedule)
+        gCalIntObj.exportScheduleToGoogleCalendar(mocked_creds, calendarId, schedule, desiredFlagLabel)
 
         #  -- ASSERT --
         # Assert that the Integration Object queried Google for the calendar
@@ -853,7 +864,16 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
 
         # Create the calendarId and schedule objects that get passed in
         calendarId = "TEST CALENDAR ID"
-        schedule = [{"start": "00/00/0000", "title": "TEST EVENT TITLE"}]
+        schedule = [{
+            "start": "00/00/0000",
+            "title": "TEST EVENT TITLE",
+            "extendedProps": {
+                "dutyType": "std",
+                "flagged": False,
+                "pts": 1
+            }
+        }]
+        desiredFlagLabel = "On-Call"
 
         # Create the gCalIntObj
         gCalIntObj = gCalIntegratinator()
@@ -861,7 +881,7 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         #  -- ACT --
 
         # Call the createGoogleCalendar method
-        gCalIntObj.exportScheduleToGoogleCalendar(mocked_creds, calendarId, schedule)
+        gCalIntObj.exportScheduleToGoogleCalendar(mocked_creds, calendarId, schedule, desiredFlagLabel)
 
         #  -- ASSERT --
         # Assert that the Integration Object queried Google for the calendar
@@ -911,7 +931,18 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
 
         # Create the calendarId and schedule objects that get passed in
         calendarId = "TEST CALENDAR ID"
-        schedule = [{"start": "", "title": ""} for i in range(15)]
+        schedule = []
+        for i in range(12):
+            schedule.append({
+                "start": "00/00/0000",
+                "title": "TEST EVENT TITLE",
+                "extendedProps": {
+                    "dutyType": "std",
+                    "flagged": False,
+                    "pts": 1
+                }
+            })
+        desiredFlagLabel = "On-Call"
 
         # Create the gCalIntObj
         gCalIntObj = gCalIntegratinator()
@@ -919,7 +950,7 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         #  -- ACT --
 
         # Call the createGoogleCalendar method
-        result = gCalIntObj.exportScheduleToGoogleCalendar(mocked_creds, calendarId, schedule)
+        result = gCalIntObj.exportScheduleToGoogleCalendar(mocked_creds, calendarId, schedule, desiredFlagLabel)
 
         #  -- ASSERT --
         mocked_service.events().insert.assert_called()
@@ -932,9 +963,9 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         # Assert that the retun indicates that the export was successful
         self.assertEqual(1, result)
 
-    def test_exportScheduleToGoogleCalendar_BuildAppropriateEventObject(self):
-        # Test to ensure that exportScheduleToGoogleCalendar sends the entire schedule
-        #  to the Google Calendar API
+    def test_exportScheduleToGoogleCalendar_withFlaggedDuty_BuildAppropriateEventObject(self):
+        # Test to ensure that exportScheduleToGoogleCalendar formats the Event title and
+        #  description appropriately when the duty is flagged.
 
         #  -- ARRANGE --
         # Reset all of the mocked objects that will be used in this test
@@ -955,18 +986,85 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         calendarId = "TEST CALENDAR ID"
         startDate = "00/00/0000"
         title = "TEST TITLE"
-        schedule = [{"start": startDate, "title": title}]
+        schedule = [{
+            "start": startDate,
+            "title": title,
+            "extendedProps": {
+                "dutyType": "std",
+                "flagged": True,
+                "pts": 1
+            }
+        }]
+        desiredFlagLabel = "On-Call"
 
         # Create the gCalIntObj
         gCalIntObj = gCalIntegratinator()
 
         # Create an Event object that we would expect to see passed to events().insert()
-        expectedEventObj = Event(title, title+" has been assigned for duty.", startDate)
+        expectedEventObj = Event(
+            title + " ({})".format(desiredFlagLabel),
+            title + " has been assigned for {} duty.".format(desiredFlagLabel),
+            startDate
+        )
 
         #  -- ACT --
 
         # Call the createGoogleCalendar method
-        gCalIntObj.exportScheduleToGoogleCalendar(mocked_creds, calendarId, schedule)
+        gCalIntObj.exportScheduleToGoogleCalendar(mocked_creds, calendarId, schedule, desiredFlagLabel)
+
+        #  -- ASSERT --
+        mocked_service.events().insert.assert_called_with(calendarId=calendarId,
+                                                          body=expectedEventObj.getBody(),
+                                                          supportsAttachments=False)
+
+    def test_exportScheduleToGoogleCalendar_withoutFlaggedDuty_BuildAppropriateEventObject(self):
+        # Test to ensure that exportScheduleToGoogleCalendar formats the Event title and
+        #  description appropriately when the duty is NOT flagged.
+
+        #  -- ARRANGE --
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+        self.mocked_flowInstance.reset_mock()
+
+        # Mock the client credentials
+        mocked_creds = MagicMock(**{"valid": True})
+
+        # Get the mocked "service" that is returned from the build function
+        mocked_service = self.mocked_build("calendar", "v3", credentials=mocked_creds)
+
+        # Reset the mocked "build" function so that the last call does not
+        #  count towards it
+        self.mocked_build.reset_mock()
+
+        # Create the calendarId and schedule objects that get passed in
+        calendarId = "TEST CALENDAR ID"
+        startDate = "00/00/0000"
+        title = "TEST TITLE"
+        schedule = [{
+            "start": startDate,
+            "title": title,
+            "extendedProps": {
+                "dutyType": "std",
+                "flagged": False,
+                "pts": 1
+            }
+        }]
+        desiredFlagLabel = "On-Call"
+
+        # Create the gCalIntObj
+        gCalIntObj = gCalIntegratinator()
+
+        # Create an Event object that we would expect to see passed to events().insert()
+        expectedEventObj = Event(
+            title,
+            title + " has been assigned for duty.",
+            startDate
+        )
+
+        #  -- ACT --
+
+        # Call the createGoogleCalendar method
+        gCalIntObj.exportScheduleToGoogleCalendar(mocked_creds, calendarId, schedule, desiredFlagLabel)
 
         #  -- ASSERT --
         mocked_service.events().insert.assert_called_with(calendarId=calendarId,
@@ -998,7 +1096,16 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
 
         # Create the calendarId and schedule objects that get passed in
         calendarId = "TEST CALENDAR ID"
-        schedule = [{"start": "", "title": ""}]
+        schedule = [{
+            "start": "00/00/0000",
+            "title": "TEST EVENT TITLE",
+            "extendedProps": {
+                "dutyType": "std",
+                "flagged": False,
+                "pts": 1
+            }
+        }]
+        desiredFlagLabel = "On-Call"
 
         # Create the gCalIntObj
         gCalIntObj = gCalIntegratinator()
@@ -1006,7 +1113,7 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         #  -- ACT --
 
         # Call the createGoogleCalendar method
-        result = gCalIntObj.exportScheduleToGoogleCalendar(mocked_creds, calendarId, schedule)
+        result = gCalIntObj.exportScheduleToGoogleCalendar(mocked_creds, calendarId, schedule, desiredFlagLabel)
 
         #  -- ASSERT --
         # Assert that the Integration Object queried Google for the calendar

@@ -276,11 +276,13 @@ class TestIntegration_exportToGCal(unittest.TestCase):
         expectedEndDate = "1997-03-31"
         expectedToken = MagicMock()
         expectedID = "longCalendarID@calendar.google.com"
+        expectedFlaggedDutyLabel = "On-Call"
 
         # Configure the appGlobals.conn.cursor.execute mock to return different values
         #  after subsequent calls.
         self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
-            (expectedID, expectedToken),  # First call returns the token
+            (expectedID, expectedToken),    # First call returns the token
+            (expectedFlaggedDutyLabel,)     # Second call is for the flagged duty label
         ]
 
         # -- Act --
@@ -349,11 +351,13 @@ class TestIntegration_exportToGCal(unittest.TestCase):
         expectedID = "longCalendarID@calendar.google.com"
         expectedRegularDutyDict = [1, 2, 3, 4, 5]
         expectedBreakDutyDict = [6, 7, 8, 9, 10]
+        expectedFlaggedDutyLabel = "On-Call"
 
         # Configure the appGlobals.conn.cursor.execute mock to return different values
         #  after subsequent calls.
         self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
-            (expectedID, expectedToken),  # First call returns the token
+            (expectedID, expectedToken),    # First call returns the token
+            (expectedFlaggedDutyLabel,)     # Second call is for the flagged duty label
         ]
 
         # Configure the results of the mocked_getBreakDuties and mocked_getSchedule2 functions
@@ -388,7 +392,8 @@ class TestIntegration_exportToGCal(unittest.TestCase):
         self.mocked_integrationPart.exportScheduleToGoogleCalendar.assert_called_once_with(
             self.mocked_pickle.load(),
             expectedID,
-            expectedRegularDutyDict + expectedBreakDutyDict
+            expectedRegularDutyDict + expectedBreakDutyDict,
+            expectedFlaggedDutyLabel
         )
 
     @patch("integration.integrations.getSchedule2", autospec=True)
@@ -425,11 +430,13 @@ class TestIntegration_exportToGCal(unittest.TestCase):
         expectedRegularDutyDict = [1, 2, 3, 4, 5]
         expectedBreakDutyDict = [6, 7, 8, 9, 10]
         expectedResponse = stdRet(0, "Reconnect Google Calendar Account")
+        expectedFlaggedDutyLabel = "On-Call"
 
         # Configure the appGlobals.conn.cursor.execute mock to return different values
         #  after subsequent calls.
         self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
-            (expectedID, expectedToken),  # First call returns the token
+            (expectedID, expectedToken),    # First call returns the token
+            (expectedFlaggedDutyLabel,)     # Second call is for the flagged duty label
         ]
 
         # Configure the results of the mocked_getBreakDuties and mocked_getSchedule2 functions
@@ -493,11 +500,13 @@ class TestIntegration_exportToGCal(unittest.TestCase):
         expectedRegularDutyDict = [1, 2, 3, 4, 5]
         expectedBreakDutyDict = [6, 7, 8, 9, 10]
         expectedResponse = stdRet(1, "successful")
+        expectedFlaggedDutyLabel = "On-Call"
 
         # Configure the appGlobals.conn.cursor.execute mock to return different values
         #  after subsequent calls.
         self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
-            (expectedID, expectedToken),  # First call returns the token
+            (expectedID, expectedToken),    # First call returns the token
+            (expectedFlaggedDutyLabel,)     # Second call is for the flagged duty label
         ]
 
         # Configure the results of the mocked_getBreakDuties and mocked_getSchedule2 functions
