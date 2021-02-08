@@ -462,8 +462,14 @@ def exportToGCal():
 
     logging.debug("Exporting schedule to Google Calendar.")
 
+    # Get the label for flagged duties for the Hall from the DB
+    cur.execute("SELECT flag_duty_label FROM hall_settings WHERE res_hall_id = %s", (authedUser.hall_id(),))
+
+    # Load the flag label
+    flaggedDutyLabel = cur.fetchone()[0]
+
     # Pass the combined regular and break duty schedule to the Integratinator to be exported.
-    status = gCalInterface.exportScheduleToGoogleCalendar(token, gCalId, regSched + breakSched)
+    status = gCalInterface.exportScheduleToGoogleCalendar(token, gCalId, regSched + breakSched, flaggedDutyLabel)
 
     # If the export failed
     if status < 0:

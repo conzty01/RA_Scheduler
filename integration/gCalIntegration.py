@@ -186,7 +186,7 @@ class gCalIntegratinator:
 
         return created_calendar["id"]
 
-    def exportScheduleToGoogleCalendar(self, client_creds, calendarId, schedule):
+    def exportScheduleToGoogleCalendar(self, client_creds, calendarId, schedule, flaggedDutyLabel):
         # Export the provided schedule to Google Calendar
 
         # Check to make sure the credentials are valid
@@ -222,9 +222,22 @@ class gCalIntegratinator:
             logging.info("Exporting schedule")
             for duty in schedule:
 
+                # Check to see if this duty should be flagged
+                if "flagged" in duty["extendedProps"].keys() and duty["extendedProps"]["flagged"]:
+                    # If so, then set the summary and description messages to include the flagged
+                    #  duty label.
+
+                    summaryMsg = duty["title"] + " ({})".format(flaggedDutyLabel)
+                    descriptionMsg = duty["title"] + " has been assigned for {} duty.".format(flaggedDutyLabel)
+
+                else:
+                    # Otherwise, set the summary and description messages to be the default
+                    summaryMsg = duty["title"]
+                    descriptionMsg = duty["title"] + " has been assigned for duty."
+
                 # Create an Event Object that will handle assembling the event's body for the Google Calendar API
-                eb = Event(duty["title"],
-                           duty["title"] + " has been assigned for duty.",
+                eb = Event(summaryMsg,
+                           descriptionMsg,
                            duty["start"])
 
                 # Call the Google Calendar API to add the event
