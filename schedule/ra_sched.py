@@ -486,6 +486,20 @@ class Day:
         for slot in self.ras:
             yield slot
 
+    def nextDutySlotIsFlagged(self):
+        # Return whether or not the next open Duty Slot should be flagged
+
+        # Do we even need to worry about flagged duty slots?
+        if self.flagDutySlot:
+            # If so, then the value to be returned will be a boolean
+            #  of whether or not the next assigned duty slot will be
+            #  the last available duty slot for the Day.
+            return self.numberOnDuty() + 1 == self.numDutySlots
+
+        else:
+            # If not, then return False
+            return False
+
     # ------------------------
     # -- Supporting Classes --
     # ------------------------
@@ -711,24 +725,27 @@ class State:
     """ Object for storing information regarding the current "state" of the Scheduler's DFS traversal.
 
         Args:
-            day               (Day):     Day object for the current state.
-            raList            (lst):     A sorted list of unvisited RA candidates for the
-                                          given date.
-            lastDateAssigned  (dict):    A dictionary containing information regarding the
-                                          last day each of the RAs were assigned to duty
-            numDoubleDays     (dict):    A dictionary containing information regarding the
-                                          number of double days an RA has already been
-                                          assigned.
-            ldaTolerance      (int):     An integer denoting the number of days before an RA
-                                          should be considered for another duty.
-            nddTolerance      (float):   An integer denoting the number of double
-            predetermined     (bool):    Boolean denoting if this state can is allowed to
-                                          be changed/reevaluated. This is used to denote
-                                          whether this particular date/duty was preset.
+            day                 (Day):     Day object for the current state.
+            raList              (lst):     A sorted list of unvisited RA candidates for the
+                                            given date.
+            lastDateAssigned    (dict):    A dictionary containing information regarding the
+                                            last day each of the RAs were assigned to duty
+            numDoubleDays       (dict):    A dictionary containing information regarding the
+                                            number of double days an RA has already been
+                                            assigned.
+            ldaTolerance        (int):     An integer denoting the number of days before an RA
+                                            should be considered for another duty.
+            nddTolerance        (float):   An integer denoting the number of double
+            numFlagDuties       (dict):    A dictionary containing information regarding the
+                                            the number of flagged duties each RA has been
+                                            assigned for the month.
+            predetermined       (bool):    Boolean denoting if this state can is allowed to
+                                            be changed/reevaluated. This is used to denote
+                                            whether this particular date/duty was preset.
     """
 
     def __init__(self, day, raList, lastDateAssigned, numDoubleDays, ldaTolerance,
-                 nddTolerance, predetermined=False):
+                 nddTolerance, numFlagDuties, predetermined=False):
         # The current day of the state
         self.curDay = day
 
@@ -743,6 +760,9 @@ class State:
 
         # The Next Double Day Tolerance of the state
         self.nddTol = nddTolerance
+
+        # The Number of Flag Duties Dictionary of the state
+        self.nfd = numFlagDuties
 
         # Whether the state was predetermined
         self.predetermined = predetermined
@@ -763,7 +783,7 @@ class State:
             self.candList = self.getSortedWorkableRAs(raList, self.curDay, self.lda,
                                                       self.curDay.isDoubleDay(), self.ndd,
                                                       self.curDay.getPoints(), self.ldaTol,
-                                                      self.nddTol)
+                                                      self.nddTol, self.nfd)
 
     def __deepcopy__(self):
         # Return a new State object with all of the same attributes as this State
@@ -774,6 +794,7 @@ class State:
             self.ndd.copy(),
             self.ldaTol,
             self.nddTol,
+            self.nfd,
             self.predetermined
         )
 
@@ -783,7 +804,7 @@ class State:
 
     def restoreState(self):
         # Return the values of the current state
-        return self.curDay, self.candList, self.lda, self.ndd
+        return self.curDay, self.candList, self.lda, self.ndd, self.nfd
 
     def hasEmptyCandList(self):
         # Return a boolean denoting whether the candidate list is empty or not
@@ -826,44 +847,68 @@ class State:
         return candRA
 
     def getSortedWorkableRAs(self, raList, day, lastDateAssigned, isDoubleDay,
-                             numDoubleDays, datePts, ldaTolerance, nddTolerance):
+                             numDoubleDays, datePts, ldaTolerance, nddTolerance,
+                             numFlagDuties):
         # Create and return a new sorted list of RAs that are available for duty
         #  on the provided day.
 
         # Calculate the average number of points amongst RAs
+        # Set the sum to 0
         s = 0
+        # Iterate through all of the RAs and add up all of their points
         for ra in raList:
             s += ra.getPoints()
 
+        # Calculate the average number of points per RA
         ptsAvg = s / len(raList)
 
         # print("  Average Points:",ptsAvg)
 
-        # If isDoubleDay, calculate the average number of double days
-        #  assigned amongst RAs
+        # If isDoubleDay, calculate the average number of double-duty days
+        #  assigned amongst RAs as well as the average number of flagged
+        #  duties assigned amongst RAs.
         if isDoubleDay:
+            # Set the sum to 0
             s = 0
+            # Iterate through all of the ras in the numDoubleDays Dictionary
             for ra in numDoubleDays:
+                # Add up all of the number of double-duty days that have been assigned
                 s += numDoubleDays[ra]
 
+            # Calculate the average number of double-days per RA
             doubleDayAvg = s / len(numDoubleDays)
             # print("  Double Day Average:",doubleDayAvg)
 
-        else:
-            # Default to -1 when not a doubleDay
-            doubleDayAvg = -1
+            # Set the sum to 0
+            s = 0
+            # Iterate through all of the RAs in the numFlagDuties Dictionary
+            for ra in numFlagDuties:
+                # Add upp all of the number of flagged duties that have been assigned
+                s += numFlagDuties[ra]
 
-        retList = []    # List to be returned containing all workable RAs
+            # Calculate the average number of flagged duties per RA
+            flagDutyAvg = s / len(numFlagDuties)
+
+        else:
+            # Default to -1 when not a double-duty day
+            doubleDayAvg = -1
+            flagDutyAvg = -1
+
+        # Initialize the list to be returned containing all workable RAs
+        retList = []
 
         # print("  Removing candidates")
-        # Get rid of the unavailable candidates
+        # Iterate over the raList and get rid of the candidates who are not
+        #  available for duty on this date.
         for ra in raList:
             # print("    ",ra)
+            # Start by assuming this RA is a duty candidate
             isCand = True
 
             # If an RA has a conflict with the duty shift
             # print(day.getDate() in ra.getConflicts())
             if day.getDate() in ra.getConflicts():
+                # Then the RA is no longer a duty candidate
                 isCand = False
                 # print("      Removed: Conflict")
 
@@ -872,27 +917,30 @@ class State:
             #  assigned for duty yet this month.
             if lastDateAssigned[ra] != 0 and \
                day.getDate() - lastDateAssigned[ra] < ldaTolerance:
+                # Then the RA is no longer a duty candidate
                 isCand = False
                 # print("      Removed: Recent Duty")
 
             # If it is a double duty day
             if isDoubleDay:
-                # If an RA has been assigned more double day duties than
+                # If an RA has been assigned more double-duty day duties than
                 #  the nddTolerance over the doubleDayAvg
                 if numDoubleDays[ra] > ((1 + nddTolerance) * doubleDayAvg):
+                    # Then the RA is no longer a duty candidate
                     isCand = False
                     # print("      Removed: Double Day Overload")
 
             # If an RA meets the necessary criteria
             if isCand:
+                # Then append them to the candidate list
                 retList.append(ra)
                 # print("      Valid Candidate")
 
-
         def genCandScore(ra, day, lastDateAssigned, numDoubleDays, isDoubleDay,
-                        datePts ,doubleDayAvg, ptsAvg):
+                         datePts, doubleDayAvg, ptsAvg, numFlagDuties, flagDutyAvg):
             # This function generates the candidate score of the RA
-            #  For simplicity's sake, all variables aside from 'ra' are values
+            #  For simplicity's sake, all variables aside from 'ra' and 'day'
+            #  are values.
 
             # Base value is the number of points an RA has
             weight = ra.getPoints()
@@ -903,13 +951,19 @@ class State:
             weight += ra.getPoints() - ptsAvg
 
             # Subtract the number of days since the RA was last assigned
-            weight -= day - lastDateAssigned
+            weight -= day.getDate() - lastDateAssigned
 
-            # If it is a doubleDay
+            # If it is a double-duty day
             if isDoubleDay:
                 # Add the difference between the number of doubleDays an RA has
                 #  and the average number of doubleDays for all the RAs.
                 weight += numDoubleDays - doubleDayAvg
+
+                # If the next duty slot for the day will be a flagged duty slot,
+                if day.nextDutySlotIsFlagged():
+                    # Add the difference between the number of flagged duties an RA has
+                    #  and the average number of flag duties for all the RAs.
+                    weight += numFlagDuties - flagDutyAvg
 
             # If the number of points from this day will throw the RA over
             #  the average...
@@ -931,9 +985,10 @@ class State:
         #  scope that is beyond genCandScore. Additionally, these parameters can
         #  be recalculated for each RA that is passed to the lambda function.
         # print("  Sorting")
-        retList.sort(key=lambda ra: genCandScore(ra, day.getDate(), lastDateAssigned[ra],
+        retList.sort(key=lambda ra: genCandScore(ra, day, lastDateAssigned[ra],
                                                  numDoubleDays[ra], isDoubleDay, datePts,
-                                                 doubleDayAvg, ptsAvg))
+                                                 doubleDayAvg, ptsAvg, numFlagDuties[ra],
+                                                 flagDutyAvg))
 
         return retList
 
