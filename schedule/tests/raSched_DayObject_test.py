@@ -79,7 +79,7 @@ class TestDayObject(unittest.TestCase):
         self.assertTrue(hasattr(Day, "isDoubleDay"))
         self.assertTrue(hasattr(Day, "getRAs"))
         self.assertTrue(hasattr(Day, "setReview"))
-        self.assertTrue(hasattr(Day, "review"))
+        self.assertTrue(hasattr(Day, "getReview"))
         self.assertTrue(hasattr(Day, "combineDay"))
         self.assertTrue(hasattr(Day, "iterDutySlots"))
 
@@ -375,29 +375,129 @@ class TestDayObject(unittest.TestCase):
             #  is the expected RA object
             self.assertEqual(expectedRAList[i], ra)
 
-    def test_magicMethodLt_isTrueWhenThisDayIsLessThanOtherDay(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
+    def test_magicMethodLt_isTrueIfAndOnlyIfThisDateIsLessThanOtherDate(self):
+        # Test to ensure that the __lt__ magic method returns True when this Day
+        #  Object's date is less than the other Day Object's date.
 
-    def test_magicMethodLt_isFalseWhenThisDayIsNotLessThanOtherDay(self):
         # -- Arrange --
+
+        # Create the objets used in this test.
+
+        # Testing with Date Objects
+        desiredDate1 = date(2021, 2, 8)
+        desiredDOW1 = 0
+        desiredDate2 = date(2021, 2, 14)
+        desiredDOW2 = 6
+
+        # Testing with Int Objects
+        desiredDate3 = 12
+        desiredDOW3 = 0
+        desiredDate4 = 30
+        desiredDOW4 = 1
+
+        # Create the Day Objects
+        testDayObject1 = Day(desiredDate1, desiredDOW1)
+        testDayObject2 = Day(desiredDate2, desiredDOW2)
+
+        testDayObject3 = Day(desiredDate3, desiredDOW3)
+        testDayObject4 = Day(desiredDate4, desiredDOW4)
+
         # -- Act --
+
+        # Call the method being tested
+        dateResult1 = testDayObject1 < testDayObject2
+        dateResult2 = testDayObject2 < testDayObject1
+
+        intResult1 = testDayObject3 < testDayObject4
+        intResult2 = testDayObject4 < testDayObject3
+
         # -- Assert --
-        pass
+
+        # Assert that the first result of each set is True
+        self.assertTrue(dateResult1)
+        self.assertTrue(intResult1)
+
+        # Assert that the second result of each set is False
+        self.assertFalse(dateResult2)
+        self.assertFalse(intResult2)
 
     def test_magicMethodHash_returnsCombinationOfDateAndIDHashes(self):
+        # Test to ensure that the __hash__ magic method returns a hash that is the
+        #  combination of the Day Object's date and ID.
+
         # -- Arrange --
+
+        # Create the objets used in this test.
+        desiredDate1 = date(2021, 2, 8)
+        desiredDOW1 = 0
+        dayID1 = 14
+        desiredDate2 = date(2021, 2, 14)
+        desiredDOW2 = 6
+        dayID2 = 2
+
+        # Create the Day Objects
+        testDayObject1 = Day(desiredDate1, desiredDOW1, dayID=dayID1)
+        testDayObject2 = Day(desiredDate2, desiredDOW2, dayID=dayID2)
+        testDayObject3 = Day(desiredDate1, desiredDOW1, dayID=dayID1)
+
         # -- Act --
+
+        # Call the method being tested
+        result1 = hash(testDayObject1)
+        result2 = hash(testDayObject2)
+        result3 = hash(testDayObject3)
+
         # -- Assert --
-        pass
+
+        # Assert that result1 and result2 are different hashes
+        self.assertNotEqual(result1, result2)
+
+        # Assert that result1 and result3 are the same hash despite being different objects
+        self.assertEqual(result1, result3)
 
     def test_magicMethodEq_isTrueIfAndOnlyIfDateIsEqual(self):
+        # Test to ensure that the __eq__ magic method returns True if and only
+        #  if this Day Object's date is equal to the other Day Object's date.
+
         # -- Arrange --
+
+        # Create the objets used in this test.
+
+        # Testing with Date Objects
+        desiredDate1 = date(2021, 2, 8)
+        desiredDOW1 = 0
+        desiredDate2 = date(2021, 2, 14)
+        desiredDOW2 = 6
+
+        # Testing with Int Objects
+        desiredDate3 = 12
+        desiredDOW3 = 0
+        desiredDate4 = 12
+        desiredDOW4 = 0
+
+        # Create the Day Objects
+        testDayObject1 = Day(desiredDate1, desiredDOW1)
+        testDayObject2 = Day(desiredDate2, desiredDOW2)
+
+        testDayObject3 = Day(desiredDate3, desiredDOW3)
+        testDayObject4 = Day(desiredDate4, desiredDOW4)
+
         # -- Act --
+
+        # Call the method being tested
+        dateResult1 = testDayObject1 == testDayObject2
+        dateResult2 = testDayObject2 == testDayObject1
+
+        intResult1 = testDayObject3 == testDayObject4
+        intResult2 = testDayObject4 == testDayObject3
+
         # -- Assert --
-        pass
+
+        # Assert that the if and only if conditional applies
+        self.assertFalse(dateResult1)
+        self.assertFalse(dateResult2)
+        self.assertTrue(intResult2)
+        self.assertTrue(intResult1)
 
     def test_magicMethodContains_isTrueIfAndOnlyIfRAIsAssignedForDuty(self):
         # Test to ensure that the __contains__ method returns True if and only
@@ -425,119 +525,628 @@ class TestDayObject(unittest.TestCase):
         self.assertFalse(result2)
 
     def test_addRA_withDutySlotsLeft_addsRAToDutySlots(self):
-        ra1 = RA("R","E",99,1,date(2017,2,2))
-        ra2 = RA("C","K",98,1,date(2017,3,3))
-        self.day.addDutySlot()
-        preNum = self.day.numberOnDuty()
+        # Test to ensure that when the addRA method is called with an open duty
+        #  slot left, the method adds the RA to the Duty Slots.
 
-        self.day.addRA(ra1)
-        self.assertEqual(self.day.numberOnDuty(),preNum+1)
-        self.assertRaises(OverflowError,self.day.addRA,ra2)
+        # -- Arrange --
+
+        # Create the objects used in this test
+        ra1 = RA("R", "E", 99, 1, date(2017, 2, 2))
+        ra2 = RA("C", "K", 98, 1, date(2017, 3, 3))
+        desiredDate = date(2021, 2, 8)
+        desiredDOW = 0
+
+        # Create the Day object to be used in this test
+        testDayObject = Day(desiredDate, desiredDOW, numDutySlots=1, flagDutySlot=True)
+
+        # Verify the number on duty
+        numOnDuty = testDayObject.numDutySlots
+
+        # -- Act --
+
+        # Add an RA to the duty slot
+        testDayObject.addRA(ra1)
+
+        # -- Assert --
+
+        # Assert that we were able to add the RA to the duty slots
+        self.assertIn(ra1, testDayObject.getRAs())
+
+        # Assert that we have filled up the duty slots
+        self.assertEqual(numOnDuty, len(testDayObject.getRAs()))
 
     def test_addRA_withDutySlotsLeft_callsRaAddPointsMethod(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
+        # Test to ensure that when the addRA method is called with an open duty
+        #  slot left, the method adds the appropriate number of points to the
+        #  RA object.
 
-    def test_addRA_withNoDutySlotsLeft_throwsOveflowError(self):
         # -- Arrange --
+
+        # Create the objects used in this test
+        ra1 = RA("R", "E", 99, 1, date(2017, 2, 2), points=0)
+        desiredDate = date(2021, 2, 8)
+        desiredDOW = 0
+        desiredDayPoints = 12
+
+        # Create the Day object to be used in this test
+        testDayObject = Day(desiredDate, desiredDOW, numDutySlots=1, customPointVal=desiredDayPoints)
+
         # -- Act --
+
+        # Add an RA to the duty slot
+        testDayObject.addRA(ra1)
+
         # -- Assert --
-        pass
+
+        # Assert that we were able to add the RA to the duty slots
+        self.assertIn(ra1, testDayObject.getRAs())
+
+        # Assert that we have filled up the duty slots
+        self.assertEqual(ra1.getPoints(), desiredDayPoints)
+
+    def test_addRA_withNoDutySlotsLeft_throwsOverflowError(self):
+        # Test to ensure that when the addRA method is called with no open
+        #  duty slots, the method raises an OverflowError.
+
+        # -- Arrange --
+
+        # Create the objects used in this test
+        ra1 = RA("R", "E", 99, 1, date(2017, 2, 2))
+        ra2 = RA("C", "K", 98, 1, date(2017, 3, 3))
+        desiredDate = date(2021, 2, 8)
+        desiredDOW = 0
+
+        # Create the Day object to be used in this test
+        testDayObject = Day(desiredDate, desiredDOW, numDutySlots=1)
+
+        # -- Act --
+
+        # Add an RA to the duty slot
+        testDayObject.addRA(ra1)
+
+        # -- Assert --
+
+        # Assert that attempting to add another RA object results in
+        #  an OverflowError being raised.
+        self.assertRaises(OverflowError, testDayObject.addRA, ra2)
+
+        # Assert that attempting to add yet another RA object results in
+        #  an OverflowError being raised.
+        self.assertRaises(OverflowError, testDayObject.addRA, ra2)
 
     def test_addRAWithoutPoints_withDutySlotsLeft_addsRAToDutySlots(self):
+        # Test to ensure that when the addRaWithoutPoints is called with an
+        #  open duty slots left, the method adds the provided RA to the
+        #  duty slot.
+
         # -- Arrange --
+
+        # Create the objects used in this test
+        ra1 = RA("R", "E", 99, 1, date(2017, 2, 2))
+        ra2 = RA("C", "K", 98, 1, date(2017, 3, 3))
+        desiredDate = date(2021, 2, 8)
+        desiredDOW = 0
+
+        # Create the Day object to be used in this test
+        testDayObject = Day(desiredDate, desiredDOW, numDutySlots=1, flagDutySlot=True)
+
+        # Verify the number on duty
+        numOnDuty = testDayObject.numDutySlots
+
         # -- Act --
+
+        # Add an RA to the duty slot
+        testDayObject.addRaWithoutPoints(ra1)
+
         # -- Assert --
-        pass
+
+        # Assert that we were able to add the RA to the duty slots
+        self.assertIn(ra1, testDayObject.getRAs())
+
+        # Assert that we have filled up the duty slots
+        self.assertEqual(numOnDuty, len(testDayObject.getRAs()))
 
     def test_addRAWithoutPoints_withDutySlotsLeft_doesNotCallRAAddPointsMethod(self):
+        # Test to ensure that when the addRaWithoutPoints method is called with an open duty
+        #  slot left, the method does NOT add any number of points to the RA object.
+
         # -- Arrange --
+
+        # Create the objects used in this test
+        ra1 = RA("R", "E", 99, 1, date(2017, 2, 2), points=0)
+        desiredDate = date(2021, 2, 8)
+        desiredDOW = 0
+        desiredDayPoints = 12
+
+        # Create the Day object to be used in this test
+        testDayObject = Day(desiredDate, desiredDOW, numDutySlots=1, customPointVal=desiredDayPoints)
+
         # -- Act --
+
+        # Add an RA to the duty slot
+        testDayObject.addRaWithoutPoints(ra1)
+
         # -- Assert --
-        pass
+
+        # Assert that we were able to add the RA to the duty slots
+        self.assertIn(ra1, testDayObject.getRAs())
+
+        # Assert that we have filled up the duty slots
+        self.assertNotEqual(ra1.getPoints(), desiredDayPoints)
 
     def test_addRAWithoutPoints_withNoDutySlotsLeft_throwsOverflowError(self):
+        # Test to ensure that when the addRaWithoutPoints method is called with no open
+        #  duty slots, the method raises an OverflowError.
+
         # -- Arrange --
+
+        # Create the objects used in this test
+        ra1 = RA("R", "E", 99, 1, date(2017, 2, 2))
+        ra2 = RA("C", "K", 98, 1, date(2017, 3, 3))
+        desiredDate = date(2021, 2, 8)
+        desiredDOW = 0
+
+        # Create the Day object to be used in this test
+        testDayObject = Day(desiredDate, desiredDOW, numDutySlots=1)
+
         # -- Act --
+
+        # Add an RA to the duty slot
+        testDayObject.addRaWithoutPoints(ra1)
+
         # -- Assert --
-        pass
 
-    def test_removeRA_removesRAFromDutySlots(self):
-        ra = RA("D", "B", 97, 1, date(2017, 4, 4))
-        self.day.addDutySlot()
-        self.day.addRA(ra)
-        self.day.removeRA(ra)
+        # Assert that attempting to add another RA object results in
+        #  an OverflowError being raised.
+        self.assertRaises(OverflowError, testDayObject.addRA, ra2)
 
-        self.assertNotIn(ra, self.day.getRAs())
+        # Assert that attempting to add yet another RA object results in
+        #  an OverflowError being raised.
+        self.assertRaises(OverflowError, testDayObject.addRA, ra2)
+
+    def test_removeRA_removesAndReturnsRAFromDutySlots(self):
+        # Test to ensure that when the removeRA method is called, the method removes
+        #  and returns the provided RA from the duty slot.
+
+        # -- Arrange --
+
+        # Create the objects being used in this test
+        ra1 = RA("D", "B", 97, 1, date(2017, 4, 4))
+        ra2 = RA("T", "C", 40, 1, date(2017, 4, 4))
+        testDayObject = Day(date(2021, 2, 8), 0, ras=[ra1, ra2])
+
+        # -- Act --
+
+        # Call the method being tested
+        removedRA = testDayObject.removeRA(ra1)
+
+        # -- Assert --
+
+        # Assert that the RA object has been removed
+        self.assertNotIn(ra1, testDayObject.getRAs())
+
+        # Assert that the correct RA was returned
+        self.assertEqual(ra1, removedRA)
+
+        # Assert that the other RA still remains assigned to the duty slot
+        self.assertIn(ra2, testDayObject.getRAs())
+
+    def test_removeRA_whenUnableToFindRA_returnsNoneObject(self):
+        # Test to ensure that when the removeRA method is called and the provided RA
+        #  has not been assigned to the Day's duty slots, the method returns a None
+        #  object.
+
+        # -- Arrange --
+
+        # Create the objects being used in this test
+        ra1 = RA("D", "B", 97, 1, date(2017, 4, 4))
+        ra2 = RA("T", "C", 40, 1, date(2017, 4, 4))
+        ra3 = RA("A", "C", 0, 1, date(2017, 4, 5))
+        testDayObject = Day(date(2021, 2, 8), 0, ras=[ra1, ra2])
+
+        # -- Act --
+
+        # Call the method being tested
+        removedRA = testDayObject.removeRA(ra3)
+
+        # -- Assert --
+
+        # Assert that the RAs assigned to duty on this day have
+        #  not changed from this operation.
+        self.assertListEqual([ra1, ra2], testDayObject.getRAs())
+
+        # Assert that the result is None
+        self.assertIsNone(removedRA)
 
     def test_removeRA_callsRARemovePointsMethod(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
+        # Test to ensure that when the removeRA method is called, the method
+        #  calls the RA.removePoints() method passing it the pointVal of the
+        #  Day Object.
 
-    def test_removeAllRAs_removesAllRAsFromDutySlots(self):
         # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
 
-    def test_numberdutySlots_returnsNumberDutySlotsAttribute(self):
-        self.assertEqual(self.day.numberDutySlots(), self.day.numDutySlots)
+        # Create the objects being used in this test
+        raPoints = 12
+        dayPoints = 10
+        expectedRemainingRAPoints = raPoints - dayPoints
+        ra1 = RA("D", "B", 97, 1, date(2017, 4, 4), points=raPoints)
+        ra2 = RA("T", "C", 40, 1, date(2017, 4, 4), points=raPoints)
+        testDayObject = Day(date(2021, 2, 8), 0, ras=[ra1, ra2], customPointVal=dayPoints)
+
+        # -- Act --
+
+        # Call the method being tested
+        removedRA = testDayObject.removeRA(ra1)
+
+        # -- Assert --
+
+        # Assert that the RA object has been removed
+        self.assertNotIn(ra1, testDayObject.getRAs())
+
+        # Assert that the correct RA was returned
+        self.assertEqual(ra1, removedRA)
+
+        # Assert that the other RA still remains assigned to the duty slot
+        self.assertIn(ra2, testDayObject.getRAs())
+
+        # Assert that the returned RA has fewer points now
+        self.assertEqual(ra1.getPoints(), expectedRemainingRAPoints)
+
+    def test_removeAllRAs_removesAndReturnsAllRAsFromDutySlots(self):
+        # Test to ensure that when the removeAllRAs method is called, the method removes
+        #  and returns all RAs assigned from the duty slot.
+
+        # -- Arrange --
+
+        # Create the objects being used in this test
+        ra1 = RA("D", "B", 97, 1, date(2017, 4, 4))
+        ra2 = RA("T", "C", 40, 1, date(2017, 4, 4))
+        raList = [ra1, ra2]
+        testDayObject = Day(date(2021, 2, 8), 0, ras=raList)
+
+        # -- Act --
+
+        # Call the method being tested
+        removedRAs = testDayObject.removeAllRAs()
+
+        # -- Assert --
+
+        # Assert that the RAs were removed as expected
+        self.assertListEqual(raList, removedRAs)
+
+        # Assert that no RAs remain assigned for duty
+        self.assertListEqual([], testDayObject.getRAs())
+
+    def test_removeAllRAs_callsRARemovePointsMethod(self):
+        # Test to ensure that when the removeAllRAs method is called, the method
+        #  calls the RA.removePoints() method passing it the pointVal of the
+        #  Day Object.
+
+        # -- Arrange --
+
+        # Create the objects being used in this test
+        raPoints = 12
+        dayPoints = 10
+        expectedRemainingRAPoints = raPoints - dayPoints
+        ra1 = RA("D", "B", 97, 1, date(2017, 4, 4), points=raPoints)
+        ra2 = RA("T", "C", 40, 1, date(2017, 4, 4), points=raPoints)
+        raList = [ra1, ra2]
+        testDayObject = Day(date(2021, 2, 8), 0, ras=raList, customPointVal=dayPoints)
+
+        # -- Act --
+
+        # Call the method being tested
+        removedRAs = testDayObject.removeAllRAs()
+
+        # -- Assert --
+
+        # Assert that the RAs were removed as expected
+        self.assertListEqual(raList, removedRAs)
+
+        # Assert that no RAs remain assigned for duty
+        self.assertListEqual([], testDayObject.getRAs())
+
+        # Assert that each RA's points have been reduced by the expected amount.
+        for ra in removedRAs:
+            self.assertEqual(expectedRemainingRAPoints, ra.getPoints())
+
+    def test_removeAllRAs_whenNoRAsAssigned_returnsEmptyList(self):
+        # Test to ensure that when the removeAllRAs method is called and no RAs
+        #  are assigned for duty, the method returns an empty list
+
+        # -- Arrange --
+
+        # Create the objects being used in this test
+        testDayObject = Day(date(2021, 2, 8), 0)
+
+        # -- Act --
+
+        # Call the method being tested
+        removedRAs = testDayObject.removeAllRAs()
+
+        # -- Assert --
+
+        # Assert that the RAs were removed as expected
+        self.assertListEqual([], removedRAs)
+
+    def test_numberDutySlots_returnsNumberDutySlotsAttribute(self):
+        # Test to ensure that when the numberDutySlots method is called,
+        #  the method returns the number of duty slots the Day Object has.
+
+        # -- Arrange --
+
+        # Create the objects being used in this test
+        testDayObject0 = Day(date(2021, 2, 8), 0, numDutySlots=0)
+        testDayObject1 = Day(date(2021, 2, 8), 0, numDutySlots=1)
+        testDayObject2 = Day(date(2021, 2, 8), 0, numDutySlots=2)
+        testDayObject3 = Day(date(2021, 2, 8), 0, numDutySlots=3)
+
+        # -- Act --
+
+        # Call the method being tested
+        result0 = testDayObject0.numberDutySlots()
+        result1 = testDayObject1.numberDutySlots()
+        result2 = testDayObject2.numberDutySlots()
+        result3 = testDayObject3.numberDutySlots()
+
+        # -- Assert --
+
+        # Assert that we received the expected value
+        self.assertEqual(testDayObject0.numDutySlots, result0)
+        self.assertEqual(testDayObject1.numDutySlots, result1)
+        self.assertEqual(testDayObject2.numDutySlots, result2)
+        self.assertEqual(testDayObject3.numDutySlots, result3)
 
     def test_addDutySlot_addsProvidedNumberOfDutySlotsToNumDutySlots(self):
-        numSlots = self.day.numberDutySlots()
-        addNum = 2
-        self.day.addDutySlot(addNum)
-        self.assertEqual(self.day.numberDutySlots(),numSlots + addNum)
+        # Test to ensure that when the addDutySlot method is called, the method
+        #  increases the number of duty slots by the amount provided.
+
+        # -- Arrange --
+
+        # Create the objects used in this test
+        startSlotNum = 0
+        incrementAmount = 3
+        expectedResultingNumSlots = startSlotNum + incrementAmount
+        testDayObject = Day(date(2021, 2, 8), 0, numDutySlots=startSlotNum)
+
+        # -- Act --
+
+        # Call the method being tested
+        testDayObject.addDutySlot(incrementAmount)
+
+        # -- Assert --
+
+        # Assert that the Day Object has the expected number of duty slots
+        self.assertEqual(expectedResultingNumSlots, testDayObject.numberDutySlots())
 
     def test_getPoints_returnsPointValAttribute(self):
+        # Test to ensure that when the getPoints method is called, the method
+        #  returns the pointVal of the Day Object.
+
         # -- Arrange --
+
+        # Create the objects used in this test.
+        testDayObject0 = Day(date(2021, 2, 8), 0, customPointVal=1)
+        testDayObject1 = Day(date(2021, 2, 8), 0, customPointVal=2)
+        testDayObject2 = Day(date(2021, 2, 8), 0, customPointVal=3)
+        testDayObject3 = Day(date(2021, 2, 8), 0, customPointVal=50)
+
         # -- Act --
+
+        # Call the method being tested
+        result0 = testDayObject0.getPoints()
+        result1 = testDayObject1.getPoints()
+        result2 = testDayObject2.getPoints()
+        result3 = testDayObject3.getPoints()
+
         # -- Assert --
-        pass
+
+        # Assert that we received the expected result
+        self.assertEqual(1, result0)
+        self.assertEqual(2, result1)
+        self.assertEqual(3, result2)
+        self.assertEqual(50, result3)
 
     def test_getDate_returnsDateAttribute(self):
+        # Test to ensure that when the getDate method is called, the method
+        #  returns the date of the Day Object.
+
         # -- Arrange --
+
+        # Create the objects used in this test.
+        desiredDate1 = date(2021, 2, 8)
+        desiredDate2 = date(2021, 2, 9)
+        desiredDate3 = date(2021, 2, 3)
+        desiredDate4 = date(1996, 12, 3)
+
+        testDayObject0 = Day(desiredDate1, 0)
+        testDayObject1 = Day(desiredDate2, 1)
+        testDayObject2 = Day(desiredDate3, 2)
+        testDayObject3 = Day(desiredDate4, 1)
+
         # -- Act --
+
+        # Call the method being tested
+        result0 = testDayObject0.getDate()
+        result1 = testDayObject1.getDate()
+        result2 = testDayObject2.getDate()
+        result3 = testDayObject3.getDate()
+
         # -- Assert --
-        pass
+
+        # Assert that we received the expected result
+        self.assertEqual(desiredDate1, result0)
+        self.assertEqual(desiredDate2, result1)
+        self.assertEqual(desiredDate3, result2)
+        self.assertEqual(desiredDate4, result3)
 
     def test_getDoW_returnsDOWAttribute(self):
+        # Test to ensure that when the getDoW method is called, the method
+        #  returns the dow of the Day Object.
+
         # -- Arrange --
+
+        # Create the objects used in this test.
+        desiredDoW1 = 0
+        desiredDoW2 = 1
+        desiredDoW3 = 2
+        desiredDoW4 = 1
+
+        testDayObject0 = Day(date(2021, 2, 8), desiredDoW1)
+        testDayObject1 = Day(date(2021, 2, 9), desiredDoW2)
+        testDayObject2 = Day(date(2021, 2, 3), desiredDoW3)
+        testDayObject3 = Day(date(1996, 12, 3), desiredDoW4)
+
         # -- Act --
+
+        # Call the method being tested
+        result0 = testDayObject0.getDoW()
+        result1 = testDayObject1.getDoW()
+        result2 = testDayObject2.getDoW()
+        result3 = testDayObject3.getDoW()
+
         # -- Assert --
-        pass
+
+        # Assert that we received the expected result
+        self.assertEqual(desiredDoW1, result0)
+        self.assertEqual(desiredDoW2, result1)
+        self.assertEqual(desiredDoW3, result2)
+        self.assertEqual(desiredDoW4, result3)
 
     def test_getId_returnsIDAttribute(self):
+        # Test to ensure that when the getId method is called, the method
+        #  returns the ID of the Day Object.
+
         # -- Arrange --
+
+        # Create the objects used in this test
+        desiredID0 = 0
+        desiredID1 = 1
+        desiredID2 = 2
+        desiredID3 = 3
+
+        testDayObject0 = Day(date(2021, 2, 8), 0)
+        testDayObject1 = Day(date(2021, 2, 9), 1, dayID=desiredID1)
+        testDayObject2 = Day(date(2021, 2, 3), 2, dayID=desiredID2)
+        testDayObject3 = Day(date(1996, 12, 3), 1, dayID=desiredID3)
+
         # -- Act --
+
+        # Call the method being tested
+        result0 = testDayObject0.getId()
+        result1 = testDayObject1.getId()
+        result2 = testDayObject2.getId()
+        result3 = testDayObject3.getId()
+
         # -- Assert --
-        pass
+
+        # Assert that we received the expected results
+        self.assertEqual(desiredID0, result0)
+        self.assertEqual(desiredID1, result1)
+        self.assertEqual(desiredID2, result2)
+        self.assertEqual(desiredID3, result3)
 
     def test_numberOnDuty_returnsNumberOfRAsOnDuty(self):
-        num = self.day.numberOnDuty()
-        self.assertEqual(num, len(self.day.ras))
+        # Test to ensure that when the numberOnDuty method is called, the method
+        #  returns the number of RAs that have already been assigned for duty.
+
+        # -- Arrange --
+
+        # Create the objects being used in this test.
+        testDayObject = Day(date(2021, 2, 8), 0, numDutySlots=100)
+        ra = RA("D", "B", 97, 1, date(2017, 4, 4))
+
+        # -- Act --
+        # -- Assert --
+
+        # Begin going through a loop to test multiple results
+        for expectedNumberOnDuty in range(10):
+
+            # Assert that we have the expected number of RAs on Duty
+            self.assertEqual(expectedNumberOnDuty, testDayObject.numberOnDuty())
+
+            # Assign another RA for duty
+            testDayObject.addRA(ra)
 
     def test_isDoubleDay_returnsIsDDAttribute(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
+        # Test to ensure that when the isDoubleDay method is called, the method
+        #  returns the isdd attribute for the Day Object.
 
-    def test_setReview_setsReviewAttributeToTrue(self):
         # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
 
-    def test_review_returnsReviewAttribute(self):
-        # -- Arrange --
+        # Create the objects being used in this test.
+        testDayObject1 = Day(date(2021, 2, 8), 0, isDoubleDay=True)
+        testDayObject2 = Day(date(2021, 2, 8), 0, isDoubleDay=False)
+
         # -- Act --
+
+        # Call the method being tested
+        result1 = testDayObject1.isDoubleDay()
+        result2 = testDayObject2.isDoubleDay()
+
         # -- Assert --
-        pass
+
+        # Assert that we received the expected results
+        self.assertTrue(result1)
+        self.assertFalse(result2)
+
+    def test_setReview_setsReviewAttribute(self):
+        # Test to ensure that when the setReview method is called, the method
+        #  sets the Day's review attribute to the provided value.
+
+        # -- Arrange --
+
+        # Create the objects being used in this test.
+        testDayObject = Day(date(2021, 2, 8), 0)
+
+        # -- Act --
+
+        # Set the review attribute to True
+        testDayObject.setReview()
+
+        # Get the value of review
+        review1 = testDayObject.review
+
+        # Set the review attribute to False
+        testDayObject.setReview(False)
+
+        # Get the value of review
+        review2 = testDayObject.review
+
+        # -- Assert --
+
+        # Assert that we received the expected results
+        self.assertTrue(review1)
+        self.assertFalse(review2)
+
+    def test_getReview_returnsReviewAttribute(self):
+        # Test to ensure that when the getReview method is called, the method
+        #  returns the value of the review attribute.
+
+        # -- Arrange --
+
+        # Create the objects being used in this test.
+        testDayObject = Day(date(2021, 2, 8), 0)
+
+        # -- Act --
+
+        # Set the review attribute to True
+        testDayObject.setReview()
+
+        # Get the value of review
+        review1 = testDayObject.getReview()
+
+        # Set the review attribute to False
+        testDayObject.setReview(False)
+
+        # Get the value of review
+        review2 = testDayObject.getReview()
+
+        # -- Assert --
+
+        # Assert that we received the expected results
+        self.assertTrue(review1)
+        self.assertFalse(review2)
 
     def test_getRAs_returnsRAsOnDuty(self):
         # Test to ensure that the getRAs function returns a list of
