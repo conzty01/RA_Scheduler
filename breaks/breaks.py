@@ -227,7 +227,10 @@ def getBreakDuties(hallId=None, start=None, end=None, showAllColors=False, raId=
     #             "title": <ra.first_name + " " + ra.last_name>,
     #             "start": <string value of day.date associated with the scheduled duty>,
     #             "color": <ra.color OR #2C3E50 if allColors/showAllColors is False>,
-    #             "extendedProps": {"dutyType":"brk"}
+    #             "extendedProps": {
+    #                 "dutyType": "brk",
+    #                 "pts": <break_duties.point_val>
+    #             }
     #         },
     #         ...
     #     ]
@@ -264,7 +267,8 @@ def getBreakDuties(hallId=None, start=None, end=None, showAllColors=False, raId=
 
     # Query the DB for the break duty schedule for the given hall and timeframe.
     cur.execute("""
-        SELECT ra.first_name, ra.last_name, ra.color, ra.id, TO_CHAR(day.date, 'YYYY-MM-DD')
+        SELECT ra.first_name, ra.last_name, ra.color, ra.id, TO_CHAR(day.date, 'YYYY-MM-DD'),
+               break_duties.point_val
         FROM break_duties JOIN day ON (day.id=break_duties.day_id)
                           JOIN month ON (month.id=break_duties.month_id)
                           JOIN ra ON (ra.id=break_duties.ra_id)
@@ -305,7 +309,10 @@ def getBreakDuties(hallId=None, start=None, end=None, showAllColors=False, raId=
             "title": row[0] + " " + row[1],
             "start": row[4],
             "color": c,
-            "extendedProps": {"dutyType": "brk"}
+            "extendedProps": {
+                "dutyType": "brk",
+                "pts": row[5]
+            }
         })
     
     # Close the DB cursor
@@ -584,6 +591,8 @@ def changeBreakDuty():
     #     newId    <int> -  an integer representing the ra.id for the RA that should be
     #                        assigned for the break duty.
     #     dateStr  <str> -  a string representing the date of the break duty.
+    #     pts      <int> -  an integer denoting the number of points that should be
+    #                        awarded for this duty.
     #
     #  This method returns a standard return object whose status is one of the
     #  following:
@@ -636,7 +645,7 @@ def changeBreakDuty():
     # Query the DB for the RA that is currently assigned to the duty. This query also helps
     #  to ensure that the currently assigned RA is on the same staff as the client.
     cur.execute("""
-        SELECT id 
+        SELECT ra.id 
         FROM ra JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
         WHERE ra.first_name LIKE %s 
         AND ra.last_name LIKE %s 
@@ -672,12 +681,13 @@ def changeBreakDuty():
     # Otherwise, if we have all the necessary pieces,
     #  go ahead and update the appropriate break duty
     cur.execute("""UPDATE break_duties
-                   SET ra_id = %s
+                   SET ra_id = %s,
+                       point_val = %s
                    WHERE hall_id = %s
                    AND day_id = %s
                    AND month_id = %s
                    AND ra_id = %s
-                """, (raParams[0], authedUser.hall_id(), dayID, monthId, oldRA[0]))
+                """, (raParams[0], data["pts"], authedUser.hall_id(), dayID, monthId, oldRA[0]))
 
     # Commit the changes to the DB
     ag.conn.commit()

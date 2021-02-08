@@ -57,3 +57,13 @@
 #raListContainer {
     float: right;
 }
+
+.fa-plus, .fa-arrow-right {
+    margin: auto;
+    position: relative;
+    top: 60%;
+}
+
+.fa-container {
+    text-align: center;
+}

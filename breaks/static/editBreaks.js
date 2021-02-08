@@ -71,7 +71,10 @@ function eventClicked(info) {
     prevRA.value = info.event.title;
 
     let selector = document.getElementById("editModalNextRA");
-    selector.value = info.event.backgroundColor;
+    selector.value = info.event.title;
+
+    // Load the duty's point value
+    document.getElementById("editDatePts").value = info.event.extendedProps.pts;
 
     // Set the ID of the clicked element so that we can find the event later
     info.el.id = "lastEventSelected";
@@ -263,16 +266,18 @@ function saveModal() {
     // id = "selector_xxxxxx"
     // There are 9 characters before the id
     let newId = parseInt(selRAOption.id.slice(9));
+    let pts = parseInt(document.getElementById("editDatePts").value);
 
     // If the new RA is different than the current RA,
-    if (oldName !== newName) {
+    if (typeof selRAOption !== "undefined") {
         // Save the changes
         console.log(dateStr+": Switching RA '"+oldName+"' for '"+newName+"'");
 
         let changeParams = {
             dateStr: dateStr,
             newId: newId,
-            oldName: oldName
+            oldName: oldName,
+            pts: pts
         }
 
         appConfig.base.callAPI("changeBreakDuty", changeParams,
