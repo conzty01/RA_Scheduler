@@ -82,6 +82,7 @@ class TestDayObject(unittest.TestCase):
         self.assertTrue(hasattr(Day, "getReview"))
         self.assertTrue(hasattr(Day, "combineDay"))
         self.assertTrue(hasattr(Day, "iterDutySlots"))
+        self.assertTrue(hasattr(Day, "nextDutySlotIsFlagged"))
 
     def test_DayObject_hasExpectedProperties(self):
         # Test to ensure that the Day object has the following properties:
@@ -1277,6 +1278,56 @@ class TestDayObject(unittest.TestCase):
             self.assertIn(ra, desiredRAList)
 
         self.assertEqual(len(desiredRAList), len(testDay1.ras))
+
+    def test_DayObject_nextDutySlotIsFlagged_withFlagDutySlotSet_returnsTrueIfNextAssignedDutySlotIsFlagged(self):
+        # Test to ensure that when calling the nextDutySlotIsFlagged method with the flagDutySlot attribute
+        #  set, returns True if and only if the next Duty Slot that is to be assigned will be flagged.
+
+        # -- Arrange --
+
+        # Create the objects used in this test.
+        testDayObject1 = Day(date(2021, 2, 8), 0, numDutySlots=1, flagDutySlot=True)
+        testDayObject2 = Day(date(2021, 2, 8), 0, numDutySlots=2, flagDutySlot=True)
+        testDayObject3 = Day(date(2021, 2, 8), 0, numDutySlots=9, flagDutySlot=True)
+
+        # -- Act --
+
+        # Call the method being tested
+        result1 = testDayObject1.nextDutySlotIsFlagged()
+        result2 = testDayObject2.nextDutySlotIsFlagged()
+        result3 = testDayObject3.nextDutySlotIsFlagged()
+
+        # -- Assert --
+
+        # Assert that we received the expected results
+        self.assertTrue(result1)
+        self.assertFalse(result2)
+        self.assertFalse(result3)
+
+    def test_DayObject_nextDutySlotIsFlagged_withFlagDutySlotNotSet_returnsFalse(self):
+        # Test to ensure that when calling the nextDutySlotIsFlagged method with the flagDutySlot attribute
+        #  set to False, returns False every time.
+
+        # -- Arrange --
+
+        # Create the objects used in this test.
+        testDayObject1 = Day(date(2021, 2, 8), 0, numDutySlots=1, flagDutySlot=False)
+        testDayObject2 = Day(date(2021, 2, 8), 0, numDutySlots=2, flagDutySlot=False)
+        testDayObject3 = Day(date(2021, 2, 8), 0, numDutySlots=9, flagDutySlot=False)
+
+        # -- Act --
+
+        # Call the method being tested
+        result1 = testDayObject1.nextDutySlotIsFlagged()
+        result2 = testDayObject2.nextDutySlotIsFlagged()
+        result3 = testDayObject3.nextDutySlotIsFlagged()
+
+        # -- Assert --
+
+        # Assert that we received the expected results
+        self.assertFalse(result1)
+        self.assertFalse(result2)
+        self.assertFalse(result3)
 
     # -------------------------------
     # -- Tests for DutySlot Object --
