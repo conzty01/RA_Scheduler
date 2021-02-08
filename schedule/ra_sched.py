@@ -360,7 +360,6 @@ class Day:
 
         # First, remove the Day's points from the RA's total.
 
-
         # Iterate through the duty slots and find the RA
 
         # Set some variables used in finding the RA
@@ -458,7 +457,7 @@ class Day:
         # Set this day as being in need of manual review.
         self.review = val
 
-    def review(self):
+    def getReview(self):
         # Return whether or not this day should be manually
         #  reviewed.
         return self.review
