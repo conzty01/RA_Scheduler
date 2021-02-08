@@ -104,15 +104,48 @@ class TestScheduleObject(unittest.TestCase):
         pass
 
     def test_addRA_assignsProvidedRAToDutyOnProvidedDate(self):
-        ra = RA("T", "C", 1234, 4321, date(2017, 1, 1))
-        d = 1
-        preAdd = self.sched.getDate(d).getRAs()
-        self.sched.addRA(d, ra)
-        postAdd = self.sched.getDate(d).getRAs()
+        # Test to ensure that the addRA function assigns the provided
+        #  RA for duty on the provided date.
 
-        self.assertEqual(preAdd, postAdd)
-        self.assertRaises(IndexError, self.sched.addRA, 0, ra)
-        self.assertRaises(IndexError, self.sched.addRA, 100, ra)
+        # -- Arrange --
+
+        # Create the objects that will be used in this test
+        desiredYear = 2021
+        desiredMonth = 2
+        testScheduleObject = Schedule(desiredYear, desiredMonth)
+        desiredRAObject = RA("Test", "User", 1, 2019, date(2017, 1, 1))
+        desiredUpperBound = 5
+
+        # -- Act --
+
+        # Run through this process a few times
+        for dateIndex in range(1, desiredUpperBound):
+            # Execute the addRA function
+            testScheduleObject.addRA(dateIndex, desiredRAObject)
+
+        # -- Assert --
+
+        # Assert that the RA was added to the appropriate days
+        totalPoints = 0
+        for dateIndex in range(1, desiredUpperBound):
+            # Load the date from the Schedule Object
+            d = testScheduleObject.getDate(dateIndex)
+
+            # Add the points to the total
+            totalPoints += d.getPoints()
+
+            # Ensure that the RA was added to the duty
+            self.assertIn(desiredRAObject, d.getRAs())
+
+        # Assert that the appropriate number of points have
+        #  been added to the RA Object
+        self.assertEqual(totalPoints, desiredRAObject.getPoints())
+
+        # Also assert that index errors are raised if inappropriate indexes
+        #  are used.
+        self.assertRaises(IndexError, self.sched.addRA, -40, desiredRAObject)
+        self.assertRaises(IndexError, self.sched.addRA, 0, desiredRAObject)
+        self.assertRaises(IndexError, self.sched.addRA, 100, desiredRAObject)
 
     def test_removeRA_removesProvidedRAFromProvidedDuty(self):
         ra = RA("R", "K", 5, 1, date(2017, 2, 2))

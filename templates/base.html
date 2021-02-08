@@ -22,10 +22,21 @@
         {%- block body %}
         {%- block navbar %}
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-          <a class="navbar-brand" href="#">{{ hall_name }}</a>
-          <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-          </button>
+            <a class="navbar-brand {{ 'dropdown-toggle' if linkedHalls|length > 1 }}" href="#" id="hallSelector" {{ "data-toggle=dropdown" if linkedHalls|length > 1 }} aria-haspopup="true" aria-expanded="false">
+                {{ hall_name }}
+            </a>
+            {% if linkedHalls|length > 1: %}
+            <div class="dropdown-menu" aria-labelledby="hallSelector">
+                {% for hallDict in linkedHalls: %}
+                {% if hallDict['name'] != hall_name %}
+                <a class="dropdown-item" href="{{url_for('staff_bp.changeHallView', newHallID=hallDict['id']) }}">{{ hallDict["name"] }}</a>
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
+            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
 
           <div class="collapse navbar-collapse" id="navbarSupportedContent">
             <ul class="navbar-nav w-100">

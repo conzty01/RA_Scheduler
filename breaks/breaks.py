@@ -27,14 +27,14 @@ def editBreaks():
     #  Required Auth Level: >= AHD
 
     # Get the user's info from our database
-    userDict = getAuth()
+    authedUser = getAuth()
 
     # If the user is not at least an AHD
-    if userDict["auth_level"] < 2:
+    if authedUser.auth_level() < 2:
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
-        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
+        logging.info("User Not Authorized - RA: {}".format(authedUser.ra_id()))
 
         # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
@@ -48,7 +48,7 @@ def editBreaks():
 
     # Call getRABreakStats to get information on the number of Break Duty
     # points each RA has for the current school year
-    bkDict = getRABreakStats(userDict["hall_id"], start, end)
+    bkDict = getRABreakStats(authedUser.hall_id(), start, end)
 
     logging.debug(str(bkDict))
 
@@ -56,13 +56,17 @@ def editBreaks():
     cur = ag.conn.cursor()
 
     # Query the DB for the necessary information about the staff's RAs.
-    cur.execute("SELECT id, first_name, last_name, color FROM ra WHERE hall_id = %s ORDER BY first_name ASC;",
-                (userDict["hall_id"],))
+    cur.execute("""
+        SELECT ra.id, ra.first_name, ra.last_name, ra.color
+        FROM ra JOIN staff_membership AS sm ON (ra.id = sm.ra_id)
+        WHERE sm.res_hall_id = %s ORDER BY ra.first_name ASC;
+        """, (authedUser.hall_id(),))
 
     # Render and return the appropriate template
-    return render_template("breaks/editBreaks.html", raList=cur.fetchall(), auth_level=userDict["auth_level"],
+    return render_template("breaks/editBreaks.html", raList=cur.fetchall(), auth_level=authedUser.auth_level(),
                            bkDict=sorted(bkDict.items(), key=lambda x: x[1]["name"].split(" ")[1]),
-                           curView=3, opts=ag.baseOpts, hall_name=userDict["hall_name"])
+                           curView=3, opts=ag.baseOpts, hall_name=authedUser.hall_name(),
+                           linkedHalls=authedUser.getAllAssociatedResHalls())
 
 
 # ---------------------
@@ -116,9 +120,9 @@ def getRABreakStats(hallId=None, startDateStr=None, endDateStr=None):
         #  this method was called from a remote client.
 
         # Get the user's information from the database
-        userDict = getAuth()
+        authedUser = getAuth()
         # Set the value of hallId from the userDict
-        hallId = userDict["hall_id"]
+        hallId = authedUser.hall_id()
 
         # Get the startDateStr and endDateStr from the request arguments
         startDateStr = request.args.get("start")
@@ -145,8 +149,9 @@ def getRABreakStats(hallId=None, startDateStr=None, endDateStr=None):
                          AND day.date BETWEEN TO_DATE(%s, 'YYYY-MM-DD')
                                           AND TO_DATE(%s, 'YYYY-MM-DD')
                         GROUP BY rid) AS numQuery
+                        JOIN staff_membership AS sm ON (sm.ra_id = numQuery.rid)
                    RIGHT JOIN ra ON (numQuery.rid = ra.id)
-                   WHERE ra.hall_id = %s;""", (hallId, startDateStr, endDateStr, hallId))
+                   WHERE sm.res_hall_id = %s;""", (hallId, startDateStr, endDateStr, hallId))
 
     # Load the results from the DB
     raList = cur.fetchall()
@@ -246,11 +251,11 @@ def getBreakDuties(hallId=None, start=None, end=None, showAllColors=False, raId=
         showAllColors = request.args.get("allColors") == "true"
 
         # Get the user's information from the database
-        userDict = getAuth()
+        authedUser = getAuth()
         # Set the value of the hallId from the userDict
-        hallId = userDict["hall_id"]
+        hallId = authedUser.hall_id()
         # Set the value of the raId from the userDict
-        raId = userDict["ra_id"]
+        raId = authedUser.ra_id()
         # Mark that this method was not called from the server
         fromServer = False
 
@@ -341,16 +346,16 @@ def addBreakDuty():
     #     -1 : the save was unsuccessful
 
     # Get the user's information from the database
-    userDict = getAuth()
+    authedUser = getAuth()
 
     # Check to see if the user is authorized to alter RA information
     # If the user is not at least an AHD
-    if userDict["auth_level"] < 2:
+    if authedUser.auth_level() < 2:
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
         logging.info("User Not Authorized - RA: {} attempted to add Break Duty for Hall: {}"
-                     .format(userDict["ra_id"], userDict["hall_id"]))
+                     .format(authedUser.ra_id(), authedUser.hall_id()))
 
         # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
@@ -365,17 +370,16 @@ def addBreakDuty():
     dateStr = data["dateStr"]
 
     # Set the hallId from the hall associated with the requesting user.
-    hallId = userDict["hall_id"]
+    hallId = authedUser.hall_id()
 
     # Create a DB cursor
     cur = ag.conn.cursor()
 
     # Validate that the RA desired exists and belongs to the same hall
-    cur.execute("SELECT id FROM ra WHERE id = %s AND hall_id = %s;", (selRAID, hallId))
+    cur.execute("SELECT ra_id FROM staff_membership WHERE ra_id = %s AND res_hall_id = %s;", (selRAID, hallId))
 
     # Load the result from the DB
     raId = cur.fetchone()
-
 
     if raId is None:
         # If the result is None, then the desired RA is not associated with
@@ -467,7 +471,7 @@ def deleteBreakDuty():
     #     -1 : the save was unsuccessful
 
     # Get the user's information from the database
-    userDict = getAuth()
+    authedUser = getAuth()
 
     # Load the data provided by the client
     data = request.json
@@ -479,16 +483,16 @@ def deleteBreakDuty():
     dateStr = data["dateStr"]
 
     # Set the hallId from the hall associated with the requesting user.
-    hallId = userDict["hall_id"]
+    hallId = authedUser.hall_id()
 
     # Check to see if the user is authorized to remove the staff member
     # If the user is not at least an AHD
-    if userDict["auth_level"] < 2:
+    if authedUser.auth_level() < 2:
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
         logging.info("User Not Authorized - RA: {}attempted to add Break Duty for Hall: {}"
-                     .format(userDict["ra_id"], userDict["hall_id"]))
+                     .format(authedUser.ra_id(), authedUser.hall_id()))
 
         # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
@@ -504,8 +508,12 @@ def deleteBreakDuty():
 
     # Query the DB for the RA that was provided and ensure that the RA is in the same hall as
     #  the requesting user.
-    cur.execute("SELECT id FROM ra WHERE first_name LIKE %s AND last_name LIKE %s AND hall_id = %s;",
-                (fName, lName, userDict["hall_id"]))
+    cur.execute("""
+        SELECT ra.id 
+        FROM ra JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
+        WHERE ra.first_name LIKE %s 
+        AND ra.last_name LIKE %s 
+        AND sm.res_hall_id = %s;""", (fName, lName, authedUser.hall_id()))
 
     # Load the result from the DB
     raId = cur.fetchone()
@@ -585,16 +593,16 @@ def changeBreakDuty():
     #     -1 : the save was unsuccessful
 
     # Get the user's information from the database
-    userDict = getAuth()
+    authedUser = getAuth()
 
     # Check to see if the user is authorized to change break duty assignments
     # If the user is not at least an AHD
-    if userDict["auth_level"] < 2:
+    if authedUser.auth_level() < 2:
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
         logging.info("User Not Authorized - RA: {} attempted to alter break duty for Hall: {}"
-                     .format(userDict["ra_id"], userDict["hall_id"]))
+                     .format(authedUser.ra_id(), authedUser.hall_id()))
 
         # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
@@ -604,7 +612,7 @@ def changeBreakDuty():
 
     logging.debug("New RA id: {}".format(data["newId"]))
     logging.debug("Old RA Name: {}".format(data["oldName"]))
-    logging.debug("HallID: {}".format(userDict["hall_id"]))
+    logging.debug("HallID: {}".format(authedUser.hall_id()))
 
     # The dateStr is expected to be in the following format: x/x/xxxx
     logging.debug("DateStr: {}".format(data["dateStr"]))
@@ -619,16 +627,21 @@ def changeBreakDuty():
 
     # Query the DB for the RA that is desired to be on the duty. This query also helps
     #  to ensure that the requested RA is on the same staff as the client.
-    cur.execute("SELECT id FROM ra WHERE id = %s AND hall_id = %s;",
-                (data["newId"], userDict["hall_id"]))
+    cur.execute("SELECT ra_id FROM staff_membership WHERE ra_id = %s AND res_hall_id = %s;",
+                (data["newId"], authedUser.hall_id()))
 
     # Load the results from the DB
     raParams = cur.fetchone()
 
     # Query the DB for the RA that is currently assigned to the duty. This query also helps
     #  to ensure that the currently assigned RA is on the same staff as the client.
-    cur.execute("SELECT id FROM ra WHERE first_name LIKE %s AND last_name LIKE %s AND hall_id = %s",
-                (fName, lName, userDict["hall_id"]))
+    cur.execute("""
+        SELECT id 
+        FROM ra JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
+        WHERE ra.first_name LIKE %s 
+        AND ra.last_name LIKE %s 
+        AND sm.res_hall_id = %s""",
+                (fName, lName, authedUser.hall_id()))
 
     # Load the results from the DB
     oldRA = cur.fetchone()
@@ -664,7 +677,7 @@ def changeBreakDuty():
                    AND day_id = %s
                    AND month_id = %s
                    AND ra_id = %s
-                """, (raParams[0], userDict["hall_id"], dayID, monthId, oldRA[0]))
+                """, (raParams[0], authedUser.hall_id(), dayID, monthId, oldRA[0]))
 
     # Commit the changes to the DB
     ag.conn.commit()

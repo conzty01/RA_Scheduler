@@ -125,16 +125,16 @@ def returnGCalRedirect():
     #  connecting a Google Calendar Account on Google's side of things.
 
     # Get the user's information from the database
-    userDict = getAuth()
+    authedUser = getAuth()
 
     # Check to see if the user is authorized to view these settings
     # If the user is not at least an HD
-    if userDict["auth_level"] < 3:
+    if authedUser.auth_level() < 3:
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
         logging.info("User Not Authorized - RA: {} attempted to connect Google Calendar for Hall: {} -G"
-                     .format(userDict["ra_id"], userDict["hall_id"]))
+                     .format(authedUser.ra_id(), authedUser.hall_id()))
 
         # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
@@ -145,12 +145,12 @@ def returnGCalRedirect():
     # Create the DB cursor object
     cur = ag.conn.cursor()
 
-    logging.debug("Checking for previously associated calendar for Hall: {}".format(userDict["hall_id"]))
+    logging.debug("Checking for previously associated calendar for Hall: {}".format(authedUser.hall_id()))
 
     # Check to see if a Google Calendar has been associated with the given hall.
     #  This is used to keep track of the incoming authorization response
     cur.execute("SELECT id FROM google_calendar_info WHERE res_hall_id = %s",
-                (userDict["hall_id"], ))
+                (authedUser.hall_id(), ))
 
     # Load the result from the DB
     res = cur.fetchone()
@@ -164,7 +164,7 @@ def returnGCalRedirect():
 
         # Execute the INSERT statement to add the new row into the DB
         cur.execute("""INSERT INTO google_calendar_info (res_hall_id, auth_state) 
-                        VALUES (%s, %s)""", (userDict["hall_id"], state))
+                        VALUES (%s, %s)""", (authedUser.hall_id(), state))
 
     else:
         # Otherwise update the entry for the appropriate hall with the current state
@@ -173,7 +173,7 @@ def returnGCalRedirect():
         cur.execute("UPDATE google_calendar_info SET auth_state = %s WHERE id = %s",
                     (state, res[0]))
 
-    logging.debug("Committing auth state to DB for Hall: {}".format(userDict["hall_id"]))
+    logging.debug("Committing auth state to DB for Hall: {}".format(authedUser.hall_id()))
 
     # Commit the changes to the DB
     ag.conn.commit()
@@ -205,17 +205,17 @@ def handleGCalAuthResponse():
     #  the hall_bp.manHall page.
 
     # Get the user's information
-    userDict = getAuth()
+    authedUser = getAuth()
 
     # Check to see if the user is authorized to add Google Calendar
     #  Integration.
     # If the user is not at least an HD
-    if userDict["auth_level"] < 3:
+    if authedUser.auth_level() < 3:
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
         logging.info("User Not Authorized - RA: {} attempted to connect Google Calendar for Hall: {} -R"
-                     .format(userDict["ra_id"], userDict["hall_id"]))
+                     .format(authedUser.ra_id(), authedUser.hall_id()))
 
         # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
@@ -250,7 +250,7 @@ def handleGCalAuthResponse():
 
     # Get the credentials from the Google Calendar Interface
     creds = gCalInterface.handleAuthResponse(request.url,
-                                             ag.baseOpts["HOST_URL"] + "int/GCalAuth")
+                                             ag.baseOpts["HOST_URL"] + "/int/GCalAuth")
 
     logging.debug("Received user credentials from interface")
 
@@ -281,7 +281,7 @@ def handleGCalAuthResponse():
     if res["status"] < 0:
         # Then log the occurrence
         logging.warning("Unable to Create Google Calendar for Hall: {} - Rolling back changes"
-                        .format(userDict["hall_id"]))
+                        .format(authedUser.hall_id()))
 
         # And rollback the Google Calendar Account Connection creation
         ag.conn.rollback()
@@ -295,7 +295,7 @@ def handleGCalAuthResponse():
         # Otherwise commit the changes made to the DB
         ag.conn.commit()
 
-    logging.info("Google Calendar Creation complete for Hall: {}".format(userDict["hall_id"]))
+    logging.info("Google Calendar Creation complete for Hall: {}".format(authedUser.hall_id()))
 
     # Return the user back to the Manage Hall page
     return redirect(url_for("hall_bp.manHall"))
@@ -317,17 +317,17 @@ def disconnectGoogleCalendar():
     #  the hall_bp.manHall page.
 
     # Get the user's information from the database
-    userDict = getAuth()
+    authedUser = getAuth()
 
     # Check to see if the user is authorized to disconnect Google
     #  Calendar Integration.
     # If the user is not at least an HD
-    if userDict["auth_level"] < 3:
+    if authedUser.auth_level() < 3:
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
         logging.info("User Not Authorized - RA: {} attempted to disconnect Google Calendar for Hall: {}"
-                     .format(userDict["ra_id"], userDict["hall_id"]))
+                     .format(authedUser.ra_id(), authedUser.hall_id()))
 
         # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
@@ -336,7 +336,7 @@ def disconnectGoogleCalendar():
     cur = ag.conn.cursor()
 
     # Delete the google_calendar_info record for the appropriate hall.
-    cur.execute("DELETE FROM google_calendar_info WHERE res_hall_id = %s;", (userDict["hall_id"], ))
+    cur.execute("DELETE FROM google_calendar_info WHERE res_hall_id = %s;", (authedUser.hall_id(), ))
 
     # Commit the changes to the DB
     ag.conn.commit()
@@ -378,16 +378,16 @@ def exportToGCal():
     #     -1 : the export was unsuccessful
 
     # Get the user's information
-    userDict = getAuth()
+    authedUser = getAuth()
 
     # Check to see if the user is authorized to export to Google Calendar
     # If the user is not at least an AHD
-    if userDict["auth_level"] < 2:
+    if authedUser.auth_level() < 2:
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
         logging.info("User Not Authorized - RA: {} attempted to export schedule to Google Calendar"
-                     .format(userDict["ra_id"]))
+                     .format(authedUser.ra_id()))
 
         # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
@@ -396,14 +396,14 @@ def exportToGCal():
 
     # First up, get the Google Calendar credentials from the DB
 
-    logging.debug("Retrieving Google Calendar info from DB for Hall: {}".format(userDict["hall_id"]))
+    logging.debug("Retrieving Google Calendar info from DB for Hall: {}".format(authedUser.hall_id()))
 
     # Create a DB cursor
     cur = ag.conn.cursor()
 
     # Query the DB for the calendar_id and token associated with the user's Res Hall
     cur.execute("SELECT calendar_id, token FROM google_calendar_info WHERE res_hall_id = %s",
-                (userDict["hall_id"], ))
+                (authedUser.hall_id(), ))
 
     # Load the data from the query
     res = cur.fetchone()
@@ -413,7 +413,7 @@ def exportToGCal():
         # If we returned no values, the Res Hall has not completed the
         #  authorization process.
 
-        logging.info("No Google Calendar token found for Hall: {}".format(userDict["hall_id"]))
+        logging.info("No Google Calendar token found for Hall: {}".format(authedUser.hall_id()))
 
         # Close the DB cursor
         cur.close()
@@ -453,12 +453,12 @@ def exportToGCal():
     # Get the appropriate regular-duty schedule from the DB
     #  Should be able to leverage existing RADSA API
     regSched = getSchedule2(start=start, end=end,
-                            hallId=userDict["hall_id"], showAllColors=True)
+                            hallId=authedUser.hall_id(), showAllColors=True)
 
     # Get the appropriate break-duty schedule from the DB
     #  Should be able to leverage existing RADSA API
     breakSched = getBreakDuties(start=start, end=end,
-                                hallId=userDict["hall_id"], showAllColors=True)
+                                hallId=authedUser.hall_id(), showAllColors=True)
 
     logging.debug("Exporting schedule to Google Calendar.")
 
@@ -468,7 +468,8 @@ def exportToGCal():
     # If the export failed
     if status < 0:
         # Log that an error was encountered for future reference.
-        logging.warning("Error: {} encountered while exporting to Google Calendar for Hall: {}".format(status, userDict["hall_id"]))
+        logging.warning("Error: {} encountered while exporting to Google Calendar for Hall: {}"
+                        .format(status, authedUser.hall_id()))
 
         # Close the DB cursor
         cur.close()

@@ -3,6 +3,7 @@ from scheduleServer import app
 import unittest
 
 from breaks.breaks import getRABreakStats
+from helperFunctions.helperFunctions import AuthenticatedUser
 
 
 class TestBreakBP_getRABreakStats(unittest.TestCase):
@@ -73,16 +74,22 @@ class TestBreakBP_getRABreakStats(unittest.TestCase):
         # Set the ra_id and hall_id to values that can be used throughout
         self.user_ra_id = 1
         self.user_hall_id = 1
+        self.associatedResHalls = [
+            {
+                "id": self.user_hall_id,
+                "auth_level": self.mocked_authLevel,
+                "name": "Test Hall"
+            }
+        ]
 
-        # Assemble all of the desired values into a dict object.
-        self.helper_getAuth = {
-            "uEmail": "test@email.com",
-            "ra_id": self.user_ra_id,
-            "name": "Test User",
-            "hall_id": self.user_hall_id,
-            "auth_level": self.mocked_authLevel,
-            "hall_name": "Test Hall"
-        }
+        # Assemble all of the desired values into an Authenticated User Object
+        self.helper_getAuth = AuthenticatedUser(
+            "test@email.com",
+            self.user_ra_id,
+            "Test",
+            "User",
+            self.associatedResHalls
+        )
 
         # Create the patcher for the getAuth() method
         self.patcher_getAuth = patch("breaks.breaks.getAuth", autospec=True)
@@ -213,8 +220,9 @@ class TestBreakBP_getRABreakStats(unittest.TestCase):
                          AND day.date BETWEEN TO_DATE(%s, 'YYYY-MM-DD')
                                           AND TO_DATE(%s, 'YYYY-MM-DD')
                         GROUP BY rid) AS numQuery
+                        JOIN staff_membership AS sm ON (sm.ra_id = numQuery.rid)
                    RIGHT JOIN ra ON (numQuery.rid = ra.id)
-                   WHERE ra.hall_id = %s;""",
+                   WHERE sm.res_hall_id = %s;""",
             (self.user_hall_id, desiredStartStr, desiredEndStr, self.user_hall_id)
         )
 
@@ -304,8 +312,9 @@ class TestBreakBP_getRABreakStats(unittest.TestCase):
                          AND day.date BETWEEN TO_DATE(%s, 'YYYY-MM-DD')
                                           AND TO_DATE(%s, 'YYYY-MM-DD')
                         GROUP BY rid) AS numQuery
+                        JOIN staff_membership AS sm ON (sm.ra_id = numQuery.rid)
                    RIGHT JOIN ra ON (numQuery.rid = ra.id)
-                   WHERE ra.hall_id = %s;""",
+                   WHERE sm.res_hall_id = %s;""",
             (self.user_hall_id, desiredStartStr, desiredEndStr, self.user_hall_id)
         )
 

@@ -42,6 +42,7 @@ function initIndexCal() {
                         allColors: 0
                     };
                 },
+                eventDataTransform: displayFlaggedDuties
             },
             {
                 url: '/breaks/api/getBreakDuties',
@@ -58,8 +59,32 @@ function initIndexCal() {
             }
         ],
         lazyFetching: true,
-        fixedWeekCount: false
+        fixedWeekCount: false,
+        eventOrder: "flagged, title"
     });
+}
+
+function displayFlaggedDuties(event) {
+    // Add the
+
+    // Create a temporary event object
+    let tmp = {};
+
+    // Translate all of the event information
+    //  over to the new event object
+    tmp.id = event.id;
+    tmp.title = event.title;
+    tmp.start = event.start;
+    tmp.color = event.color;
+    tmp.extendedProps = event.extendedProps;
+
+    // Check to see if this event has been flagged
+    if (tmp.extendedProps.flagged) {
+       tmp.display = "list-item";
+    }
+
+    // Return the transformed event object
+    return tmp;
 }
 
 function addSchedule( dutyList ){

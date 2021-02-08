@@ -84,3 +84,13 @@
 .bootstrap-select > button {
     height: 100%;
 }
+
+.fa-plus, .fa-arrow-right {
+    margin: auto;
+    position: relative;
+    top: 60%;
+}
+
+.fa-container {
+    text-align: center;
+}

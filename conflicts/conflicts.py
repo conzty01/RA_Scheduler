@@ -27,11 +27,12 @@ def conflicts():
     #  Required Auth Level: None
 
     # Authenticate the user against the DB
-    userDict = getAuth()
+    authedUser = getAuth()
 
     # Render and return the appropriate template.
-    return render_template("conflicts/conflicts.html", auth_level=userDict["auth_level"], curView=2,
-                           opts=ag.baseOpts, hall_name=userDict["hall_name"])
+    return render_template("conflicts/conflicts.html", auth_level=authedUser.auth_level(), curView=2,
+                           opts=ag.baseOpts, hall_name=authedUser.hall_name(),
+                           linkedHalls=authedUser.getAllAssociatedResHalls())
 
 
 @conflicts_bp.route("/editCons")
@@ -44,15 +45,15 @@ def editCons():
     #  Required Auth Level: >= AHD
 
     # Authenticate the user against the DB
-    userDict = getAuth()
+    authedUser = getAuth()
 
     # If the user is not at least an AHD
-    if userDict["auth_level"] < 2:
+    if authedUser.auth_level() < 2:
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
         logging.info("User Not Authorized - RA: {} attempted to reach Edit Conflicts page for Hall: {}"
-                     .format(userDict["ra_id"], userDict["hall_id"]))
+                     .format(authedUser.ra_id(), authedUser.hall_id()))
 
         # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
@@ -61,12 +62,16 @@ def editCons():
     cur = ag.conn.cursor()
 
     # Query the database for a list of all of the RAs for the user's staff.
-    cur.execute("SELECT id, first_name, last_name, color FROM ra WHERE hall_id = %s ORDER BY first_name ASC;",
-                (userDict["hall_id"],))
+    cur.execute("""
+        SELECT ra.id, first_name, last_name, color 
+        FROM ra JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
+        WHERE sm.res_hall_id = %s 
+        ORDER BY ra.first_name ASC;""", (authedUser.hall_id(),))
 
     # Render and return the appropriate template.
-    return render_template("conflicts/editCons.html", raList=cur.fetchall(), auth_level=userDict["auth_level"],
-                           curView=3, opts=ag.baseOpts, hall_name=userDict["hall_name"])
+    return render_template("conflicts/editCons.html", raList=cur.fetchall(), auth_level=authedUser.auth_level(),
+                           curView=3, opts=ag.baseOpts, hall_name=authedUser.hall_name(),
+                           linkedHalls=authedUser.getAllAssociatedResHalls())
 
 
 # ---------------------
@@ -99,15 +104,15 @@ def getUserConflicts():
     #     }
 
     # Get the user's information from the database
-    userDict = getAuth()
+    authedUser = getAuth()
 
     # Get the monthNum and year from the request arguments
     monthNum = int(request.args.get("monthNum"))
     year = int(request.args.get("year"))
 
     # Set the value of hallId and raID from the userDict
-    hallId = userDict["hall_id"]
-    raID = userDict["ra_id"]
+    hallId = authedUser.hall_id()
+    raID = authedUser.ra_id()
 
     logging.debug("MonthNum: {}, Year: {}, HallID: {}, raID: {}".format(monthNum, year, hallId, raID))
 
@@ -211,21 +216,21 @@ def getRAConflicts(startDateStr=None, endDateStr=None, raID=-1, hallID=None):
         #  this method was called from a remote client.
 
         # Get the user's info from our database
-        userDict = getAuth()
+        authedUser = getAuth()
 
         # If the user is not at least an AHD
-        if userDict["auth_level"] < 2:
+        if authedUser.auth_level() < 2:
             # Then they are not permitted to see this view.
 
             # Log the occurrence.
             logging.info("User Not Authorized - RA: {} attempted to view staff conflicts for Hall: {}"
-                         .format(userDict["ra_id"], userDict["hall_id"]))
+                         .format(authedUser.ra_id(), authedUser.hall_id()))
 
             # Notify the user that they are not authorized.
             return jsonify(stdRet(-1, "NOT AUTHORIZED"))
 
         # Set the value of hallId from the userDict
-        hallID = userDict["hall_id"]
+        hallID = authedUser.hall_id()
 
         # Get the raID from the request arguments
         raID = request.args.get("raID")
@@ -268,7 +273,8 @@ def getRAConflicts(startDateStr=None, endDateStr=None, raID=-1, hallID=None):
         FROM conflicts JOIN day ON (conflicts.day_id = day.id)
                        JOIN month ON (month.id=day.month_id) 
                        JOIN ra ON (ra.id = conflicts.ra_id)
-        WHERE ra.hall_id = %s
+                       JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
+        WHERE sm.res_hall_id = %s
         AND month.year >= TO_DATE(%s, 'YYYY-MM')
         AND month.year <= TO_DATE(%s, 'YYYY-MM') 
         {};""".format(addStr), (hallID, startDateStr, endDateStr))
@@ -345,21 +351,21 @@ def getNumberConflicts(hallId=None, monthNum=None, year=None):
         #  this method was called from a remote client.
 
         # Get the user's information from the database
-        userDict = getAuth()
+        authedUser = getAuth()
 
         # If the user is not at least an AHD
-        if userDict["auth_level"] < 2:
+        if authedUser.auth_level() < 2:
             # Then they are not permitted to see this view.
 
             # Log the occurrence.
             logging.info("User Not Authorized - RA: {} attempted to view staff conflicts numbers for Hall: {}"
-                         .format(userDict["ra_id"], userDict["hall_id"]))
+                         .format(authedUser.ra_id(), authedUser.hall_id()))
 
             # Notify the user that they are not authorized.
             return jsonify(stdRet(-1, "NOT AUTHORIZED"))
 
         # Set the value of the hallId from the userDict
-        hallId = userDict["hall_id"]
+        hallId = authedUser.hall_id()
 
         # Get the value for monthNum and year from the request arguments.
         monthNum = request.args.get("monthNum")
@@ -382,7 +388,8 @@ def getNumberConflicts(hallId=None, monthNum=None, year=None):
             WHERE month.num = %s
             AND EXTRACT(YEAR FROM month.year) = %s
         ) AS cons ON (cons.ra_id = ra.id)
-        WHERE ra.hall_id = %s
+        JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
+        WHERE sm.res_hall_id  = %s
         GROUP BY ra.id;
     """, (monthNum, year, hallId))
 
@@ -435,7 +442,7 @@ def processConflicts():
     logging.debug("Process Conflicts")
 
     # Get the user's information from the database
-    userDict = getAuth()
+    authedUser = getAuth()
 
     logging.debug(str(request.json))
 
@@ -451,13 +458,13 @@ def processConflicts():
     #  remote user.
     cur.execute("""SELECT TO_CHAR(day.date, 'YYYY-MM-DD')
                    FROM conflicts JOIN day ON (conflicts.day_id = day.id)
-                                  JOIN ra ON (ra.id = conflicts.ra_id)
+                                  JOIN staff_membership AS sm ON (sm.ra_id = conflicts.ra_id)
                                   JOIN month ON (month.id = day.month_id)
                    WHERE num = %s
                    AND EXTRACT(YEAR from year) = %s
-                   AND hall_id = %s
-                   AND ra.id = %s;""",
-                (monthNum, year, userDict["hall_id"], userDict["ra_id"]))
+                   AND sm.res_hall_id = %s
+                   AND sm.ra_id = %s;""",
+                (monthNum, year, authedUser.hall_id(), authedUser.ra_id()))
 
     # Load the results from the DB
     prevConflicts = cur.fetchall()
@@ -500,7 +507,7 @@ def processConflicts():
                                 JOIN day ON (conflicts.day_id = day.id)
                             WHERE TO_CHAR(day.date, 'YYYY-MM-DD') IN %s
                             AND conflicts.ra_id = %s
-                        );""", (tuple(deleteSet), userDict["ra_id"]))
+                        );""", (tuple(deleteSet), authedUser.ra_id()))
 
         # Set the flag to indicate that we have made changes to the DB
         madeChanges = True
@@ -515,7 +522,7 @@ def processConflicts():
         cur.execute("""INSERT INTO conflicts (ra_id, day_id)
                         SELECT %s, day.id FROM day
                         WHERE TO_CHAR(day.date, 'YYYY-MM-DD') IN %s
-                        """, (userDict["ra_id"], tuple(addSet)))
+                        """, (authedUser.ra_id(), tuple(addSet)))
 
         # Set the flag to indicate that we have made changes to the DB
         madeChanges = True

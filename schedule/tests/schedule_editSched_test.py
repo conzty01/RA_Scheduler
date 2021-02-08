@@ -3,7 +3,7 @@ from scheduleServer import app
 from flask import Response
 import unittest
 
-from helperFunctions.helperFunctions import stdRet, getCurSchoolYear
+from helperFunctions.helperFunctions import stdRet, getCurSchoolYear, AuthenticatedUser
 
 
 class TestSchedule_editSched(unittest.TestCase):
@@ -74,16 +74,22 @@ class TestSchedule_editSched(unittest.TestCase):
         # Set the ra_id and hall_id to values that can be used throughout
         self.user_ra_id = 1
         self.user_hall_id = 1
+        self.associatedResHalls = [
+            {
+                "id": self.user_hall_id,
+                "auth_level": self.mocked_authLevel,
+                "name": "Test Hall"
+            }
+        ]
 
-        # Assemble all of the desired values into a dict object.
-        self.helper_getAuth = {
-            "uEmail": "test@email.com",
-            "ra_id": self.user_ra_id,
-            "name": "Test User",
-            "hall_id": self.user_hall_id,
-            "auth_level": self.mocked_authLevel,
-            "hall_name": "Test Hall"
-        }
+        # Assemble all of the desired values into an Authenticated User Object
+        self.helper_getAuth = AuthenticatedUser(
+            "test@email.com",
+            self.user_ra_id,
+            "Test",
+            "User",
+            self.associatedResHalls
+        )
 
         # Create the patcher for the getAuth() method
         self.patcher_getAuth = patch("schedule.schedule.getAuth", autospec=True)
@@ -220,14 +226,23 @@ class TestSchedule_editSched(unittest.TestCase):
         self.assertFalse(resp.is_json)
 
         # Assert that the getRABreakStats Function was called as expected
-        mocked_getRAStats.assert_called_once_with(self.helper_getAuth["hall_id"], start, end)
+        mocked_getRAStats.assert_called_once_with(self.helper_getAuth.hall_id(), start, end)
 
         # Assert that the last call to the DB was queried as expected.
         #  In this instance, we are unable to use the assert_called_once_with
         #  method as this function calls out to
         self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
-            "SELECT id, first_name, last_name, color FROM ra WHERE hall_id = %s ORDER BY first_name ASC;",
-            (self.helper_getAuth["hall_id"],)
+            """
+        SELECT ra.id, ra.first_name, ra.last_name, ra.color 
+        FROM ra JOIN staff_membership AS sm ON (ra.id = sm.ra_id)
+        WHERE sm.res_hall_id = %s 
+        ORDER BY ra.first_name ASC;""", (self.helper_getAuth.hall_id(),)
+        )
+
+        # Assert that at least one call to the DB was queried as expected.
+        self.mocked_appGlobals.conn.cursor().execute.assert_any_call(
+            "SELECT duty_flag_label FROM hall_settings WHERE res_hall_id = %s",
+            (self.user_hall_id,)
         )
 
     @patch("schedule.schedule.getRAStats", autospec=True)
@@ -246,6 +261,14 @@ class TestSchedule_editSched(unittest.TestCase):
 
         # Set the auth_level of this session to 2
         self.mocked_authLevel.return_value = 2
+
+        # Create some of the objects used in this test
+        expectedDutyFlagLabel = "Test Label"
+        expectedCustomSettingsDict = {"dutyFlagLabel": expectedDutyFlagLabel}
+
+        # Configure the expectedCustomSettingsDict so that it is as it would
+        #  appear to the renderer
+        expectedCustomSettingsDict.update(self.mocked_appGlobals.baseOpts)
 
         # Generate the various objects that will be used in this test
         expectedRAList = []
@@ -270,6 +293,12 @@ class TestSchedule_editSched(unittest.TestCase):
             mocked_getRAStats.return_value.items(),
             key=lambda kv: kv[1]["name"].split(" ")[1]
         )
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedDutyFlagLabel, )   # First query is for the call to hall_settings
+        ]
 
         # Configure the appGlobals.conn.cursor.execute mock to return different values
         #  after subsequent calls.
@@ -298,8 +327,17 @@ class TestSchedule_editSched(unittest.TestCase):
         #  In this instance, we are unable to use the assert_called_once_with
         #  method as this function calls out to
         self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
-            "SELECT id, first_name, last_name, color FROM ra WHERE hall_id = %s ORDER BY first_name ASC;",
-            (self.helper_getAuth["hall_id"],)
+            """
+        SELECT ra.id, ra.first_name, ra.last_name, ra.color 
+        FROM ra JOIN staff_membership AS sm ON (ra.id = sm.ra_id)
+        WHERE sm.res_hall_id = %s 
+        ORDER BY ra.first_name ASC;""", (self.helper_getAuth.hall_id(),)
+        )
+
+        # Assert that at least one call to the DB was queried as expected.
+        self.mocked_appGlobals.conn.cursor().execute.assert_any_call(
+            "SELECT duty_flag_label FROM hall_settings WHERE res_hall_id = %s",
+            (self.user_hall_id,)
         )
 
         # Assert that the appropriate information was passed to the render_template function
@@ -309,6 +347,7 @@ class TestSchedule_editSched(unittest.TestCase):
             auth_level=self.mocked_authLevel,
             ptDict=ptDictSorted,
             curView=3,
-            opts=self.mocked_appGlobals.baseOpts,
-            hall_name=self.helper_getAuth["hall_name"]
+            opts=expectedCustomSettingsDict,
+            hall_name=self.helper_getAuth.hall_name(),
+            linkedHalls=self.helper_getAuth.getAllAssociatedResHalls()
         )
