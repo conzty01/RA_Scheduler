@@ -204,22 +204,30 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
 
         lastDateAssigned = {}   # <- Dictionary of RA keys to lists of dates
         numDoubleDays = {}      # <- Dictionary of RA keys to int of the number of double duty days
+        numFlagDuties = {}      # <- Dictionary of RA keys to int of the number of flagged duty days
 
         # Initialize lastDateAssigned and numDoubleDays for each RA
         for r in raList:
             numDoubleDays[r] = 0
             lastDateAssigned[r] = 0
+            numFlagDuties[r] = 0
 
-        # Prime the lastDateAssigned from the prevDuties
-        for ra, dDate in prevDuties:
+        # Prime the lastDateAssigned and lastFlagDateAssigned from the prevDuties
+        for ra, dDate, flagged in prevDuties:
             lastDateAssigned[ra] = dDate
-        return numDoubleDays, lastDateAssigned
 
-    # Create and prime the numDoubleDays and lastDateAssigned dicts with the
+            # If the duty was a flagged duty...
+            if flagged:
+                # Then add the duty to the lastFlagDateAssigned dictionary.
+                numFlagDuties[ra] += 1
+
+        return numDoubleDays, lastDateAssigned, numFlagDuties
+
+    # Create and prime the numDoubleDays, lastDateAssigned, and lastFlagDateAssigned dicts with the
     #  data from the previous month's schedule.
-    numDoubleDays, lastDateAssigned = createPreviousDuties(raList,prevDuties)
+    numDoubleDays, lastDateAssigned, numFlagDuties = createPreviousDuties(raList, prevDuties)
 
-    # Create calendar
+    # Create the calendar
     logging.debug(" Creating Calendar")
     cal = createDateDict(year, month, noDutyDates, doubleDays, doublePts, doubleNum,
                          doubleDates, doubleDateNum, doubleDatePts, breakDuties,
@@ -233,6 +241,7 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
     #       1: The sorted, unvisited RA candidate list
     #       2: The lastDateAssigned dictionary
     #       3: The numDoubleDays dictionary
+    #       4: The numFlagDuties dictionary
 
     logging.debug(" Initializing First Day")
     # Initialize the first day
@@ -240,7 +249,7 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
 
     # Prime the stack with the first day and raList
     startState = State(curDay, raList, lastDateAssigned, numDoubleDays,
-                       ldaTolerance, nddTolerance)
+                       ldaTolerance, nddTolerance, numFlagDuties)
 
     stateStack.push(startState)
 
@@ -251,7 +260,7 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
 
         # Get the current working state off the stack
         curState = stateStack.pop()
-        curDay, candList, lastDateAssigned, numDoubleDays = curState.restoreState()
+        curDay, candList, lastDateAssigned, numDoubleDays, numFlagDuties = curState.restoreState()
 
         # logging.debug("""  -- TOP OF SCHEDULE LOOP --
         #                     Current Day: {}
@@ -287,7 +296,7 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
 
         # Generate the next State
         nextState = State(nextDay, raList, lastDateAssigned, numDoubleDays,
-                          ldaTolerance, nddTolerance)
+                          ldaTolerance, nddTolerance, numFlagDuties)
 
         # If there is at least one RA that can be scheduled for the next day,
         #  or the current day is the end of the month, then add the next day to

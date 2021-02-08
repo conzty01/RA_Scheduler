@@ -489,7 +489,8 @@ def runScheduler():
     # Query the DB for the last 'x' number of duties from the previous month so that we
     #  do not schedule RAs back-to-back between months.
     cur.execute("""SELECT ra.first_name, ra.last_name, ra.id, sm.res_hall_id,
-                          sm.start_date, day.date - TO_DATE(%s, 'YYYY-MM-DD')
+                          sm.start_date, day.date - TO_DATE(%s, 'YYYY-MM-DD'),
+                          duties.flagged
                   FROM duties JOIN day ON (day.id=duties.day_id)
                               JOIN ra ON (ra.id=duties.ra_id)
                               JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
@@ -517,8 +518,11 @@ def runScheduler():
     prevDuties = cur.fetchall()
 
     # Create shell RA objects that will hash to the same value as their respective RA objects.
-    #  This hash is how we map the equivalent RA objects together.
-    prevRADuties = [(RA(d[0], d[1], d[2], d[3], d[4]), d[5]) for d in prevDuties]
+    #  This hash is how we map the equivalent RA objects together. These shell RAs will be put
+    #  in a tuple containing the RA, the number of days from the duty date to the beginning of
+    #  the next month, and a boolean whether or not that duty was flagged.
+    #     Ex: (RA Shell, No. days since last duty, Whether the duty is flagged)
+    prevRADuties = [(RA(d[0], d[1], d[2], d[3], d[4]), d[5], d[6]) for d in prevDuties]
 
     logging.debug("PREVIOUS DUTIES: {}".format(prevRADuties))
 
