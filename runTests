@@ -1,2 +1,4 @@
 coverage run -m unittest discover -p "*_test.py"
+coverage html -d coverageHTML
 coverage report
+echo "Execute Command 'firefox coverageHTML/index.html' to view the HTML coverage report."
