@@ -1,7 +1,7 @@
 from flask import render_template, request, jsonify, Blueprint
 from flask_login import login_required
 from psycopg2 import IntegrityError
-from schedule import scheduler4_0
+from schedule import scheduler4_1
 from schedule.ra_sched import RA
 import copy as cp
 import calendar
@@ -31,14 +31,14 @@ def editSched():
     #  Required Auth Level: >= AHD
 
     # Authenticate the user against the DB
-    userDict = getAuth()
+    authedUser = getAuth()
 
     # If the user is not at least an AHD
-    if userDict["auth_level"] < 2:
+    if authedUser.auth_level() < 2:
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
-        logging.info("User Not Authorized - RA: {}".format(userDict["ra_id"]))
+        logging.info("User Not Authorized - RA: {}".format(authedUser.ra_id()))
 
         # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
@@ -49,22 +49,40 @@ def editSched():
 
     # Call getRAStats to get information on the number of Duty
     # points each RA has for the current school year
-    ptDict = getRAStats(userDict["hall_id"], start, end)
+    ptDict = getRAStats(authedUser.hall_id(), start, end)
 
     logging.debug("Point Dict: {}".format(ptDict))
 
     # Create a DB cursor
     cur = ag.conn.cursor()
 
+    # Load the necessary hall settings from the DB
+    cur.execute("SELECT duty_flag_label FROM hall_settings WHERE res_hall_id = %s", (authedUser.hall_id(),))
+
+    # Create a custom settings dictionary
+    custSettings = {
+        "dutyFlagLabel": cur.fetchone()[0]
+    }
+
+    # Merge the base options into the custom settings dictionary to simplify passing
+    #  settings into the template renderer.
+    custSettings.update(ag.baseOpts)
+
+    logging.debug("Custom Settings Dict: {}".format(custSettings))
+
     # Query the DB for a list of all of the RAs and their information for the user's staff.
-    cur.execute("SELECT id, first_name, last_name, color FROM ra WHERE hall_id = %s ORDER BY first_name ASC;",
-                (userDict["hall_id"],))
+    cur.execute("""
+        SELECT ra.id, ra.first_name, ra.last_name, ra.color 
+        FROM ra JOIN staff_membership AS sm ON (ra.id = sm.ra_id)
+        WHERE sm.res_hall_id = %s 
+        ORDER BY ra.first_name ASC;""", (authedUser.hall_id(),))
 
     # Sort alphabetically by last name of RA
     ptDictSorted = sorted(ptDict.items(), key=lambda kv: kv[1]["name"].split(" ")[1])
 
-    return render_template("schedule/editSched.html", raList=cur.fetchall(), auth_level=userDict["auth_level"],
-                           ptDict=ptDictSorted, curView=3, opts=ag.baseOpts, hall_name=userDict["hall_name"])
+    return render_template("schedule/editSched.html", raList=cur.fetchall(), auth_level=authedUser.auth_level(),
+                           ptDict=ptDictSorted, curView=3, opts=custSettings, hall_name=authedUser.hall_name(),
+                           linkedHalls=authedUser.getAllAssociatedResHalls())
 
 
 # ---------------------
@@ -101,7 +119,7 @@ def getSchedule2(start=None, end=None, hallId=None, showAllColors=None):
     #                                for the returned RA conflicts.
     #     end            <str>   -  a string representing the last day that should be included
     #                                for the returned RA conflicts.
-    #     showAllColors  <bool>  -  a boolean that, if set to True, will associate the
+    #     allColors      <bool>  -  a boolean that, if set to True, will associate the
     #                                returned duties with their RA's respective color.
     #                                Setting this to False will associate each duty
     #                                with the default color of #2C3E50.
@@ -114,7 +132,11 @@ def getSchedule2(start=None, end=None, hallId=None, showAllColors=None):
     #           "title": <ra.first_name> + " " + <ra.last_name>,
     #           "start": <day.date>,
     #           "color": <ra.color or "#2C3E50">,
-    #           "extendedProps": {"dutyType": "std"}
+    #           "extendedProps": {
+    #               "dutyType": "std",
+    #               "flagged": <duties.flagged>,
+    #               "pts": <duties.point_val>
+    #           }
     #        }
     #     ]
 
@@ -125,10 +147,10 @@ def getSchedule2(start=None, end=None, hallId=None, showAllColors=None):
         #  this method was called from a remote client.
 
         # Get the user's information from the database
-        userDict = getAuth()
+        authedUser = getAuth()
 
         # Set the value of hallId from the userDict
-        hallId = userDict["hall_id"]
+        hallId = authedUser.hall_id()
 
         # Get the start and end string values from the request arguments.
         #  Since we utilize the fullCal.js library, we know that the request
@@ -154,7 +176,8 @@ def getSchedule2(start=None, end=None, hallId=None, showAllColors=None):
 
     # Query the DB for the regularly scheduled duties for the given Res Hall and timeframe.
     cur.execute("""
-        SELECT ra.first_name, ra.last_name, ra.color, ra.id, TO_CHAR(day.date, 'YYYY-MM-DD')
+        SELECT ra.first_name, ra.last_name, ra.color, ra.id, TO_CHAR(day.date, 'YYYY-MM-DD'),
+               duties.flagged, duties.point_val
         FROM duties JOIN day ON (day.id=duties.day_id)
                     JOIN RA ON (ra.id=duties.ra_id)
         WHERE duties.hall_id = %s
@@ -196,7 +219,7 @@ def getSchedule2(start=None, end=None, hallId=None, showAllColors=None):
             #  added. If this method was called from the server, then there is no
             #  concept of the current user and thus the default color should be used.
 
-            if not fromServer and userDict["ra_id"] == row[3]:
+            if not fromServer and authedUser.ra_id() == row[3]:
                 # If it is the RA, then show their unique color
                 c = row[2]
 
@@ -216,7 +239,11 @@ def getSchedule2(start=None, end=None, hallId=None, showAllColors=None):
             "title": row[0] + " " + row[1],
             "start": row[4],
             "color": c,
-            "extendedProps": {"dutyType": "std"}
+            "extendedProps": {
+                "dutyType": "std",
+                "flagged": row[5],
+                "pts": row[6]
+            }
         })
 
     # If this API method was called from the server
@@ -263,30 +290,16 @@ def runScheduler():
     #     -1 : an error occurred while scheduling
 
     # Get the user's information from the database
-    userDict = getAuth()
-
-    # Currently unused feature that allows the scheduler to automatically create
-    #  point_modifiers for RAs that have been excluded from being scheduled for
-    #  the given month. This feature is unreleased because if the user sets this
-    #  to true and then runs the scheduler more than once for the same month,
-    #  there is no way for the application to know if it created any
-    #  point_modifiers for the excluded RAs of the previous run so that it can
-    #  remove them from the system/algorithm. As a result, any point_modifiers
-    #  created in this manner will just grow and grow until an HD goes in and
-    #  manually alters the point_modifier.modifier value.
-    # TODO: Figure out how to address the above comment. Possibly implement a
-    #        draft system so that AHD+ users can view a scheduler run before
-    #        publishing it to the rest of staff?
-    autoExcAdj = False  # bool(request.json["autoExcAdj"])
+    authedUser = getAuth()
 
     # Check to see if the user is authorized to run the scheduler
     # If the user is not at least an AHD
-    if userDict["auth_level"] < 2:
+    if authedUser.auth_level() < 2:
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
         logging.info("User Not Authorized - RA: {} attempted to run scheduler."
-                     .format(userDict["ra_id"]))
+                     .format(authedUser.ra_id()))
 
         # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
@@ -349,7 +362,7 @@ def runScheduler():
         return jsonify(stdRet(-1, "Missing Scheduler Parameters"))
 
     # Set the value of the hallId from the userDict
-    hallId = userDict["hall_id"]
+    hallId = authedUser.hall_id()
 
     # Create a DB cursor
     cur = ag.conn.cursor()
@@ -381,7 +394,7 @@ def runScheduler():
     #  conflicts for the given month excluding any ra table records with
     #  an auth_level of 3 or higher.
     cur.execute("""
-        SELECT first_name, last_name, id, hall_id, date_started,
+        SELECT ra.first_name, ra.last_name, ra.id, sm.res_hall_id, sm.start_date,
                COALESCE(cons.array_agg, ARRAY[]::date[])
         FROM ra LEFT OUTER JOIN (
             SELECT ra_id, ARRAY_AGG(days.date)
@@ -394,8 +407,9 @@ def runScheduler():
             GROUP BY ra_id
             ) AS cons
         ON (ra.id = cons.ra_id)
-        WHERE ra.hall_id = %s
-        AND ra.auth_level < 3 {}
+        JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
+        WHERE sm.res_hall_id = %s
+        AND sm.auth_level < 3 {}
     """.format(eligibleRAStr), (monthId, hallId))
 
     # Load the result from the DB
@@ -413,7 +427,7 @@ def runScheduler():
     maxBreadDuty = "{:04d}-{:02d}-{:02d}".format(date.year, date.month, dateNum)
 
     # Get the RA statistics for the given hall
-    ptsDict = getRAStats(userDict["hall_id"], start, end, maxBreakDay=maxBreadDuty)
+    ptsDict = getRAStats(hallId, start, end, maxBreakDay=maxBreadDuty)
 
     logging.debug("ptsDict: {}".format(ptsDict))
 
@@ -467,17 +481,19 @@ def runScheduler():
     # Log this information for the debugger!
     logging.debug("StartMonthStr: {}".format(startMonthStr))
     logging.debug("EndMonthStr: {}".format(endMonthStr))
-    logging.debug("Hall Id: {}".format(userDict["hall_id"]))
+    logging.debug("Hall Id: {}".format(hallId))
     logging.debug("Year: {}".format(date.year))
     logging.debug('MonthNum: {0:02d}'.format(monthNum))
     logging.debug("LDAT: {}".format(ldat))
 
     # Query the DB for the last 'x' number of duties from the previous month so that we
     #  do not schedule RAs back-to-back between months.
-    cur.execute("""SELECT ra.first_name, ra.last_name, ra.id, ra.hall_id,
-                          ra.date_started, day.date - TO_DATE(%s, 'YYYY-MM-DD')
+    cur.execute("""SELECT ra.first_name, ra.last_name, ra.id, sm.res_hall_id,
+                          sm.start_date, day.date - TO_DATE(%s, 'YYYY-MM-DD'),
+                          duties.flagged
                   FROM duties JOIN day ON (day.id=duties.day_id)
                               JOIN ra ON (ra.id=duties.ra_id)
+                              JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
                   WHERE duties.hall_id = %s
                   AND duties.sched_id IN (
                         SELECT DISTINCT ON (schedule.month_id) schedule.id
@@ -502,8 +518,11 @@ def runScheduler():
     prevDuties = cur.fetchall()
 
     # Create shell RA objects that will hash to the same value as their respective RA objects.
-    #  This hash is how we map the equivalent RA objects together.
-    prevRADuties = [(RA(d[0], d[1], d[2], d[3], d[4]), d[5]) for d in prevDuties]
+    #  This hash is how we map the equivalent RA objects together. These shell RAs will be put
+    #  in a tuple containing the RA, the number of days from the duty date to the beginning of
+    #  the next month, and a boolean whether or not that duty was flagged.
+    #     Ex: (RA Shell, No. days since last duty, Whether the duty is flagged)
+    prevRADuties = [(RA(d[0], d[1], d[2], d[3], d[4]), d[5], d[6]) for d in prevDuties]
 
     logging.debug("PREVIOUS DUTIES: {}".format(prevRADuties))
 
@@ -516,7 +535,7 @@ def runScheduler():
         FROM break_duties JOIN day ON (break_duties.day_id = day.id)
         WHERE break_duties.month_id = {}
         AND break_duties.hall_id = {}
-    """.format(monthId, userDict["hall_id"]))
+    """.format(monthId, hallId))
 
     # Load the results from the DB and convert the value to an int.
     breakDuties = [int(row[0]) for row in cur.fetchall()]
@@ -529,15 +548,44 @@ def runScheduler():
     copy_raList = cp.deepcopy(ra_list)
     copy_noDutyList = cp.copy(noDutyList)
 
+    # Load the Res Hall's settings for the scheduler
+    cur.execute("""SELECT duty_config, auto_adj_excl_ra_pts, flag_multi_duty 
+                   FROM hall_settings
+                   WHERE res_hall_id = %s""", (hallId,))
+    dutyConfig, autoExcAdj, flagMultiDuty = cur.fetchone()
+
+    # AutoExcAdj is a currently unused feature that allows the scheduler to
+    #  automatically create point_modifiers for RAs that have been excluded from
+    #  being scheduled for the given month. This feature is unreleased because
+    #  if the user sets this to true and then runs the scheduler more than once
+    #  for the same month, there is no way for the application to know if it
+    #  created any point_modifiers for the excluded RAs of the previous run so
+    #  that it can remove them from the system/algorithm. As a result, any
+    #  point_modifiers created in this manner will just grow and grow until
+    #  an HD goes in and manually alters the point_modifier.modifier value.
+    # TODO: Figure out how to address the above comment. Possibly implement a
+    #        draft system so that AHD+ users can view a scheduler run before
+    #        publishing it to the rest of staff?
+
+    regNumAssigned = dutyConfig["reg_duty_num_assigned"]
+    mulNumAssigned = dutyConfig["multi_duty_num_assigned"]
+    regDutyPts = dutyConfig["reg_duty_pts"]
+    mulDutyPts = dutyConfig["multi_duty_pts"]
+    mulDutyDays = dutyConfig["multi_duty_days"]
+
     # Set completed to False and successful to False by default. These values
     #  will be manipulated in the while loop below as necessary.
     completed = False
     successful = False
     while not completed:
         # While we are not finished scheduling, create a candidate schedule
-        sched = scheduler4_0.schedule(copy_raList, year, monthNum,
-                                      noDutyDates=copy_noDutyList, ldaTolerance=ldat,
-                                      prevDuties=prevRADuties, breakDuties=breakDuties)
+        sched = scheduler4_1.schedule(copy_raList, year, monthNum, doubleDateNum=mulNumAssigned,
+                                      doubleDatePts=mulDutyPts, noDutyDates=copy_noDutyList,
+                                      doubleDays=mulDutyDays, doublePts=mulDutyPts,
+                                      ldaTolerance=ldat, doubleNum=mulNumAssigned,
+                                      prevDuties=prevRADuties, breakDuties=breakDuties,
+                                      setDDFlag=flagMultiDuty, regDutyPts=regDutyPts,
+                                      regNumAssigned=regNumAssigned)
 
         # If we were unable to schedule with the previous parameters,
         if len(sched) == 0:
@@ -574,7 +622,7 @@ def runScheduler():
     if not successful:
         # Log the occurrence
         logging.info("Unable to Generate Schedule for Hall: {} MonthNum: {} Year: {}"
-                     .format(userDict["hall_id"], monthNum, year))
+                     .format(hallId, monthNum, year))
 
         # Notify the user of this result
         return jsonify(stdRet(0, "Unable to Generate Schedule"))
@@ -618,15 +666,20 @@ def runScheduler():
             # If there is at least one RA assigned for duty on this day,
             #  then iterate over all of the RAs assigned for duty on this
             #  day and add them to the dutyDayStr
-            for r in d:
-                dutyDayStr += "({},{},{},{},{}),".format(hallId, r.getId(), days[d.getDate()],
-                                                         schedId, d.getPoints())
+            for s in d.iterDutySlots():
+                # Retrieve the RA object that is assigned to this duty slot
+                r = s.getAssignment()
+
+                # Add the necessary information to the dutyDayStr
+                dutyDayStr += "({},{},{},{},{},{}),".format(hallId, r.getId(), days[d.getDate()],
+                                                         schedId, d.getPoints(), s.getFlag())
 
                 # Check to see if the RA has already been added to the dictionary
                 if r in avgPtDict.keys():
                     # If so, add the points to the dict
                     avgPtDict[r.getId()] += d.getPoints()
                 else:
+                    # Otherwise, initialize the RA's entry with this day's points.
                     avgPtDict[r.getId()] = d.getPoints()
 
         else:
@@ -634,14 +687,15 @@ def runScheduler():
             #  then add the day to the noDutyDayStr
             noDutyDayStr += "({},{},{},{}),".format(hallId, days[d.getDate()], schedId, d.getPoints())
 
-    # Attempt to save the schedule to the DB
+    # Attempt to save the schedule to the DBgit s
     try:
         # If there were days added to the dutyDayStr
         if dutyDayStr != "":
             # Then insert all of the duties that were scheduled for the month into the DB
             cur.execute("""
-                    INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val) VALUES {};
-                    """.format(dutyDayStr[:-1]))
+            INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val, flagged) 
+            VALUES {};
+            """.format(dutyDayStr[:-1]))
 
         # If there were days added to the noDutyDayStr
         if noDutyDayStr != "":
@@ -671,7 +725,11 @@ def runScheduler():
 
         # Select all RAs in the given hall whose auth_level is below 3 (HD)
         #  that were not included in the eligibleRAs list
-        cur.execute("""SELECT id FROM ra WHERE id NOT IN %s AND hall_id = %s""", (tuple(eligibleRAs), hallId))
+        cur.execute("""
+            SELECT ra_id 
+            FROM staff_membership 
+            WHERE ra_id NOT IN %s 
+            AND res_hall_id = %s""", (tuple(eligibleRAs), hallId))
 
         raAdjList = cur.fetchall()
 
@@ -704,9 +762,9 @@ def runScheduler():
     return jsonify(stdRet(1, "successful"))
 
 
-@schedule_bp.route("/api/changeRAonDuty", methods=["POST"])
+@schedule_bp.route("/api/alterDuty", methods=["POST"])
 @login_required
-def changeRAforDutyDay():
+def alterDuty():
     # API Method will change the RA assigned for a given duty
     #  from one RA to another in the same hall.
     #
@@ -722,6 +780,10 @@ def changeRAforDutyDay():
     #                         to be assigned for the given duty.
     #     oldName  <str>  -  a string containing the name of the RA that is currently
     #                         on duty for the given day.
+    #     flag     <bool> -  a boolean used to denote whether or not this duty should
+    #                         be flagged in the DB.
+    #     pts      <int>  -  an integer denoting the number of points that should be
+    #                         awarded for this duty.
     #
     #  This method returns a standard return object whose status is one of the
     #  following:
@@ -731,16 +793,16 @@ def changeRAforDutyDay():
     #     -1 : an error occurred while scheduling
 
     # Get the user's information from the database
-    userDict = getAuth()
+    authedUser = getAuth()
 
     # Check to see if the user is authorized to alter duties
     # If the user is not at least an AHD
-    if userDict["auth_level"] < 2:
+    if authedUser.auth_level() < 2:
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
         logging.info("User Not Authorized - RA: {} attempted to alter duty for Hall: {}"
-                     .format(userDict["ra_id"], userDict["hall_id"]))
+                     .format(authedUser.ra_id(), authedUser.hall_id()))
 
         # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
@@ -750,7 +812,7 @@ def changeRAforDutyDay():
 
     logging.debug("New RA id: {}".format(data["newId"]))
     logging.debug("Old RA Name: {}".format(data["oldName"]))
-    logging.debug("HallID: {}".format(userDict["hall_id"]))
+    logging.debug("HallID: {}".format(authedUser.hall_id()))
     # Expected as x/x/xxxx
     logging.debug("DateStr: {}".format(data["dateStr"]))
 
@@ -761,8 +823,8 @@ def changeRAforDutyDay():
     cur = ag.conn.cursor()
 
     # Query the DB for the RA that is to be assigned for this duty.
-    cur.execute("SELECT id FROM ra WHERE id = %s AND hall_id = %s;",
-                (data["newId"], userDict["hall_id"]))
+    cur.execute("SELECT ra_id FROM staff_membership WHERE ra_id = %s AND res_hall_id = %s;",
+                (data["newId"], authedUser.hall_id()))
 
     # Load the query results
     raParams = cur.fetchone()
@@ -771,7 +833,7 @@ def changeRAforDutyDay():
     if raParams is None:
         # If we did not, log the occurrence.
         logging.warning("Alter Duty - unable to locate RA: {} for Hall: {}"
-                        .format(data["newId"], userDict["hall_id"]))
+                        .format(data["newId"], authedUser.hall_id()))
 
         # Close the DB cursor
         cur.close()
@@ -780,8 +842,12 @@ def changeRAforDutyDay():
         return jsonify(stdRet(0, "New Assigned RA is Not a Valid Selection"))
 
     # Query the DB for the RA that is currently assigned for the duty.
-    cur.execute("SELECT id FROM ra WHERE first_name LIKE %s AND last_name LIKE %s AND hall_id = %s",
-                (fName, lName, userDict["hall_id"]))
+    cur.execute("""
+        SELECT ra.id 
+        FROM ra JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
+        WHERE ra.first_name LIKE %s 
+        AND ra.last_name LIKE %s 
+        AND sm.res_hall_id = %s""", (fName, lName, authedUser.hall_id()))
 
     # Load the query results
     oldRA = cur.fetchone()
@@ -790,7 +856,7 @@ def changeRAforDutyDay():
     if oldRA is None:
         # If we did not, log the occurrence.
         logging.warning("Alter Duty - unable to locate RA: {} {} for Hall: {}"
-                        .format(fName, lName, userDict["hall_id"]))
+                        .format(fName, lName, authedUser.hall_id()))
 
         # Close the DB cursor
         cur.close()
@@ -822,7 +888,7 @@ def changeRAforDutyDay():
 
     # Query the DB for the schedule that the duty belongs to
     cur.execute("SELECT id FROM schedule WHERE hall_id = %s AND month_id = %s ORDER BY created DESC, id DESC;",
-                (userDict["hall_id"], monthId))
+                (authedUser.hall_id(), monthId))
 
     # Load the query results
     schedId = cur.fetchone()
@@ -831,7 +897,7 @@ def changeRAforDutyDay():
     if schedId is None:
         # If we did not, log the occurrence.
         logging.warning("Alter Duty - unable to locate schedule for Month: {}, Hall: {}"
-                        .format(monthId, userDict["hall_id"]))
+                        .format(monthId, authedUser.hall_id()))
 
         # Close the DB cursor
         cur.close()
@@ -841,13 +907,16 @@ def changeRAforDutyDay():
 
     # Execute an UPDATE statement to alter the duty in the DB
     cur.execute("""UPDATE duties
-                   SET ra_id = %s
+                   SET ra_id = %s,
+                       point_val = %s,
+                       flagged = %s
                    WHERE hall_id = %s
                    AND day_id = %s
                    AND sched_id = %s
                    AND ra_id = %s
-                   """, (raParams[0], userDict["hall_id"],
-                         dayID, schedId[0], oldRA[0]))
+                   """, (raParams[0], data["pts"], data["flag"],
+                         authedUser.hall_id(), dayID, schedId[0],
+                         oldRA[0]))
 
     # Commit the changes in the DB
     ag.conn.commit()
@@ -875,6 +944,10 @@ def addNewDuty():
     #                         to be altered.
     #     id       <int>  -  an integer representing the ra.id value for the RA that is
     #                         to be assigned for the given duty.
+    #     flag     <bool> -  a boolean used to denote whether or not this duty should
+    #                         be flagged in the DB.
+    #     pts      <int>  -  an integer denoting the number of points that should be
+    #                         awarded for this duty.
     #
     #  This method returns a standard return object whose status is one of the
     #  following:
@@ -884,25 +957,25 @@ def addNewDuty():
     #     -1 : an error occurred while scheduling
 
     # Get the user's information from the database
-    userDict = getAuth()
+    authedUser = getAuth()
 
     # Check to see if the user is authorized to add duties
     # If the user is not at least an AHD
-    if userDict["auth_level"] < 2:
+    if authedUser.auth_level() < 2:
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
         logging.info("User Not Authorized - RA: {} attempted to add a duty for Hall: {}"
-                     .format(userDict["ra_id"], userDict["hall_id"]))
+                     .format(authedUser.ra_id(), authedUser.hall_id()))
 
         # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
 
-    # Load the provdied data from the request json
+    # Load the provided data from the request json
     data = request.json
 
     logging.debug("New RA id: {}".format(data["id"]))
-    logging.debug("HallID: {}".format(userDict["hall_id"]))
+    logging.debug("HallID: {}".format(authedUser.hall_id()))
     # Expected as x-x-xxxx
     logging.debug("DateStr: {}".format(data["dateStr"]))
 
@@ -910,7 +983,8 @@ def addNewDuty():
     cur = ag.conn.cursor()
 
     # Query the DB for the given RA
-    cur.execute("SELECT id FROM ra WHERE id = %s AND hall_id = %s;", (data["id"], userDict["hall_id"]))
+    cur.execute("SELECT ra_id FROM staff_membership WHERE ra_id = %s AND res_hall_id = %s;",
+                (data["id"], authedUser.hall_id()))
 
     # Load the query result
     raId = cur.fetchone()
@@ -920,7 +994,7 @@ def addNewDuty():
     if raId is None:
         # If not, then log the occurrence.
         logging.warning("Add Duty - unable to locate RA: {} for Hall: {}"
-                        .format(data["id"], userDict["hall_id"]))
+                        .format(data["id"], authedUser.hall_id()))
 
         # Close the DB cursor
         cur.close()
@@ -952,7 +1026,7 @@ def addNewDuty():
 
     # Query the DB for the schedule that this duty should belong to.
     cur.execute("SELECT id FROM schedule WHERE hall_id = %s AND month_id = %s ORDER BY created DESC, id DESC;",
-                (userDict["hall_id"], monthId))
+                (authedUser.hall_id(), monthId))
 
     # Load the query results
     schedId = cur.fetchone()
@@ -961,7 +1035,7 @@ def addNewDuty():
     if schedId is None:
         # If we did not, log the occurrence.
         logging.warning("Add Duty - unable to locate schedule for Month: {}, Hall: {}"
-                        .format(monthId, userDict["hall_id"]))
+                        .format(monthId, authedUser.hall_id()))
 
         # Close the DB cursor
         cur.close()
@@ -970,9 +1044,9 @@ def addNewDuty():
         return jsonify(stdRet(0, "Unable to validate schedule."))
 
     # Execute an INSERT statement to have the duty created in the duties table
-    cur.execute("""INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val)
-                    VALUES (%s, %s, %s, %s, %s);""",
-                (userDict["hall_id"], raId[0], dayID, schedId[0], data["pts"]))
+    cur.execute("""INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val, flagged)
+                    VALUES (%s, %s, %s, %s, %s, %s);""",
+                (authedUser.hall_id(), raId[0], dayID, schedId[0], data["pts"], data["flag"]))
 
     # Commit the changes to the DB
     ag.conn.commit()
@@ -1011,16 +1085,16 @@ def deleteDuty():
     #     -1 : an error occurred while scheduling
 
     # Get the user's information from the database
-    userDict = getAuth()
+    authedUser = getAuth()
 
     # Check to see if the user is authorized to delete duties
     # If the user is not at least an AHD
-    if userDict["auth_level"] < 2:
+    if authedUser.auth_level() < 2:
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
         logging.info("User Not Authorized - RA: {} attempted to delete duty for Hall: {}"
-                     .format(userDict["ra_id"], userDict["hall_id"]))
+                     .format(authedUser.ra_id(), authedUser.hall_id()))
 
         # Notify the user that they are not authorized.
         return jsonify(stdRet(-1, "NOT AUTHORIZED"))
@@ -1029,7 +1103,7 @@ def deleteDuty():
     data = request.json
 
     logging.debug("Deleted Duty RA Name: {}".format(data["raName"]))
-    logging.debug("HallID: {}".format(userDict["hall_id"]))
+    logging.debug("HallID: {}".format(authedUser.hall_id()))
     # Expected as x-x-xxxx
     logging.debug("DateStr: {}".format(data["dateStr"]))
 
@@ -1040,8 +1114,12 @@ def deleteDuty():
     cur = ag.conn.cursor()
 
     # Query the DB for the given RA
-    cur.execute("SELECT id FROM ra WHERE first_name LIKE %s AND last_name LIKE %s AND hall_id = %s;",
-                (fName, lName, userDict["hall_id"]))
+    cur.execute("""
+        SELECT ra.id 
+        FROM ra JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
+        WHERE ra.first_name LIKE %s 
+        AND ra.last_name LIKE %s 
+        AND sm.res_hall_id = %s;""", (fName, lName, authedUser.hall_id()))
 
     # Load the query results
     raId = cur.fetchone()
@@ -1050,7 +1128,7 @@ def deleteDuty():
     if raId is None:
         # If we did not, log the occurrence.
         logging.warning("Delete Duty - unable to locate RA: {} {} for Hall: {}"
-                        .format(fName, lName, userDict["hall_id"]))
+                        .format(fName, lName, authedUser.hall_id()))
 
         # Close the DB cursor
         cur.close()
@@ -1082,7 +1160,7 @@ def deleteDuty():
 
     # Query the DB for the schedule that the duty belongs to
     cur.execute("SELECT id FROM schedule WHERE hall_id = %s AND month_id = %s ORDER BY created DESC, id DESC;",
-                (userDict["hall_id"], monthId))
+                (authedUser.hall_id(), monthId))
 
     # Load the result from the DB
     schedId = cur.fetchone()
@@ -1091,7 +1169,7 @@ def deleteDuty():
     if schedId is None:
         # If we did not, log the occurrence.
         logging.warning("Delete Duty - unable to locate schedule for Month: {}, Hall: {}"
-                        .format(monthId, userDict["hall_id"]))
+                        .format(monthId, authedUser.hall_id()))
 
         # Close the DB cursor
         cur.close()
@@ -1105,7 +1183,7 @@ def deleteDuty():
                     AND hall_id = %s
                     AND day_id = %s
                     AND sched_id = %s""",
-                (raId[0], userDict["hall_id"], dayID, schedId[0]))
+                (raId[0], authedUser.hall_id(), dayID, schedId[0]))
 
     # Commit the changes to the DB
     ag.conn.commit()
@@ -1114,7 +1192,7 @@ def deleteDuty():
     cur.close()
 
     logging.info("Successfully deleted Duty: {} for Hall: {}"
-                 .format(data["dateStr"], userDict["hall_id"]))
+                 .format(data["dateStr"], authedUser.hall_id()))
 
     # Notify the user that the delete was successful
     return jsonify(stdRet(1, "successful"))

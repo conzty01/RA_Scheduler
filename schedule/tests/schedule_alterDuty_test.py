@@ -2,10 +2,10 @@ from unittest.mock import MagicMock, patch
 from scheduleServer import app
 import unittest
 
-from helperFunctions.helperFunctions import stdRet
+from helperFunctions.helperFunctions import stdRet, AuthenticatedUser
 
 
-class TestSchedule_changeRAforDutyDay(unittest.TestCase):
+class TestSchedule_alterDuty(unittest.TestCase):
     def setUp(self):
         # Set up a number of items that will be used for these tests.
 
@@ -73,16 +73,22 @@ class TestSchedule_changeRAforDutyDay(unittest.TestCase):
         # Set the ra_id and hall_id to values that can be used throughout
         self.user_ra_id = 1
         self.user_hall_id = 1
+        self.associatedResHalls = [
+            {
+                "id": self.user_hall_id,
+                "auth_level": self.mocked_authLevel,
+                "name": "Test Hall"
+            }
+        ]
 
-        # Assemble all of the desired values into a dict object.
-        self.helper_getAuth = {
-            "uEmail": "test@email.com",
-            "ra_id": self.user_ra_id,
-            "name": "Test User",
-            "hall_id": self.user_hall_id,
-            "auth_level": self.mocked_authLevel,
-            "hall_name": "Test Hall"
-        }
+        # Assemble all of the desired values into an Authenticated User Object
+        self.helper_getAuth = AuthenticatedUser(
+            "test@email.com",
+            self.user_ra_id,
+            "Test",
+            "User",
+            self.associatedResHalls
+        )
 
         # Create the patcher for the getAuth() method
         self.patcher_getAuth = patch("schedule.schedule.getAuth", autospec=True)
@@ -154,7 +160,7 @@ class TestSchedule_changeRAforDutyDay(unittest.TestCase):
         # -- Act --
 
         # Make a request to the desired API endpoint
-        resp = self.server.post("/schedule/api/changeRAonDuty",
+        resp = self.server.post("/schedule/api/alterDuty",
                                 base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
 
         # -- Assert --
@@ -199,14 +205,22 @@ class TestSchedule_changeRAforDutyDay(unittest.TestCase):
             None,  # Fourth query is for the Schedule ID
         ]
 
+        # Configure the flag that should be sent
+        desiredFlag = True
+
+        # Configure the points that should be set
+        desiredPts = 16
+
         # -- Act --
 
         # Make a request to the desired API endpoint
-        resp = self.server.post("/schedule/api/changeRAonDuty",
+        resp = self.server.post("/schedule/api/alterDuty",
                                 json=dict(
                                     newId=desiredNewRAID,
                                     oldName=desiredOldName,
-                                    dateStr=desiredDateStr
+                                    dateStr=desiredDateStr,
+                                    flag=desiredFlag,
+                                    pts=desiredPts
                                 ),
                                 base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
 
@@ -215,7 +229,7 @@ class TestSchedule_changeRAforDutyDay(unittest.TestCase):
         # Assert that the last time appGlobals.conn.cursor().execute was called,
         #  it was a query for the RA.
         self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
-            "SELECT id FROM ra WHERE id = %s AND hall_id = %s;",
+            "SELECT ra_id FROM staff_membership WHERE ra_id = %s AND res_hall_id = %s;",
             (desiredNewRAID, self.user_hall_id)
         )
 
@@ -255,14 +269,22 @@ class TestSchedule_changeRAforDutyDay(unittest.TestCase):
             None,  # Fourth query is for the Schedule ID
         ]
 
+        # Configure the flag that should be sent
+        desiredFlag = True
+
+        # Configure the points that should be set
+        desiredPts = 16
+
         # -- Act --
 
         # Make a request to the desired API endpoint
-        resp = self.server.post("/schedule/api/changeRAonDuty",
+        resp = self.server.post("/schedule/api/alterDuty",
                                 json=dict(
                                     newId=desiredNewRAID,
                                     oldName=desiredOldName,
-                                    dateStr=desiredDateStr
+                                    dateStr=desiredDateStr,
+                                    flag=desiredFlag,
+                                    pts=desiredPts
                                 ),
                                 base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
 
@@ -271,7 +293,12 @@ class TestSchedule_changeRAforDutyDay(unittest.TestCase):
         # Assert that the last time appGlobals.conn.cursor().execute was called,
         #  it was a query for the RA.
         self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
-            "SELECT id FROM ra WHERE first_name LIKE %s AND last_name LIKE %s AND hall_id = %s",
+            """
+        SELECT ra.id 
+        FROM ra JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
+        WHERE ra.first_name LIKE %s 
+        AND ra.last_name LIKE %s 
+        AND sm.res_hall_id = %s""",
             (expectedfName, expectedlName, self.user_hall_id)
         )
 
@@ -311,14 +338,22 @@ class TestSchedule_changeRAforDutyDay(unittest.TestCase):
             None,  # Fourth query is for the Schedule ID
         ]
 
+        # Configure the flag that should be sent
+        desiredFlag = True
+
+        # Configure the points that should be set
+        desiredPts = 16
+
         # -- Act --
 
         # Make a request to the desired API endpoint
-        resp = self.server.post("/schedule/api/changeRAonDuty",
+        resp = self.server.post("/schedule/api/alterDuty",
                                 json=dict(
                                     newId=desiredNewRAID,
                                     oldName=desiredOldName,
-                                    dateStr=desiredDateStr
+                                    dateStr=desiredDateStr,
+                                    flag=desiredFlag,
+                                    pts=desiredPts
                                 ),
                                 base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
 
@@ -369,14 +404,22 @@ class TestSchedule_changeRAforDutyDay(unittest.TestCase):
             None,  # Fourth query is for the Schedule ID
         ]
 
+        # Configure the flag that should be sent
+        desiredFlag = True
+
+        # Configure the points that should be set
+        desiredPts = 16
+
         # -- Act --
 
         # Make a request to the desired API endpoint
-        resp = self.server.post("/schedule/api/changeRAonDuty",
+        resp = self.server.post("/schedule/api/alterDuty",
                                 json=dict(
                                     newId=desiredNewRAID,
                                     oldName=desiredOldName,
-                                    dateStr=desiredDateStr
+                                    dateStr=desiredDateStr,
+                                    flag=desiredFlag,
+                                    pts=desiredPts
                                 ),
                                 base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
 
@@ -428,14 +471,22 @@ class TestSchedule_changeRAforDutyDay(unittest.TestCase):
             (expectedScheduleID,),              # Fourth query is for the Schedule ID
         ]
 
+        # Configure the flag that should be sent
+        desiredFlag = True
+
+        # Configure the points that should be set
+        desiredPts = 16
+
         # -- Act --
 
         # Make a request to the desired API endpoint
-        resp = self.server.post("/schedule/api/changeRAonDuty",
+        resp = self.server.post("/schedule/api/alterDuty",
                                 json=dict(
                                     newId=desiredNewRAID,
                                     oldName=desiredOldName,
-                                    dateStr=desiredDateStr
+                                    dateStr=desiredDateStr,
+                                    flag=desiredFlag,
+                                    pts=desiredPts
                                 ),
                                 base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
 
@@ -445,13 +496,15 @@ class TestSchedule_changeRAforDutyDay(unittest.TestCase):
         #  it was a query for the RA.
         self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
             """UPDATE duties
-                   SET ra_id = %s
+                   SET ra_id = %s,
+                       point_val = %s,
+                       flagged = %s
                    WHERE hall_id = %s
                    AND day_id = %s
                    AND sched_id = %s
                    AND ra_id = %s
                    """,
-            (desiredNewRAID, self.user_hall_id, expectedDayID,
+            (desiredNewRAID, desiredPts, desiredFlag, self.user_hall_id, expectedDayID,
              expectedScheduleID, expectedOldRAID)
         )
 

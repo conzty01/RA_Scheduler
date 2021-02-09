@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 from scheduleServer import app
 import unittest
 
-from helperFunctions.helperFunctions import stdRet
+from helperFunctions.helperFunctions import stdRet, AuthenticatedUser
 
 
 class TestHallBP_saveHallSettings(unittest.TestCase):
@@ -73,16 +73,22 @@ class TestHallBP_saveHallSettings(unittest.TestCase):
         # Set the ra_id and hall_id to values that can be used throughout
         self.user_ra_id = 1
         self.user_hall_id = 1
+        self.associatedResHalls = [
+            {
+                "id": self.user_hall_id,
+                "auth_level": self.mocked_authLevel,
+                "name": "Test Hall"
+            }
+        ]
 
-        # Assemble all of the desired values into a dict object.
-        self.helper_getAuth = {
-            "uEmail": "test@email.com",
-            "ra_id": self.user_ra_id,
-            "name": "Test User",
-            "hall_id": self.user_hall_id,
-            "auth_level": self.mocked_authLevel,
-            "hall_name": "Test Hall"
-        }
+        # Assemble all of the desired values into an Authenticated User Object
+        self.helper_getAuth = AuthenticatedUser(
+            "test@email.com",
+            self.user_ra_id,
+            "Test",
+            "User",
+            self.associatedResHalls
+        )
 
         # Create the patcher for the getAuth() method
         self.patcher_getAuth = patch("hall.hall.getAuth", autospec=True)
@@ -190,8 +196,8 @@ class TestHallBP_saveHallSettings(unittest.TestCase):
         #  to the hall that whose settings they are manipulating.
         self.mocked_appGlobals.conn.cursor().execute.assert_any_call(
             """SELECT res_hall.id
-                       FROM res_hall JOIN ra ON (ra.hall_id = res_hall.id)
-                       WHERE ra.id = %s;""", (self.user_ra_id,)
+                   FROM res_hall JOIN staff_membership AS sm ON (sm.res_hall_id = res_hall.id)
+                   WHERE sm.ra_id = %s;""", (self.user_ra_id,)
         )
 
         # Assert that appGlobals.conn.commit was never called
@@ -225,8 +231,6 @@ class TestHallBP_saveHallSettings(unittest.TestCase):
         desiredSettingName = "Residence Hall Name"
         desiredSettingValue = "Test Hall"
 
-        expectedHallID = 14
-
         # Configure the appGlobals.conn.cursor.execute mock to return different values
         #  after subsequent calls.
 
@@ -251,8 +255,8 @@ class TestHallBP_saveHallSettings(unittest.TestCase):
         #  to the hall that whose settings they are manipulating.
         self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
             """SELECT res_hall.id
-                       FROM res_hall JOIN ra ON (ra.hall_id = res_hall.id)
-                       WHERE ra.id = %s;""", (self.user_ra_id,)
+                   FROM res_hall JOIN staff_membership AS sm ON (sm.res_hall_id = res_hall.id)
+                   WHERE sm.ra_id = %s;""", (self.user_ra_id,)
         )
 
         # Assert that appGlobals.conn.cursor().close was called
@@ -296,3 +300,361 @@ class TestHallBP_saveHallSettings(unittest.TestCase):
 
         # Assert that we received our expected result
         self.assertEqual(stdRet(-1, "NOT AUTHORIZED"), resp.json)
+
+    @patch("hall.hall.Json", autospec=True)
+    def test_withAuthorizedUser_SavesDutyConfig(self, mocked_psycopg2Json):
+        # Test to ensure that when an authorized user passes valid
+        #  Hall Setting data to this API, the method saves the
+        #  data to the DB. An authorized user is considered a user
+        #  whose "auth_level" at least 3 (HD).
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 3
+
+        desiredSettingName = "Duty Configuration"
+        desiredSettingValue = {
+            "reg_duty_num_assigned": 1,     # Number of RAs to be assigned on regular duty days.
+            "multi_duty_num_assigned": 2,   # Number of RAs to be assigned on multi-duty days.
+            "brk_duty_num_assigned": 1,     # Number of RAs to be assigned on break duty days.
+            "reg_duty_pts": 1,              # Number of points to be awarded for regular duties.
+            "multi_duty_pts": 2,            # Number of points to be awarded for multi-day duties.
+            "brk_duty_pts": 3,              # Number of points to be awarded for break duties.
+            "multi_duty_days": [4, 5]       # Days of the week which are considered multi-duty days.
+                                            #    Mon, Tues, Wed, Thurs, Fri, Sat, Sun
+                                            #     0    1     2     3     4    5    6
+        }
+
+        expectedHallID = 14
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedHallID,)  # First call returns a Hall ID if the user belongs
+            #  to the appropriate hall.
+        ]
+
+        # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.post("/hall/api/saveHallSettings",
+                                json=dict(
+                                    name=desiredSettingName,
+                                    value=desiredSettingValue
+                                ),
+                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that the Json constructor was called once
+        mocked_psycopg2Json.assert_called_once_with(desiredSettingValue)
+
+        # Assert that the when the appGlobals.conn.cursor().execute was last called,
+        #  it was an UPDATE statement.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
+            "UPDATE hall_settings SET duty_config = %s WHERE res_hall_id = %s;",
+            (mocked_psycopg2Json(mocked_psycopg2Json), self.user_hall_id)
+        )
+
+        # Assert that the API method checked to ensure that the user belonged
+        #  to the hall that whose settings they are manipulating.
+        self.mocked_appGlobals.conn.cursor().execute.assert_any_call(
+            """SELECT res_hall.id
+                   FROM res_hall JOIN staff_membership AS sm ON (sm.res_hall_id = res_hall.id)
+                   WHERE sm.ra_id = %s;""", (self.user_ra_id,)
+        )
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_called_once()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received our expected result
+        self.assertEqual(stdRet(1, "successful"), resp.json)
+
+    def test_withAuthorizedUser_SavesSchoolYear(self):
+        # Test to ensure that when an authorized user passes valid
+        #  Hall Setting data to this API, the method saves the
+        #  data to the DB. An authorized user is considered a user
+        #  whose "auth_level" at least 3 (HD).
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 3
+
+        desiredSettingName = "Defined School Year"
+        desiredSettingValue = {
+            "start": 1,
+            "end": 12
+        }
+
+        expectedHallID = 14
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedHallID,)  # First call returns a Hall ID if the user belongs
+            #  to the appropriate hall.
+        ]
+
+        # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.post("/hall/api/saveHallSettings",
+                                json=dict(
+                                    name=desiredSettingName,
+                                    value=desiredSettingValue
+                                ),
+                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that the when the appGlobals.conn.cursor().execute was last called,
+        #  it was an UPDATE statement.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
+            """UPDATE hall_settings 
+                       SET year_start_mon = %s, year_end_mon = %s
+                       WHERE res_hall_id = %s;""",
+            (desiredSettingValue["start"], desiredSettingValue["end"], self.user_hall_id)
+        )
+
+        # Assert that the API method checked to ensure that the user belonged
+        #  to the hall that whose settings they are manipulating.
+        self.mocked_appGlobals.conn.cursor().execute.assert_any_call(
+            """SELECT res_hall.id
+                   FROM res_hall JOIN staff_membership AS sm ON (sm.res_hall_id = res_hall.id)
+                   WHERE sm.ra_id = %s;""", (self.user_ra_id,)
+        )
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_called_once()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received our expected result
+        self.assertEqual(stdRet(1, "successful"), resp.json)
+
+    def test_withAuthorizedUser_SavesMultiDutyFlag(self):
+        # Test to ensure that when an authorized user passes valid
+        #  Hall Setting data to this API, the method saves the
+        #  data to the DB. An authorized user is considered a user
+        #  whose "auth_level" at least 3 (HD).
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 3
+
+        desiredSettingName = "Multi-Duty Day Flag"
+        desiredSettingValue = {
+            "flag": True,
+            "label": "Secondary"
+        }
+
+        expectedHallID = 14
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedHallID,)  # First call returns a Hall ID if the user belongs
+            #  to the appropriate hall.
+        ]
+
+        # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.post("/hall/api/saveHallSettings",
+                                json=dict(
+                                    name=desiredSettingName,
+                                    value=desiredSettingValue
+                                ),
+                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that the when the appGlobals.conn.cursor().execute was last called,
+        #  it was an UPDATE statement.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
+            """UPDATE hall_settings 
+                       SET flag_multi_duty = %s, duty_flag_label = %s
+                       WHERE res_hall_id = %s;""",
+            (desiredSettingValue["flag"], desiredSettingValue["label"], self.user_hall_id)
+        )
+
+        # Assert that the API method checked to ensure that the user belonged
+        #  to the hall that whose settings they are manipulating.
+        self.mocked_appGlobals.conn.cursor().execute.assert_any_call(
+            """SELECT res_hall.id
+                   FROM res_hall JOIN staff_membership AS sm ON (sm.res_hall_id = res_hall.id)
+                   WHERE sm.ra_id = %s;""", (self.user_ra_id,)
+        )
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_called_once()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received our expected result
+        self.assertEqual(stdRet(1, "successful"), resp.json)
+
+    def test_withAuthorizedUser_SavesAutoAdjRAPts(self):
+        # Test to ensure that when an authorized user passes valid
+        #  Hall Setting data to this API, the method saves the
+        #  data to the DB. An authorized user is considered a user
+        #  whose "auth_level" at least 3 (HD).
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 3
+
+        desiredSettingName = "Automatic RA Point Adjustment"
+        desiredSettingValue = False
+
+        expectedHallID = 14
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedHallID,)  # First call returns a Hall ID if the user belongs
+            #  to the appropriate hall.
+        ]
+
+        # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.post("/hall/api/saveHallSettings",
+                                json=dict(
+                                    name=desiredSettingName,
+                                    value=desiredSettingValue
+                                ),
+                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that the when the appGlobals.conn.cursor().execute was last called,
+        #  it was an UPDATE statement.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
+            "UPDATE hall_settings SET auto_adj_excl_ra_pts = %s WHERE res_hall_id = %s;",
+            (desiredSettingValue, self.user_hall_id)
+        )
+
+        # Assert that the API method checked to ensure that the user belonged
+        #  to the hall that whose settings they are manipulating.
+        self.mocked_appGlobals.conn.cursor().execute.assert_any_call(
+            """SELECT res_hall.id
+                   FROM res_hall JOIN staff_membership AS sm ON (sm.res_hall_id = res_hall.id)
+                   WHERE sm.ra_id = %s;""", (self.user_ra_id,)
+        )
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_called_once()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received our expected result
+        self.assertEqual(stdRet(1, "successful"), resp.json)
+
+    def test_withAuthorizedUser_withUnknownSetting_returnsAppropriateResponse(self):
+        # Test to ensure that when an authorized user passes an unknown
+        #  Hall Setting to this API, the method logs a warning and returns
+        #  an "Unknown Setting Provided" response. An authorized user is
+        #  considered a user whose "auth_level" at least 3 (HD).
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+        self.mocked_loggingWARNING.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 3
+
+        desiredSettingName = "Unknown Setting Name48"
+        desiredSettingValue = "Unknown Setting Value"
+
+        expectedHallID = 14
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedHallID,)  # First call returns a Hall ID if the user belongs
+            #  to the appropriate hall.
+        ]
+
+        # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.post("/hall/api/saveHallSettings",
+                                json=dict(
+                                    name=desiredSettingName,
+                                    value=desiredSettingValue
+                                ),
+                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that the API method checked to ensure that the user belonged
+        #  to the hall that whose settings they are manipulating.
+        self.mocked_appGlobals.conn.cursor().execute.assert_any_call(
+            """SELECT res_hall.id
+                   FROM res_hall JOIN staff_membership AS sm ON (sm.res_hall_id = res_hall.id)
+                   WHERE sm.ra_id = %s;""", (self.user_ra_id,)
+        )
+
+        # Assert that the event was logged
+        self.mocked_loggingWARNING.assert_called_once_with(
+            "Unable to handle Hall Setting: {}".format(desiredSettingName)
+        )
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received our expected result
+        self.assertEqual(stdRet(0, "Unknown Setting Provided"), resp.json)

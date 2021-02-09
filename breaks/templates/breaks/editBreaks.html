@@ -18,33 +18,32 @@
         <h3 class="modal-title">Change Break Duty: <span id="editModalLongTitle" style="font-weight:bold;"></span></h3>
       </div>
       <div class="modal-body">
-          <div class="row">
-              <div class="col-sm-5">
-                  <div class="form-group">
-                      <label for="editModalPrevRA">Current Assigned RA</label>
-                      <select id="editModalPrevRA" class="form-control" disabled>
-                          {% for ra in raList: %}
-                          <option value="{{ ra[1] }} {{ ra[2] }}">{{ ra[1] }} {{ ra[2] }}</option>
-                          {% endfor %}
-                      </select>
-                  </div>
+          <div class="form-group form-row">
+              <div class="col-md-5">
+                  <label for="editModalPrevRA">Current Assigned RA</label>
+                  <select id="editModalPrevRA" class="form-control" disabled>
+                      {% for ra in raList: %}
+                      <option value="{{ ra[1] }} {{ ra[2] }}">{{ ra[1] }} {{ ra[2] }}</option>
+                      {% endfor %}
+                  </select>
               </div>
-
-              <div class="col-sm-1 align-middle">
+              <div class="col-md-2 fa-container">
                   <span class="fa fa-arrow-right"></span>
               </div>
-
-              <div class="col-sm-5 modalRight">
-                  <div class="form-group">
-                      <label for="editModalNextRA">New Assigned RA</label>
-                      <select id="editModalNextRA" class="form-control">
-                          {% for ra in raList: %}
-                          <option id="selector_{{ ra[0] }}" value="{{ ra[4] }}">{{ ra[1] }} {{ ra[2] }}</option>
-                          {% endfor %}
-                      </select>
-                  </div>
+              <div class="col-md-5">
+                  <label for="editModalNextRA">New Assigned RA</label>
+                  <select id="editModalNextRA" class="form-control">
+                      {% for ra in raList: %}
+                      <option id="selector_{{ ra[0] }}" value="{{ ra[1] }} {{ ra[2] }}">{{ ra[1] }} {{ ra[2] }}</option>
+                      {% endfor %}
+                  </select>
               </div>
-
+          </div>
+          <div class="form-group form-row">
+              <div class="col">
+                  <label for="editDatePts">Point Value:</label>
+                  <input class="form-control" type="number" id="editDatePts" name="editDatePts" value="3">
+              </div>
           </div>
       </div>
       <div class="modalError">Update Assignment Failed: <span class="msg"></span></div>

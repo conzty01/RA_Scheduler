@@ -3,7 +3,7 @@ from scheduleServer import app
 from flask import Response
 import unittest
 
-from helperFunctions.helperFunctions import stdRet, getCurSchoolYear
+from helperFunctions.helperFunctions import stdRet, getCurSchoolYear, AuthenticatedUser
 
 
 class TestBreakBP_editBreaks(unittest.TestCase):
@@ -71,16 +71,25 @@ class TestBreakBP_editBreaks(unittest.TestCase):
         # We then set the auth_level mock to return the __eq__ Mock
         self.mocked_authLevel.__eq__ = self.mocked_authLevel_ltMock
 
-        # Assemble all of the desired values into a dict object.
-        self.helper_getAuth = {
-            "uEmail": "test@email.com",
-            "ra_id": 1,
-            "name": "Test User",
-            "hall_id": 1,
-            "auth_level": self.mocked_authLevel,
-            "hall_name": "Test Hall"
-        }
+        # Set the ra_id and hall_id to values that can be used throughout
+        self.user_ra_id = 1
+        self.user_hall_id = 1
+        self.associatedResHalls = [
+            {
+                "id": self.user_hall_id,
+                "auth_level": self.mocked_authLevel,
+                "name": "Test Hall"
+            }
+        ]
 
+        # Assemble all of the desired values into an Authenticated User Object
+        self.helper_getAuth = AuthenticatedUser(
+            "test@email.com",
+            self.user_ra_id,
+            "Test",
+            "User",
+            self.associatedResHalls
+        )
         # Create the patcher for the getAuth() method
         self.patcher_getAuth = patch("breaks.breaks.getAuth", autospec=True)
 
@@ -153,7 +162,7 @@ class TestBreakBP_editBreaks(unittest.TestCase):
         #  be thoroughly tested in another test class.
         mocked_getRABreakStats.return_value = {
            1: {
-              "name": self.helper_getAuth["name"],
+              "name": self.helper_getAuth.name(),
               "count": 0
            }
         }
@@ -175,14 +184,17 @@ class TestBreakBP_editBreaks(unittest.TestCase):
         self.assertFalse(resp.is_json)
 
         # Assert that the getRABreakStats Function was called as expected
-        mocked_getRABreakStats.assert_called_once_with(self.helper_getAuth["hall_id"], start, end)
+        mocked_getRABreakStats.assert_called_once_with(self.helper_getAuth.hall_id(), start, end)
 
         # Assert that the last call to the DB was queried as expected.
         #  In this instance, we are unable to use the assert_called_once_with
         #  method as this function calls out to
         self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
-            "SELECT id, first_name, last_name, color FROM ra WHERE hall_id = %s ORDER BY first_name ASC;",
-            (self.helper_getAuth["hall_id"],)
+            """
+        SELECT ra.id, ra.first_name, ra.last_name, ra.color
+        FROM ra JOIN staff_membership AS sm ON (ra.id = sm.ra_id)
+        WHERE sm.res_hall_id = %s ORDER BY ra.first_name ASC;
+        """, (self.helper_getAuth.hall_id(),)
         )
 
     @patch("breaks.breaks.getRABreakStats", autospec=True)
@@ -205,7 +217,7 @@ class TestBreakBP_editBreaks(unittest.TestCase):
         #  be thoroughly tested in another test class.
         mocked_getRABreakStats.return_value = {
            1: {
-              "name": self.helper_getAuth["name"],
+              "name": self.helper_getAuth.name(),
               "count": 0
            }
         }
@@ -227,14 +239,17 @@ class TestBreakBP_editBreaks(unittest.TestCase):
         self.assertFalse(resp.is_json)
 
         # Assert that the getRABreakStats Function was called as expected
-        mocked_getRABreakStats.assert_called_once_with(self.helper_getAuth["hall_id"], start, end)
+        mocked_getRABreakStats.assert_called_once_with(self.helper_getAuth.hall_id(), start, end)
 
         # Assert that the last call to the DB was queried as expected.
         #  In this instance, we are unable to use the assert_called_once_with
         #  method as this function calls out to
         self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
-            "SELECT id, first_name, last_name, color FROM ra WHERE hall_id = %s ORDER BY first_name ASC;",
-            (self.helper_getAuth["hall_id"],)
+            """
+        SELECT ra.id, ra.first_name, ra.last_name, ra.color
+        FROM ra JOIN staff_membership AS sm ON (ra.id = sm.ra_id)
+        WHERE sm.res_hall_id = %s ORDER BY ra.first_name ASC;
+        """, (self.helper_getAuth.hall_id(),)
         )
 
     @patch("breaks.breaks.getRABreakStats", autospec=True)
@@ -296,7 +311,8 @@ class TestBreakBP_editBreaks(unittest.TestCase):
                           key=lambda x: x[1]["name"].split(" ")[1]),
             curView=3,
             opts=self.mocked_appGlobals.baseOpts,
-            hall_name=self.helper_getAuth["hall_name"]
+            hall_name=self.helper_getAuth.hall_name(),
+            linkedHalls=self.helper_getAuth.getAllAssociatedResHalls()
         )
 
     def test_WithUnauthorizedUser_ReturnsNotAuthorizedJSON(self):

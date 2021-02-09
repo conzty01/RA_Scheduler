@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 from scheduleServer import app
 import unittest
 
-from helperFunctions.helperFunctions import stdRet
+from helperFunctions.helperFunctions import stdRet, AuthenticatedUser
 
 
 class TestBreakBP_changeBreakDuty(unittest.TestCase):
@@ -73,16 +73,22 @@ class TestBreakBP_changeBreakDuty(unittest.TestCase):
         # Set the ra_id and hall_id to values that can be used throughout
         self.user_ra_id = 1
         self.user_hall_id = 1
+        self.associatedResHalls = [
+            {
+                "id": self.user_hall_id,
+                "auth_level": self.mocked_authLevel,
+                "name": "Test Hall"
+            }
+        ]
 
-        # Assemble all of the desired values into a dict object.
-        self.helper_getAuth = {
-            "uEmail": "test@email.com",
-            "ra_id": self.user_ra_id,
-            "name": "Test User",
-            "hall_id": self.user_hall_id,
-            "auth_level": self.mocked_authLevel,
-            "hall_name": "Test Hall"
-        }
+        # Assemble all of the desired values into an Authenticated User Object
+        self.helper_getAuth = AuthenticatedUser(
+            "test@email.com",
+            self.user_ra_id,
+            "Test",
+            "User",
+            self.associatedResHalls
+        )
 
         # Create the patcher for the getAuth() method
         self.patcher_getAuth = patch("breaks.breaks.getAuth", autospec=True)
@@ -146,6 +152,8 @@ class TestBreakBP_changeBreakDuty(unittest.TestCase):
         #   newId    <int> -  an integer representing the ra.id for the RA that should be
         #                      assigned for the break duty.
         #   dateStr  <str> -  a string representing the date of the break duty.
+        #   pts      <int> -  an integer denoting the number of points that should be
+        #                      awarded for this duty.
 
         # -- Arrange --
 
@@ -166,6 +174,7 @@ class TestBreakBP_changeBreakDuty(unittest.TestCase):
         desiredDateStr = "2021-01-06"
         desiredDayID = 9
         desiredMonthID = 10
+        desiredPts = 9
 
         self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
             # First call returns ra table record data for the new RA
@@ -183,7 +192,8 @@ class TestBreakBP_changeBreakDuty(unittest.TestCase):
                                 json=dict(
                                     oldName=desiredOldName,
                                     newId=desiredNewID,
-                                    dateStr=desiredDateStr
+                                    dateStr=desiredDateStr,
+                                    pts=desiredPts
                                 ),
                                 base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
 
@@ -197,13 +207,14 @@ class TestBreakBP_changeBreakDuty(unittest.TestCase):
         #  the whitespace must match exactly.
         self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
             """UPDATE break_duties
-                   SET ra_id = %s
+                   SET ra_id = %s,
+                       point_val = %s
                    WHERE hall_id = %s
                    AND day_id = %s
                    AND month_id = %s
                    AND ra_id = %s
                 """,
-            (desiredNewID, self.user_hall_id, desiredDayID, desiredMonthID, desiredOldID)
+            (desiredNewID, desiredPts, self.user_hall_id, desiredDayID, desiredMonthID, desiredOldID)
         )
 
         # Assert that appGlobals.conn.commit was called once

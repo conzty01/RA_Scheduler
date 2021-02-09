@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 from scheduleServer import app
 import unittest
 
-from helperFunctions.helperFunctions import stdRet
+from helperFunctions.helperFunctions import stdRet, AuthenticatedUser
 
 
 class TestSchedule_addNewDuty(unittest.TestCase):
@@ -73,16 +73,22 @@ class TestSchedule_addNewDuty(unittest.TestCase):
         # Set the ra_id and hall_id to values that can be used throughout
         self.user_ra_id = 1
         self.user_hall_id = 1
+        self.associatedResHalls = [
+            {
+                "id": self.user_hall_id,
+                "auth_level": self.mocked_authLevel,
+                "name": "Test Hall"
+            }
+        ]
 
-        # Assemble all of the desired values into a dict object.
-        self.helper_getAuth = {
-            "uEmail": "test@email.com",
-            "ra_id": self.user_ra_id,
-            "name": "Test User",
-            "hall_id": self.user_hall_id,
-            "auth_level": self.mocked_authLevel,
-            "hall_name": "Test Hall"
-        }
+        # Assemble all of the desired values into an Authenticated User Object
+        self.helper_getAuth = AuthenticatedUser(
+            "test@email.com",
+            self.user_ra_id,
+            "Test",
+            "User",
+            self.associatedResHalls
+        )
 
         # Create the patcher for the getAuth() method
         self.patcher_getAuth = patch("schedule.schedule.getAuth", autospec=True)
@@ -214,7 +220,7 @@ class TestSchedule_addNewDuty(unittest.TestCase):
         # Assert that the last time appGlobals.conn.cursor().execute was called,
         #  it was a query for the RA.
         self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
-            "SELECT id FROM ra WHERE id = %s AND hall_id = %s;",
+            "SELECT ra_id FROM staff_membership WHERE ra_id = %s AND res_hall_id = %s;",
             (desiredRAID, self.user_hall_id)
         )
 
@@ -360,6 +366,9 @@ class TestSchedule_addNewDuty(unittest.TestCase):
             (expectedScheduleID,)               # Third query is for the schedule
         ]
 
+        # Configure the flag that should be passed in
+        desiredFlagState = True
+
         # -- Act --
 
         # Make a request to the desired API endpoint
@@ -367,7 +376,8 @@ class TestSchedule_addNewDuty(unittest.TestCase):
                                 json=dict(
                                     id=desiredRAID,
                                     pts=desiredPointVal,
-                                    dateStr=desiredDateStr
+                                    dateStr=desiredDateStr,
+                                    flag=desiredFlagState
                                 ),
                                 base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
 
@@ -376,10 +386,10 @@ class TestSchedule_addNewDuty(unittest.TestCase):
         # Assert that the last time appGlobals.conn.cursor().execute was called,
         #  it was a query for the RA.
         self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
-            """INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val)
-                    VALUES (%s, %s, %s, %s, %s);""",
+            """INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val, flagged)
+                    VALUES (%s, %s, %s, %s, %s, %s);""",
             (self.user_hall_id, desiredRAID, expectedDayID,
-             expectedScheduleID, desiredPointVal)
+             expectedScheduleID, desiredPointVal, desiredFlagState)
         )
 
         # Assert that we received the expected response

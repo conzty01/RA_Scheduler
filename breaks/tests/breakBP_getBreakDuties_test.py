@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 from scheduleServer import app
 import unittest
 
-
+from helperFunctions.helperFunctions import AuthenticatedUser
 from breaks.breaks import getBreakDuties
 
 
@@ -74,16 +74,22 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
         # Set the ra_id and hall_id to values that can be used throughout
         self.user_ra_id = 1
         self.user_hall_id = 1
+        self.associatedResHalls = [
+            {
+                "id": self.user_hall_id,
+                "auth_level": self.mocked_authLevel,
+                "name": "Test Hall"
+            }
+        ]
 
-        # Assemble all of the desired values into a dict object.
-        self.helper_getAuth = {
-            "uEmail": "test@email.com",
-            "ra_id": self.user_ra_id,
-            "name": "Test User",
-            "hall_id": self.user_hall_id,
-            "auth_level": self.mocked_authLevel,
-            "hall_name": "Test Hall"
-        }
+        # Assemble all of the desired values into an Authenticated User Object
+        self.helper_getAuth = AuthenticatedUser(
+            "test@email.com",
+            self.user_ra_id,
+            "Test",
+            "User",
+            self.associatedResHalls
+        )
 
         # Create the patcher for the getAuth() method
         self.patcher_getAuth = patch("breaks.breaks.getAuth", autospec=True)
@@ -176,7 +182,8 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
                 "User" + str(i),
                 "#{:06}".format(i),
                 i,
-                "2021-01-{:02}".format(i)
+                "2021-01-{:02}".format(i),
+                3
             ))
 
         # Configure the appGlobals.conn.cursor.execute mock to return different values
@@ -203,7 +210,10 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
                 "title": row[0] + " " + row[1],
                 "start": row[4],
                 "color": color,
-                "extendedProps": {"dutyType": "brk"}
+                "extendedProps": {
+                    "dutyType": "brk",
+                    "pts": row[5]
+                }
             })
 
         # -- Act --
@@ -223,7 +233,8 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
         #  it was a select statement. Since this line is using triple-quote strings,
         #  the whitespace must match exactly.
         self.mocked_appGlobals.conn.cursor().execute.assert_called_once_with("""
-        SELECT ra.first_name, ra.last_name, ra.color, ra.id, TO_CHAR(day.date, 'YYYY-MM-DD')
+        SELECT ra.first_name, ra.last_name, ra.color, ra.id, TO_CHAR(day.date, 'YYYY-MM-DD'),
+               break_duties.point_val
         FROM break_duties JOIN day ON (day.id=break_duties.day_id)
                           JOIN month ON (month.id=break_duties.month_id)
                           JOIN ra ON (ra.id=break_duties.ra_id)
@@ -273,7 +284,8 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
                 "User" + str(i),
                 "#{:06}".format(i),
                 i,
-                "2021-01-{:02}".format(i)
+                "2021-01-{:02}".format(i),
+                3
             ))
 
         # Configure the appGlobals.conn.cursor.execute mock to return different values
@@ -292,7 +304,10 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
                 "title": row[0] + " " + row[1],
                 "start": row[4],
                 "color": row[2],
-                "extendedProps": {"dutyType": "brk"}
+                "extendedProps": {
+                    "dutyType": "brk",
+                    "pts": row[5]
+                }
             })
 
         # -- Act --
@@ -340,7 +355,8 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
                 "User" + str(i),
                 "#{:06}".format(i),
                 i,
-                "2021-01-{:02}".format(i)
+                "2021-01-{:02}".format(i),
+                54
             ))
 
         # Configure the appGlobals.conn.cursor.execute mock to return different values
@@ -367,7 +383,10 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
                 "title": row[0] + " " + row[1],
                 "start": row[4],
                 "color": color,
-                "extendedProps": {"dutyType": "brk"}
+                "extendedProps": {
+                    "dutyType": "brk",
+                    "pts": row[5]
+                }
             })
 
         # -- Act --
@@ -428,7 +447,8 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
                 "User" + str(i),
                 "#{:06}".format(i),
                 i,
-                "2021-01-{:02}".format(i)
+                "2021-01-{:02}".format(i),
+                3
             ))
 
         # Configure the appGlobals.conn.cursor.execute mock to return different values
@@ -447,7 +467,10 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
                 "title": row[0] + " " + row[1],
                 "start": row[4],
                 "color": "#2C3E50",
-                "extendedProps": {"dutyType": "brk"}
+                "extendedProps": {
+                    "dutyType": "brk",
+                    "pts": row[5]
+                }
             })
 
         # -- Act --
@@ -467,7 +490,8 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
         #  it was a select statement. Since this line is using triple-quote strings,
         #  the whitespace must match exactly.
         self.mocked_appGlobals.conn.cursor().execute.assert_called_once_with("""
-        SELECT ra.first_name, ra.last_name, ra.color, ra.id, TO_CHAR(day.date, 'YYYY-MM-DD')
+        SELECT ra.first_name, ra.last_name, ra.color, ra.id, TO_CHAR(day.date, 'YYYY-MM-DD'),
+               break_duties.point_val
         FROM break_duties JOIN day ON (day.id=break_duties.day_id)
                           JOIN month ON (month.id=break_duties.month_id)
                           JOIN ra ON (ra.id=break_duties.ra_id)
@@ -512,7 +536,8 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
                 "User" + str(i),
                 "#{:06}".format(i),
                 i,
-                "2021-01-{:02}".format(i)
+                "2021-01-{:02}".format(i),
+                3
             ))
 
         # Configure the appGlobals.conn.cursor.execute mock to return different values
@@ -531,7 +556,10 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
                 "title": row[0] + " " + row[1],
                 "start": row[4],
                 "color": row[2],
-                "extendedProps": {"dutyType": "brk"}
+                "extendedProps": {
+                    "dutyType": "brk",
+                    "pts": row[5]
+                }
             })
 
         # -- Act --
@@ -552,7 +580,8 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
         #  it was a select statement. Since this line is using triple-quote strings,
         #  the whitespace must match exactly.
         self.mocked_appGlobals.conn.cursor().execute.assert_called_once_with("""
-        SELECT ra.first_name, ra.last_name, ra.color, ra.id, TO_CHAR(day.date, 'YYYY-MM-DD')
+        SELECT ra.first_name, ra.last_name, ra.color, ra.id, TO_CHAR(day.date, 'YYYY-MM-DD'),
+               break_duties.point_val
         FROM break_duties JOIN day ON (day.id=break_duties.day_id)
                           JOIN month ON (month.id=break_duties.month_id)
                           JOIN ra ON (ra.id=break_duties.ra_id)
@@ -598,7 +627,8 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
                 "User" + str(i),
                 "#{:06}".format(i),
                 i,
-                "2021-01-{:02}".format(i)
+                "2021-01-{:02}".format(i),
+                3
             ))
 
         # Configure the appGlobals.conn.cursor.execute mock to return different values
@@ -617,7 +647,10 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
                 "title": row[0] + " " + row[1],
                 "start": row[4],
                 "color": "#2C3E50",
-                "extendedProps": {"dutyType": "brk"}
+                "extendedProps": {
+                    "dutyType": "brk",
+                    "pts": row[5]
+                }
             })
 
         # -- Act --
@@ -638,7 +671,8 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
         #  it was a select statement. Since this line is using triple-quote strings,
         #  the whitespace must match exactly.
         self.mocked_appGlobals.conn.cursor().execute.assert_called_once_with("""
-        SELECT ra.first_name, ra.last_name, ra.color, ra.id, TO_CHAR(day.date, 'YYYY-MM-DD')
+        SELECT ra.first_name, ra.last_name, ra.color, ra.id, TO_CHAR(day.date, 'YYYY-MM-DD'),
+               break_duties.point_val
         FROM break_duties JOIN day ON (day.id=break_duties.day_id)
                           JOIN month ON (month.id=break_duties.month_id)
                           JOIN ra ON (ra.id=break_duties.ra_id)
@@ -684,7 +718,8 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
                 "User" + str(i),
                 "#{:06}".format(i),
                 i,
-                "2021-01-{:02}".format(i)
+                "2021-01-{:02}".format(i),
+                3
             ))
 
         # Configure the appGlobals.conn.cursor.execute mock to return different values
@@ -711,7 +746,10 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
                 "title": row[0] + " " + row[1],
                 "start": row[4],
                 "color": color,
-                "extendedProps": {"dutyType": "brk"}
+                "extendedProps": {
+                    "dutyType": "brk",
+                    "pts": row[5]
+                }
             })
 
         # -- Act --
@@ -732,7 +770,8 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
         #  it was a select statement. Since this line is using triple-quote strings,
         #  the whitespace must match exactly.
         self.mocked_appGlobals.conn.cursor().execute.assert_called_once_with("""
-        SELECT ra.first_name, ra.last_name, ra.color, ra.id, TO_CHAR(day.date, 'YYYY-MM-DD')
+        SELECT ra.first_name, ra.last_name, ra.color, ra.id, TO_CHAR(day.date, 'YYYY-MM-DD'),
+               break_duties.point_val
         FROM break_duties JOIN day ON (day.id=break_duties.day_id)
                           JOIN month ON (month.id=break_duties.month_id)
                           JOIN ra ON (ra.id=break_duties.ra_id)

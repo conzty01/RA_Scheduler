@@ -6,7 +6,7 @@ import unittest
 from helperFunctions.helperFunctions import AuthenticatedUser
 
 
-class TestIntegration_disconnectGoogleCalendar(unittest.TestCase):
+class TestHallBP_getHallSettings(unittest.TestCase):
     def setUp(self):
         # Set up a number of items that will be used for these tests.
 
@@ -74,11 +74,17 @@ class TestIntegration_disconnectGoogleCalendar(unittest.TestCase):
         # Set the ra_id and hall_id to values that can be used throughout
         self.user_ra_id = 1
         self.user_hall_id = 1
+        self.user_hall_id2 = 2
         self.associatedResHalls = [
             {
                 "id": self.user_hall_id,
                 "auth_level": self.mocked_authLevel,
                 "name": "Test Hall"
+            },
+            {
+                "id": self.user_hall_id2,
+                "auth_level": self.mocked_authLevel,
+                "name": "Test Hall 2"
             }
         ]
 
@@ -92,7 +98,7 @@ class TestIntegration_disconnectGoogleCalendar(unittest.TestCase):
         )
 
         # Create the patcher for the getAuth() method
-        self.patcher_getAuth = patch("integration.integrations.getAuth", autospec=True)
+        self.patcher_getAuth = patch("staff.staff.getAuth", autospec=True)
 
         # Start the patcher - mock returned
         self.mocked_getAuth = self.patcher_getAuth.start()
@@ -101,7 +107,7 @@ class TestIntegration_disconnectGoogleCalendar(unittest.TestCase):
         self.mocked_getAuth.return_value = self.helper_getAuth
 
         # -- Create a patcher for the appGlobals file --
-        self.patcher_appGlobals = patch("integration.integrations.ag", autospec=True)
+        self.patcher_appGlobals = patch("staff.staff.ag", autospec=True)
 
         # Start the patcher - mock returned
         self.mocked_appGlobals = self.patcher_appGlobals.start()
@@ -111,12 +117,6 @@ class TestIntegration_disconnectGoogleCalendar(unittest.TestCase):
         self.mocked_appGlobals.conn = MagicMock()
         self.mocked_appGlobals.UPLOAD_FOLDER = "./static"
         self.mocked_appGlobals.ALLOWED_EXTENSIONS = {"txt", "csv"}
-
-        # -- Create a patcher for the gCalIntegratinator object --
-        self.patcher_integrationPart = patch("integration.integrations.gCalIntegratinator", autospec=True)
-
-        # Start the patcher - mock returned
-        self.mocked_integrationPart = self.patcher_integrationPart.start()
 
         # -- Create a patchers for the logging --
         self.patcher_loggingDEBUG = patch("logging.debug", autospec=True)
@@ -137,7 +137,6 @@ class TestIntegration_disconnectGoogleCalendar(unittest.TestCase):
         self.patcher_getAuth.stop()
         self.patcher_appGlobals.stop()
         self.patcher_osEnviron.stop()
-        self.patcher_integrationPart.stop()
 
         self.patcher_loggingDEBUG.stop()
         self.patcher_loggingINFO.stop()
@@ -150,115 +149,203 @@ class TestIntegration_disconnectGoogleCalendar(unittest.TestCase):
         #  to the default value which is 1.
         self.mocked_authLevel.return_value = 1
 
-    def test_withAuthorizedUser_deletesAppropriateRecordFromDB(self):
-        # Test to ensure that if this function is called with an authorized user
-        #  that the appropriate record is deleted from the DB.
+    @patch("staff.staff.redirect", autospec=True)
+    @patch("staff.staff.url_for", autospec=True)
+    def test_whenProvidedHallUserIsAssociatedWith_setsProvidedHallAsSelected(self, mocked_urlFor, mocked_redirect):
+        # Test to ensure that when the method is provided a hall that the user is
+        #  associated with, the method sets the provided hall as the selected hall.
 
         # -- Arrange --
 
         # Reset all of the mocked objects that will be used in this test
-        self.mocked_authLevel.reset_mock()
         self.mocked_appGlobals.conn.reset_mock()
-        self.resetAuthLevel()
 
-        # Set the auth_level to the appropriate value
-        self.mocked_authLevel.return_value = 3
+        # Set the various items to be used in this test
+        desiredHallID = self.user_hall_id2
+
+        # Configure the mocked redirect function to return a valid response object
+        mocked_redirect.return_value = Response(status=200)
 
         # -- Act --
 
         # Make a request to the desired API endpoint
-        resp = self.server.get("/int/disconnectGCal",
+        resp = self.server.get("/staff/api/changeHallView/{}".format(desiredHallID),
                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
 
         # -- Assert --
 
         # Assert that the when the appGlobals.conn.cursor().execute was called,
-        #  it was a SELECT statement.
-        self.mocked_appGlobals.conn.cursor().execute.assert_called_once_with(
-            "DELETE FROM google_calendar_info WHERE res_hall_id = %s;",
-            (self.user_hall_id,)
+        #  it was an UPDATE statement to clear out the selected halls for the user.
+        self.mocked_appGlobals.conn.cursor().execute.assert_any_call(
+            """
+                UPDATE staff_membership
+                SET selected = false
+                WHERE ra_id = %s
+            """
+            , (self.user_ra_id, )
         )
 
-        # Assert that appGlobals.conn.commit was never called
+        # Assert that the when the appGlobals.conn.cursor().execute was called,
+        #  it was an UPDATE statement to mark the desired hall as selected.
+        self.mocked_appGlobals.conn.cursor().execute.assert_any_call(
+            """
+                UPDATE staff_membership
+                SET selected = true
+                WHERE ra_id = %s
+                AND res_hall_id = %s
+            """
+            , (self.user_ra_id, desiredHallID)
+        )
+
+        # Assert that appGlobals.conn.commit was called
         self.mocked_appGlobals.conn.commit.assert_called_once()
 
         # Assert that appGlobals.conn.cursor().close was called
         self.mocked_appGlobals.conn.cursor().close.assert_called_once()
 
-    def test_withoutAuthorizedUser_returnsNotAuthorizedResponse(self):
-        # Test to ensure that when this method is called without an authorized user,
-        #  they receive a "not authorized" response.
+        # Assert that the url_for was called for the index page
+        mocked_urlFor.assert_called_once_with("index")
+
+        # Assert that a redirect was created for the index page
+        mocked_redirect.assert_called_once_with(mocked_urlFor("index"))
+
+    @patch("staff.staff.redirect", autospec=True)
+    @patch("staff.staff.url_for", autospec=True)
+    def test_whenProvidedHallUserIsAssociatedWith_returnsRedirectToIndex(self, mocked_urlFor, mocked_redirect):
+        # Test to ensure that when provided a hall ID that the user is associated
+        #  with, the method returns a redirect to the index page.
 
         # -- Arrange --
 
         # Reset all of the mocked objects that will be used in this test
-        self.mocked_authLevel.reset_mock()
         self.mocked_appGlobals.conn.reset_mock()
-        self.resetAuthLevel()
+
+        # Set the various items to be used in this test
+        desiredHallID = self.user_hall_id2
+
+        # Configure the mocked redirect function to return a valid response object
+        mocked_redirect.return_value = Response(status=200)
 
         # -- Act --
 
         # Make a request to the desired API endpoint
-        resp = self.server.get("/int/disconnectGCal",
+        resp = self.server.get("/staff/api/changeHallView/{}".format(desiredHallID),
                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
 
         # -- Assert --
+
+        # Assert that the when the appGlobals.conn.cursor().execute was called,
+        #  it was an UPDATE statement to clear out the selected halls for the user.
+        self.mocked_appGlobals.conn.cursor().execute.assert_any_call(
+            """
+                UPDATE staff_membership
+                SET selected = false
+                WHERE ra_id = %s
+            """
+            , (self.user_ra_id,)
+        )
+
+        # Assert that the when the appGlobals.conn.cursor().execute was called,
+        #  it was an UPDATE statement to mark the desired hall as selected.
+        self.mocked_appGlobals.conn.cursor().execute.assert_any_call(
+            """
+                UPDATE staff_membership
+                SET selected = true
+                WHERE ra_id = %s
+                AND res_hall_id = %s
+            """
+            , (self.user_ra_id, desiredHallID)
+        )
+
+        # Assert that appGlobals.conn.commit was called
+        self.mocked_appGlobals.conn.commit.assert_called_once()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that the url_for was called for the index page
+        mocked_urlFor.assert_called_once_with("index")
+
+        # Assert that a redirect was created for the index page
+        mocked_redirect.assert_called_once_with(mocked_urlFor("index"))
+
+    @patch("staff.staff.redirect", autospec=True)
+    @patch("staff.staff.url_for", autospec=True)
+    def test_whenProvidedHallUserIsNOTAssociatedWith_doesNotInteractWithDB(self, mocked_urlFor, mocked_redirect):
+        # Test to ensure that when the provided hall id is not associated with the user,
+        #  the method does not interact with the DB.
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_appGlobals.conn.reset_mock()
+        self.mocked_loggingWARNING.reset_mock()
+
+        # Set the various items to be used in this test
+        desiredHallID = 999
+
+        # Configure the mocked redirect function to return a valid response object
+        mocked_redirect.return_value = Response(status=200)
+
+        # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/staff/api/changeHallView/{}".format(desiredHallID),
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that appGlobals.conn.cursor.execute was never called
+        self.mocked_appGlobals.conn.cursor().execute.assert_not_called()
 
         # Assert that appGlobals.conn.commit was never called
         self.mocked_appGlobals.conn.commit.assert_not_called()
 
         # Assert that appGlobals.conn.cursor().close was called
-        self.mocked_appGlobals.conn.cursor().close.assert_not_called()
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
 
-    @patch("integration.integrations.redirect", autospec=True)
-    @patch("integration.integrations.url_for", autospec=True)
-    def test_withAuthorizedUser_returnsRedirectToManHallPage(self, mocked_urlFor, mocked_redirect):
-        # Test to ensure that when this method is called with an authorized user,
-        #  this method returns a redirect to the Manage Hall page.
+        # Assert that the method logged the occurrence of the missing hall association
+        self.mocked_loggingWARNING.assert_called_once_with(
+            "No hall association found for RA: {} and Hall: {}"
+            .format(self.user_ra_id, desiredHallID)
+        )
+
+    @patch("staff.staff.redirect", autospec=True)
+    @patch("staff.staff.url_for", autospec=True)
+    def test_whenProvidedHallUserIsNOTAssociatedWith_returnsRedirectToIndex(self, mocked_urlFor, mocked_redirect):
+        # Test to ensure that when the provided hall id is not associated with the user,
+        #  the method returns a redirect to the index page.
 
         # -- Arrange --
 
         # Reset all of the mocked objects that will be used in this test
-        self.mocked_authLevel.reset_mock()
         self.mocked_appGlobals.conn.reset_mock()
-        self.resetAuthLevel()
 
-        # Set the auth_level to the appropriate value
-        self.mocked_authLevel.return_value = 3
+        # Set the various items to be used in this test
+        desiredHallID = 999
 
-        # Create the objects needed for this test.
-        expectedResponse = Response(status=200)
-
-        # Configure the mocked redirect object to return a Response object
-        mocked_redirect.return_value = expectedResponse
+        # Configure the mocked redirect function to return a valid response object
+        mocked_redirect.return_value = Response(status=200)
 
         # -- Act --
 
         # Make a request to the desired API endpoint
-        resp = self.server.get("/int/disconnectGCal",
+        resp = self.server.get("/staff/api/changeHallView/{}".format(desiredHallID),
                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
 
         # -- Assert --
 
-        # Assert that the when the appGlobals.conn.cursor().execute was called,
-        #  it was a SELECT statement.
-        self.mocked_appGlobals.conn.cursor().execute.assert_called_once_with(
-            "DELETE FROM google_calendar_info WHERE res_hall_id = %s;",
-            (self.user_hall_id,)
-        )
+        # Assert that appGlobals.conn.cursor.execute was never called
+        self.mocked_appGlobals.conn.cursor().execute.assert_not_called()
 
         # Assert that appGlobals.conn.commit was never called
-        self.mocked_appGlobals.conn.commit.assert_called_once()
+        self.mocked_appGlobals.conn.commit.assert_not_called()
 
         # Assert that appGlobals.conn.cursor().close was called
         self.mocked_appGlobals.conn.cursor().close.assert_called_once()
 
-        # Assert that the mocked url_for function is called with the appropriate endpoint
-        mocked_urlFor.assert_called_once_with("hall_bp.manHall")
+        # Assert that the url_for was called for the index page
+        mocked_urlFor.assert_called_once_with("index")
 
-        # Assert that the mocked redirect function is called with the url_for result
-        mocked_redirect.assert_called_once_with(mocked_urlFor.return_value)
-
-        # Assert that we received the expected response
-        self.assertEqual(expectedResponse.status_code, resp.status_code)
-        self.assertEqual(type(expectedResponse), type(resp))
+        # Assert that a redirect was created for the index page
+        mocked_redirect.assert_called_once_with(mocked_urlFor("index"))

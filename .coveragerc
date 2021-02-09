@@ -1,0 +1,57 @@
+# .coveragerc to control coverage.py
+[run]
+branch = true
+source = 
+	# Specify the directories that should be included in the test
+	breaks
+	conflicts
+	hall
+	helperFunctions
+	integration
+	schedule
+	staff
+	.
+omit =
+    # Exclude any /tests/ directories
+    */tests/*
+
+    # Exclude any __init__.py file
+    */__init__.py
+
+    # Exclude any imported modules
+    */.envs/*
+
+    # Exclude the following files from the project
+    addNextMonth.py
+    appGlobals.py
+    createDB.py
+    migrateDB.py
+    populateDB.py
+    scheduler*.py
+    schedule/scheduler1_0.py
+    schedule/scheduler2_0.py
+    schedule/scheduler3_0.py
+    schedule/scheduler3_1.py
+    schedule/scheduler4_0.py
+
+[report]
+# Regexes for lines to exclude from consideration
+exclude_lines = 
+	# Have to re-enable the standard pragma
+	pragma: no cover
+
+	# Don't complain about missing debug-only code:
+	def __repr__
+	if self\.debug
+
+	# Don't complain if tests don't hit defensive assertion code:
+	raise AssertionError
+	raise NotImplementedError
+
+	# Don't complain if non-runnable code isn't run:
+	if 0:
+	if __name__ == .__main__.:
+ignore_errors = true
+
+[html]
+directory = coverage_html_report
