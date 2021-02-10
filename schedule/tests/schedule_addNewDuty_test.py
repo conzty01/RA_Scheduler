@@ -285,8 +285,7 @@ class TestSchedule_addNewDuty(unittest.TestCase):
 
     def test_withAuthorizedUser_withoutValidSchedule_returnsInvalidScheduleResponse(self):
         # Test to ensure that when an authorized user attempts to use this API,
-        #  if no schedule is available, this method will return an Invalid
-        #  Schedule response.
+        #  if no schedule is available, this will create a new schedule record.
 
         # -- Arrange --
 
@@ -303,13 +302,16 @@ class TestSchedule_addNewDuty(unittest.TestCase):
         desiredPointVal = 3
         expectedMonthID = 9
         expectedDayID = 17
+        expectedScheduleID = 60
+        desiredFlagState = False
 
         # Configure the appGlobals.conn.cursor.execute mock to return different values
         #  after subsequent calls.
         self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
             (desiredRAID,),                     # First query is for the RA ID
             (expectedDayID, expectedMonthID),   # Second query is for the day info
-            None                                # Third query is for the schedule
+            None,                               # Third query is for the schedule
+            (expectedScheduleID,)               # Fourth call will return the new schedule ID
         ]
 
         # -- Act --
@@ -319,21 +321,31 @@ class TestSchedule_addNewDuty(unittest.TestCase):
                                 json=dict(
                                     id=desiredRAID,
                                     pts=desiredPointVal,
-                                    dateStr=desiredDateStr
+                                    dateStr=desiredDateStr,
+                                    flag=desiredFlagState
                                 ),
                                 base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
 
         # -- Assert --
 
-        # Assert that the last time appGlobals.conn.cursor().execute was called,
-        #  it was a query for the RA.
-        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
-            "SELECT id FROM schedule WHERE hall_id = %s AND month_id = %s ORDER BY created DESC, id DESC;",
+        # Assert that one of the times appGlobals.conn.cursor().execute was called,
+        #  it was a query to insert a new schedule record.
+        self.mocked_appGlobals.conn.cursor().execute.assert_any_call(
+            "INSERT INTO schedule (hall_id, month_id) VALUES (%s, %s) RETURNING id",
             (self.user_hall_id, expectedMonthID)
         )
 
+        # Assert that the last time appGlobals.conn.cursor().execute was called,
+        #  it was a query to insert the new duty into the DB.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
+            """INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val, flagged)
+                    VALUES (%s, %s, %s, %s, %s, %s);""",
+            (self.user_hall_id, desiredRAID, expectedDayID,
+             expectedScheduleID, desiredPointVal, desiredFlagState)
+        )
+
         # Assert that we received the expected response
-        self.assertEqual(resp.json, stdRet(0, "Unable to validate schedule."))
+        self.assertEqual(resp.json, stdRet(1, "successful"))
 
         # Assert that appGlobals.conn.cursor().close was called
         self.mocked_appGlobals.conn.cursor().close.assert_called_once()
