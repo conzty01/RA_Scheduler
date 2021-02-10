@@ -415,9 +415,19 @@ def runScheduler():
     # Load the result from the DB
     partialRAList = cur.fetchall()
 
-    # Get the start and end date for the school year. This will be used
-    #  to calculate how many points each RA has for the given year.
-    start, end = getSchoolYear(date.month, date.year)
+    # Get the start date for the school year. This will be used
+    #  to calculate how many points each RA has up to the month
+    #  being scheduled.
+    start, _ = getSchoolYear(date.month, date.year)
+
+    # Get the end from the DB. The end date will be the first day
+    #  of the month being scheduled. This will prevent the scheduler
+    #  from using the number of points an RA had during a previous
+    #  run of the scheduler for this month.
+    cur.execute("SELECT year FROM month WHERE id = %s", (monthId,))
+
+    # Load the value from the DB and convert it to a string in the expected format
+    end = cur.fetchone()[0].isoformat()
 
     # Get the number of days in the given month
     _, dateNum = calendar.monthrange(date.year, date.month)
