@@ -159,7 +159,7 @@ def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None
     # Query the DB for all of the duties within the provided timeframe and add up the points
     #  for each RA.
     cur.execute("""SELECT ra.id, ra.first_name, ra.last_name, COALESCE(ptQuery.pts, 0),
-                          COALESCE(point_modifier.modifier, 0)
+                          COALESCE(pmStats.modifier, 0)
                FROM
                (
                    SELECT combined_res.rid AS rid, CAST(SUM(combined_res.pts) AS INTEGER) AS pts
@@ -194,14 +194,21 @@ def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None
                       AND day.date BETWEEN TO_DATE(%s, 'YYYY-MM-DD')
                                        AND TO_DATE(%s, 'YYYY-MM-DD')
                       GROUP BY rid
+                      
                    ) AS combined_res
                    GROUP BY combined_res.rid
                ) ptQuery
                RIGHT JOIN ra ON (ptQuery.rid = ra.id)
-               LEFT JOIN point_modifier ON (ra.id = point_modifier.ra_id)
+               LEFT JOIN (
+                   SELECT point_modifier.ra_id AS rid, point_modifier.modifier
+                   FROM point_modifier
+                   WHERE res_hall_id = %s
+               ) AS pmStats ON (ra.id = pmStats.rid)
                JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
-               WHERE sm.res_hall_id = %s;""",
-                (hallId, hallId, startDateStr, endDateStr, hallId, breakDutyStart, breakDutyEnd, hallId))
+               WHERE sm.res_hall_id = %s;
+               """, (hallId, hallId, startDateStr, endDateStr, hallId, breakDutyStart, breakDutyEnd, hallId, hallId))
+
+    #logging.debug(cur.query)
 
     # Get the result from the DB
     raList = cur.fetchall()
