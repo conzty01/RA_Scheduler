@@ -1038,15 +1038,17 @@ def addNewDuty():
 
     # Check to see if we did not find a schedule fitting the day and hall.
     if schedId is None:
-        # If we did not, log the occurrence.
-        logging.warning("Add Duty - unable to locate schedule for Month: {}, Hall: {}"
-                        .format(monthId, authedUser.hall_id()))
+        # If we did not, then create an entry in the schedule table for this Duty.
+        # log the occurrence.
+        logging.info("Add Duty - unable to locate schedule for Month: {}, Hall: {} - Creating new schedule."
+                     .format(monthId, authedUser.hall_id()))
 
-        # Close the DB cursor
-        cur.close()
+        # Insert the schedule entry into the DB
+        cur.execute("INSERT INTO schedule (hall_id, month_id) VALUES (%s, %s) RETURNING id",
+                    (authedUser.hall_id(), monthId))
 
-        # Notify the user and stop processing
-        return jsonify(stdRet(0, "Unable to validate schedule."))
+        # Load the schedule ID from the DB
+        schedId = cur.fetchone()
 
     # Execute an INSERT statement to have the duty created in the duties table
     cur.execute("""INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val, flagged)
