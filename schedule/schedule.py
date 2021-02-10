@@ -436,15 +436,20 @@ def runScheduler():
     for res in partialRAList:
         # Add up the RA's duty points and any point modifier
         pts = ptsDict[res[2]]["pts"]["dutyPts"] + ptsDict[res[2]]["pts"]["modPts"]
+
+        # Parse out the date information since we only use the day in this implementation
+        parsedConflictDays = [dateObject.day for dateObject in res[5]]
+
+        # Append the newly created RA to the ra_list
         ra_list.append(
             RA(
-                res[0],     # First Name
-                res[1],     # Last Name
-                res[2],     # RA ID
-                res[3],     # Hall ID
-                res[4],     # Start Date
-                res[5],     # Conflicts
-                pts         # Points
+                res[0],                 # First Name
+                res[1],                 # Last Name
+                res[2],                 # RA ID
+                res[3],                 # Hall ID
+                res[4],                 # Start Date
+                parsedConflictDays,     # Conflicts
+                pts                     # Points
             )
         )
 
