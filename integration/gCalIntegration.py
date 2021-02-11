@@ -259,6 +259,87 @@ class gCalIntegratinator:
 
         return 1
 
+    class BaseGCalIntegratinatorException(Exception):
+        # Base GCalIntegratinator Exception
+
+        def __init__(self, *args):
+            # If args are provided
+            if args:
+                # Then set the message as the first argument
+                self.message = args[0]
+
+            else:
+                # Otherwise set the message to None
+                self.message = None
+
+            # Set the exception name to GCalIntegratinatorError
+            self.exceptionName = "GCalIntegratinatorError"
+
+        def __str__(self):
+            # If a message has been defined
+            if self.message is not None:
+                # Then put the message in the string representation
+                return "{}, {} ".format(self.exceptionName, self.message)
+
+            else:
+                # Otherwise return a default string
+                return "{} has been raised".format(self.exceptionName)
+
+    class CalendarCreationError(BaseGCalIntegratinatorException):
+        """GCalIntegratinator Exception to be raised when an error occurs
+            during the creation of the a Google Calendar."""
+
+        def __init__(self, *args):
+            # Pass the arguments to the parent class.
+            super().__init__(self, *args)
+
+            # Set the name of the exception
+            self.exceptionName = "GoogleCalendarCreationError"
+
+    class InvalidCalendarIdError(BaseGCalIntegratinatorException):
+        """GCalIntegratinator Exception to be raised if the provided Google
+            Calendar calendar ID is invalid."""
+
+        def __init__(self, *args):
+            # Pass the arguments to the parent class.
+            super().__init__(self, *args)
+
+            # Set the name of the exception
+            self.exceptionName = "InvalidCalendarIdError"
+
+    class InvalidCalendarCredentialsError(BaseGCalIntegratinatorException):
+        """GCalIntegratinator Exception to be raised if the provided
+            Google Calendar credentials are invalid."""
+
+        def __init__(self, *args):
+            # Pass the arguments to the parent class.
+            super().__init__(self, *args)
+
+            # Set the name of the exception
+            self.exceptionName = "InvalidCalendarCredentialsError"
+
+    class ExpiredCalendarCredentialsError(BaseGCalIntegratinatorException):
+        """GCalIntegratinator Exception to be raised if the provided Google
+            Calendar calendar credentials have expired."""
+
+        def __init__(self, *args):
+            # Pass the arguments to the parent class.
+            super().__init__(self, *args)
+
+            # Set the name of the exception
+            self.exceptionName = "ExpiredCalendarCredentialsError"
+
+    class UnknownError(BaseGCalIntegratinatorException):
+        """GCalIntegratinator Exception to be raised if an unknown
+            error occurs within the GCalIntegratintor object"""
+
+        def __init__(self, *args):
+            # Pass the arguments to the parent class.
+            super().__init__(self, *args)
+
+            # Set the name of the exception
+            self.exceptionName = "GCalIntegratinatorUnknownError"
+
 
 class Event:
     """ Object for abstracting the Event schema that is used by the Google Calendar API """
