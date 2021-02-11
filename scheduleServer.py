@@ -241,9 +241,9 @@ def logout():
     #  Required Auth Level: None
 
     # Authenticate the user against the DB
-    userDict = getAuth()
+    authedUser = getAuth()
 
-    logging.info("Logout User: {}".format(userDict["ra_id"]))
+    logging.info("Logout User: {}".format(authedUser.ra_id()))
 
     # Log out the user
     logout_user()
@@ -258,8 +258,6 @@ def login():
     #  will return a redirect to the Google Login blueprint.
     #
     #  Required Auth Level: None
-
-    logging.info("Redirecting client to Google Login")
 
     # Redirect the user to the Google Login Blueprint
     return redirect(url_for("google.login"))
@@ -285,16 +283,121 @@ def index():
 # --      Error Handling      --
 # ------------------------------
 
-@app.route("/error/<string:msg>")
-def err(msg):
-    # The error page for errors encountered in the index and login pages.
+@app.errorhandler(404)
+def error404Handler(e):
+    # A 404 Error has occurred in the base app. Generate an appropriate
+    #  response to display to the user.
+
+    # Attempt to authorize the user against the DB
+    authedUser = getAuth()
+
+    # Create the appropriate Message, Code, and Additional Information to
+    #  be displayed to the user
+    errMsg = "Page Not Found"
+    errCode = 404
+    addInfo = "We can't seem to find the page you're looking for. Try " \
+              "checking the spelling of the URL or going back to the previous page."
+
+    # Call and return the result from the generateErrorPage method
+    return generateErrorPage(errMsg, errCode, addInfo, authedUser), errCode
+
+
+@app.errorhandler(403)
+def error403Handler(e):
+    # A 403 Error has occurred in the base app. Generate an appropriate
+    #  response to display to the user.
+
+    # Attempt to authorize the user against the DB
+    authedUser = getAuth()
+
+    # Create the appropriate Message, Code, and Additional Information to
+    #  be displayed to the user
+    errMsg = "Access Denied"
+    errCode = 403
+    addInfo = "You do not have the necessary permissions to access this page. " \
+              "Please reach out to your Hall Director/Area Coordinator if you " \
+              "believe there has been a mistake."
+
+    # Call and return the result from the generateErrorPage method
+    return generateErrorPage(errMsg, errCode, addInfo, authedUser), errCode
+
+
+@app.errorhandler(410)
+def error410Handler(e):
+    # A 410 Error has occurred in the base app. Generate an appropriate
+    #  response to display to the user.
+
+    # Attempt to authorize the user against the DB
+    authedUser = getAuth()
+
+    # Create the appropriate Message, Code, and Additional Information to
+    #  be displayed to the user
+    errMsg = "Page Removed"
+    errCode = 410
+    addInfo = "The page you have attempted to access has been removed."
+
+    # Call and return the result from the generateErrorPage method
+    return generateErrorPage(errMsg, errCode, addInfo, authedUser), errCode
+
+
+@app.errorhandler(500)
+def error500Handler(e):
+    # A 500 Error has occurred in the base app. Generate an appropriate
+    #  response to display to the user.
+
+    # Attempt to authorize the user against the DB
+    authedUser = getAuth()
+
+    # Create the appropriate Message, Code, and Additional Information to
+    #  be displayed to the user
+    errMsg = "Unexpected Server Error"
+    errCode = 500
+    addInfo = None
+
+    # Call and return the result from the generateErrorPage method
+    return generateErrorPage(errMsg, errCode, addInfo, authedUser), errCode
+
+
+def generateErrorPage(msg, errCode, addInfo, authedUser=None):
+    # This method can be used from any error handler to generate an error page to
+    #  display to users.
     #
     #  Required Auth Level: None
 
-    logging.warning("Rendering error page with Message: {}".format(msg))
+    logging.warning("Rendering error page with Error Code: {}, {}".format(errCode, msg))
+
+    # If we do not have an authenticated user
+    if authedUser is None:
+        # Then set the default values for the items we need from it
+        linkedHalls = []
+        authLevel = 0
+        hallName = ""
+
+    else:
+        # Otherwise, pull the values that are needed from the authenticated user
+        linkedHalls = authedUser.getAllAssociatedResHalls()
+        authLevel = authedUser.auth_level()
+        hallName = authedUser.hall_name()
 
     # Render the error page with the appropriate message.
-    return render_template("error.html", errorMsg=msg)
+    return render_template("error.html", errorCode=errCode, errorMsg=msg, addInfo=addInfo,
+                           hall_name=hallName, linkedHalls=linkedHalls, auth_level=authLevel,
+                           opts=ag.baseOpts, curView=-1)
+
+
+@app.route("/reportAnIssue")
+def forwardToGitReports():
+    # An endpoint that will forward the user to a page where they can create a
+    #  bug report that is submitted as an Issue in GitHub.
+    #
+    #  Required Auth Level: None
+
+    # Log that the user is attempting to create a Bug Report. This can help
+    #  provide context as to what the user was doing before an error occurred.
+    logging.warning("Directing User to Bug Report Submission Form")
+
+    # Return a redirect to the Bug Report page
+    return redirect(os.environ["BUG_URL"])
 
 
 if __name__ == "__main__":

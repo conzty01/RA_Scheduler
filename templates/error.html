@@ -1,16 +1,83 @@
-<html>
-    <head>
-        <title>Luther College RA Scheduling App</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <link rel="stylesheet" href="{{url_for('static', filename='master.css')}}">
-    </head>
-    <body>
-        <h1>Oh, No!</h1>
-        {% if errorMsg != None: %}
-        <p>{{ errorMsg }}</p>
-        {% else: %}
-        <p>It looks like something strange happened and I'm not exactly sure what it is!</p>
-        {% endif %}
-        <p>Please contact your Hall Director or Assistant Hall Director.</p>
-    </body>
-</html>
+{% extends "base.html" %}
+{% block styles %}
+{{ super() }}
+<style>
+#errorTitle {
+    margin-top: 5%;
+}
+#additionalInfo {
+    margin-bottom: 20px;
+}
+#errorMessage {
+    margin-bottom: 20px;
+}
+</style>
+{% endblock styles %}
+
+{% block navbar %}
+
+{% if linkedHalls|length >= 1: %}
+    {{ super() }}
+{% else: %}
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <a class="navbar-brand" href="#" id="hallSelector" aria-haspopup="true" aria-expanded="false">
+        RA Duty Scheduler
+    </a>
+
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+        <ul class="navbar-nav w-100">
+            <li class="nav-item">
+                <a class="nav-link" href="{{url_for('login')}}">Log In</a>
+            </li>
+        </ul>
+    </div>
+</nav>
+
+{% endif %}
+
+{% endblock navbar%}
+
+
+{% block contentRows %}
+<div class="row justify-content-center" id="errorTitle">
+    <h1><span id="errorCode">{{ errorCode }}</span> Error</h1>
+</div>
+
+<div class="row justify-content-center" id="errorMessage">
+    {% if errorMsg != None: %}
+    <h4>{{ errorMsg }}</h4>
+    {% else: %}
+    <h4>It looks like something strange happened...</h4>
+    {% endif %}
+</div>
+
+<div class="row justify-content-center" id="additionalInfo">
+    {% if addInfo != None: %}
+    <div class="row">
+        <div class="col-sm-12">
+            {{ addInfo }}
+        </div>
+    </div>
+    {% else: %}
+    <div class="row">
+        <div class="col-sm-12">
+            We recommend giving us <a href="javascript:history.back()">another shot at that</a>!
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<div class="row justify-content-center">
+    <div class="row">
+        <div class="col-sm-12">
+            If the problem persists, please let us know with a
+        <a href="{{ url_for('forwardToGitReports') }}" target="_blank" >bug report</a>.
+        </div>
+    </div>
+</div>
+{% endblock contentRows %}
+
+{% block scripts %}
+{{ super() }}
+{% endblock scripts %}
