@@ -283,20 +283,24 @@ def index():
 # --      Error Handling      --
 # ------------------------------
 
-@app.errorhandler(404)
-def error404Handler(e):
-    # A 404 Error has occurred in the base app. Generate an appropriate
-    #  response to display to the user.
+@app.errorhandler(401)
+def error401Handler(e):
+    # A 401 Unauthorized Error has occurred in the base app. Generate an appropriate
+    #  response to display to the user. Although the HTTP standard specifies "unauthorized",
+    #  semantically this response means "unauthenticated". That is, the client must
+    #  authenticate itself to get the requested response.
 
-    # Attempt to authorize the user against the DB
-    authedUser = getAuth()
+    # This error will be raised if there is an issue finding the user/RA in the DB. As a
+    #  result, we should proceed as if the user is not in the DB.
+    authedUser = None
 
     # Create the appropriate Message, Code, and Additional Information to
     #  be displayed to the user
-    errMsg = "Page Not Found"
-    errCode = 404
-    addInfo = "We can't seem to find the page you're looking for. Try " \
-              "checking the spelling of the URL or going back to the previous page."
+    errMsg = "Unauthorized"
+    errCode = 401
+    addInfo = "We were unable to verify your identity in our records. " \
+              "Please reach out to your Hall Director/Area Coordinator to have " \
+              "an account created for you."
 
     # Call and return the result from the generateErrorPage method
     return generateErrorPage(errMsg, errCode, addInfo, authedUser), errCode
@@ -304,7 +308,7 @@ def error404Handler(e):
 
 @app.errorhandler(403)
 def error403Handler(e):
-    # A 403 Error has occurred in the base app. Generate an appropriate
+    # A 403 Forbidden Error has occurred in the base app. Generate an appropriate
     #  response to display to the user.
 
     # Attempt to authorize the user against the DB
@@ -322,9 +326,28 @@ def error403Handler(e):
     return generateErrorPage(errMsg, errCode, addInfo, authedUser), errCode
 
 
+@app.errorhandler(404)
+def error404Handler(e):
+    # A 404 Page Not Found Error has occurred in the base app. Generate an appropriate
+    #  response to display to the user.
+
+    # Attempt to authorize the user against the DB
+    authedUser = getAuth()
+
+    # Create the appropriate Message, Code, and Additional Information to
+    #  be displayed to the user
+    errMsg = "Page Not Found"
+    errCode = 404
+    addInfo = "We can't seem to find the page you're looking for. Try " \
+              "checking the spelling of the URL or going back to the previous page."
+
+    # Call and return the result from the generateErrorPage method
+    return generateErrorPage(errMsg, errCode, addInfo, authedUser), errCode
+
+
 @app.errorhandler(410)
 def error410Handler(e):
-    # A 410 Error has occurred in the base app. Generate an appropriate
+    # A 410 Gone Error has occurred in the base app. Generate an appropriate
     #  response to display to the user.
 
     # Attempt to authorize the user against the DB
@@ -342,7 +365,7 @@ def error410Handler(e):
 
 @app.errorhandler(500)
 def error500Handler(e):
-    # A 500 Error has occurred in the base app. Generate an appropriate
+    # A 500 Internal Server Error has occurred in the base app. Generate an appropriate
     #  response to display to the user.
 
     # Attempt to authorize the user against the DB
