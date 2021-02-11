@@ -1,4 +1,4 @@
-from flask import request, jsonify, redirect, url_for, Blueprint
+from flask import request, jsonify, redirect, url_for, Blueprint, abort
 from integration.gCalIntegration import gCalIntegratinator
 from flask_login import login_required
 from calendar import monthrange
@@ -136,8 +136,8 @@ def returnGCalRedirect():
         logging.info("User Not Authorized - RA: {} attempted to connect Google Calendar for Hall: {} -G"
                      .format(authedUser.ra_id(), authedUser.hall_id()))
 
-        # Notify the user that they are not authorized.
-        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+        # Raise an 403 Access Denied HTTP Exception that will be handled by flask
+        abort(403)
 
     # Get the authorization url and state from the Google Calendar Interface
     authURL, state = gCalInterface.generateAuthURL(ag.baseOpts["HOST_URL"] + "/int/GCalAuth")
@@ -217,8 +217,8 @@ def handleGCalAuthResponse():
         logging.info("User Not Authorized - RA: {} attempted to connect Google Calendar for Hall: {} -R"
                      .format(authedUser.ra_id(), authedUser.hall_id()))
 
-        # Notify the user that they are not authorized.
-        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+        # Raise an 403 Access Denied HTTP Exception that will be handled by flask
+        abort(403)
 
     # Get the state that was passed back by the authorization response.
     #  This is used to map the request to the response
@@ -329,8 +329,8 @@ def disconnectGoogleCalendar():
         logging.info("User Not Authorized - RA: {} attempted to disconnect Google Calendar for Hall: {}"
                      .format(authedUser.ra_id(), authedUser.hall_id()))
 
-        # Notify the user that they are not authorized.
-        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+        # Raise an 403 Access Denied HTTP Exception that will be handled by flask
+        abort(403)
 
     # Create the cursor
     cur = ag.conn.cursor()
