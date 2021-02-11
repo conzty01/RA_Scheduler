@@ -343,8 +343,6 @@ class TestBreakBP_editBreaks(unittest.TestCase):
         self.assertRaises(custException, self.server.get, "/breaks/editBreaks",
                           base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
 
-        # -- Assert --
-
         # Assert that the mocked_abort was called with the expected value
         mocked_abort.assert_called_once_with(403)
 
