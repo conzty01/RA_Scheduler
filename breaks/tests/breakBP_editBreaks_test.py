@@ -1,4 +1,3 @@
-from werkzeug.exceptions import Forbidden
 from unittest.mock import MagicMock, patch
 from scheduleServer import app
 from flask import Response
