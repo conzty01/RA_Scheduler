@@ -39,6 +39,9 @@ export USE_ADHOC=true
 #  and CRITICAL. If the LOG_LEVEL is not recognized, then WARNING is used.
 export LOG_LEVEL='DEBUG'
 
+# The BUG_URL is the URL where users can go to submit bug reports.
+export BUG_URL=''
+
 # Enabling EXPLAIN_TEMPLATE_LOADING will instruct Flask to print out the steps
 #  it goes through to locate templates on every render_template call. This is
 #  used for debugging
