@@ -1,5 +1,5 @@
+from flask import redirect, url_for, abort
 from flask_login import current_user
-from flask import redirect, url_for
 import datetime
 import logging
 
@@ -33,6 +33,8 @@ def getAuth():
     # The email returned from Google
     uEmail = current_user.username
 
+    logging.debug(uEmail)
+
     # Create a DB cursor
     cur = ag.conn.cursor()
 
@@ -49,6 +51,8 @@ def getAuth():
     # Get user info from the database
     res = cur.fetchall()
 
+    logging.debug("DB Result: {}".format(res))
+
     # Check to see if we found any records for the user
     if len(res) == 0:
         # If the user does not exist, go to error url
@@ -57,8 +61,8 @@ def getAuth():
         # Close the DB cursor
         cur.close()
 
-        # Redirect to the error page
-        return redirect(url_for("err", msg="No user found with email: {}".format(uEmail)))
+        # Raise an 401 Unauthorized HTTP Exception that will be handled by flask
+        abort(401)
 
     # Otherwise, pull the RA's information from the first record and create the dictionary
     #  to be returned
@@ -78,6 +82,8 @@ def getAuth():
 
     # Close the DB cursor
     cur.close()
+
+    logging.debug("getAuth Complete")
 
     # Return our authentication dictionary
     return AuthenticatedUser(uEmail, ra_id, fName, lName, res_halls)

@@ -1,4 +1,5 @@
 from unittest.mock import MagicMock, patch
+from werkzeug.exceptions import Unauthorized
 import unittest
 
 from helperFunctions.helperFunctions import getAuth
@@ -160,7 +161,7 @@ class TestHallBP_getAuth(unittest.TestCase):
 
     def test_whenCurrentUsernameIsNotInDB_returnsRedirectForErrorPage(self):
         # Test to ensure that when this method is called with a username that
-        #  is NOT in the DB, the method returns a redirect for the Error page.
+        #  is NOT in the DB, the method aborts with a 401 HTTP Error.
 
         # -- Arrange --
 
@@ -178,9 +179,9 @@ class TestHallBP_getAuth(unittest.TestCase):
         ]
 
         # -- Act --
+        # -- Assert --
 
-        # Call getAuth()
-        result = getAuth()
+        self.assertRaises(Unauthorized, getAuth)
 
         # -- Assert --
 
@@ -203,18 +204,6 @@ class TestHallBP_getAuth(unittest.TestCase):
 
         # Assert that appGlobals.conn.cursor().close was called
         self.mocked_appGlobals.conn.cursor().close.assert_called_once()
-
-        # Assert that the url for the error page was looked up
-        self.mocked_urlFor.assert_called_once_with(
-            "err",
-            msg="No user found with email: {}".format(self.username)
-        )
-
-        # Assert that a redirect for the error page was created
-        self.mocked_redirect.assert_called_once_with(self.mocked_urlFor(""))
-
-        # Assert that the redirect that was created was returned by the method
-        self.assertEqual(self.mocked_redirect(""), result)
 
     def test_whenCurrentUsernameIsInDB_ifAssociatedWithMultipleHalls_returnsExpectedAuthenticatedUser(self):
         # Test to ensure that when this method is called with a username that
