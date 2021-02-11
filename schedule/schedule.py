@@ -415,9 +415,19 @@ def runScheduler():
     # Load the result from the DB
     partialRAList = cur.fetchall()
 
-    # Get the start and end date for the school year. This will be used
-    #  to calculate how many points each RA has for the given year.
-    start, end = getSchoolYear(date.month, date.year)
+    # Get the start date for the school year. This will be used
+    #  to calculate how many points each RA has up to the month
+    #  being scheduled.
+    start, _ = getSchoolYear(date.month, date.year)
+
+    # Get the end from the DB. The end date will be the first day
+    #  of the month being scheduled. This will prevent the scheduler
+    #  from using the number of points an RA had during a previous
+    #  run of the scheduler for this month.
+    cur.execute("SELECT year FROM month WHERE id = %s", (monthId,))
+
+    # Load the value from the DB and convert it to a string in the expected format
+    end = cur.fetchone()[0].isoformat()
 
     # Get the number of days in the given month
     _, dateNum = calendar.monthrange(date.year, date.month)
@@ -436,15 +446,20 @@ def runScheduler():
     for res in partialRAList:
         # Add up the RA's duty points and any point modifier
         pts = ptsDict[res[2]]["pts"]["dutyPts"] + ptsDict[res[2]]["pts"]["modPts"]
+
+        # Parse out the date information since we only use the day in this implementation
+        parsedConflictDays = [dateObject.day for dateObject in res[5]]
+
+        # Append the newly created RA to the ra_list
         ra_list.append(
             RA(
-                res[0],     # First Name
-                res[1],     # Last Name
-                res[2],     # RA ID
-                res[3],     # Hall ID
-                res[4],     # Start Date
-                res[5],     # Conflicts
-                pts         # Points
+                res[0],                 # First Name
+                res[1],                 # Last Name
+                res[2],                 # RA ID
+                res[3],                 # Hall ID
+                res[4],                 # Start Date
+                parsedConflictDays,     # Conflicts
+                pts                     # Points
             )
         )
 
@@ -1033,15 +1048,17 @@ def addNewDuty():
 
     # Check to see if we did not find a schedule fitting the day and hall.
     if schedId is None:
-        # If we did not, log the occurrence.
-        logging.warning("Add Duty - unable to locate schedule for Month: {}, Hall: {}"
-                        .format(monthId, authedUser.hall_id()))
+        # If we did not, then create an entry in the schedule table for this Duty.
+        # log the occurrence.
+        logging.info("Add Duty - unable to locate schedule for Month: {}, Hall: {} - Creating new schedule."
+                     .format(monthId, authedUser.hall_id()))
 
-        # Close the DB cursor
-        cur.close()
+        # Insert the schedule entry into the DB
+        cur.execute("INSERT INTO schedule (hall_id, month_id) VALUES (%s, %s) RETURNING id",
+                    (authedUser.hall_id(), monthId))
 
-        # Notify the user and stop processing
-        return jsonify(stdRet(0, "Unable to validate schedule."))
+        # Load the schedule ID from the DB
+        schedId = cur.fetchone()
 
     # Execute an INSERT statement to have the duty created in the duties table
     cur.execute("""INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val, flagged)

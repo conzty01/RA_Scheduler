@@ -235,6 +235,10 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
 
     logging.debug(" Finished Creating Calendar")
 
+    logging.debug(" Initial numDoubleDays: {}".format(numDoubleDays))
+    logging.debug(" Initial lastDateAssigned: {}".format(lastDateAssigned))
+    logging.debug(" Initial numFlagDuties: {}".format(numFlagDuties))
+
     stateStack = Stack()    # Stack of memory states for traversing the dates
     # The stack contains tuples of the following objects:
     #       0: Date object for the given state
@@ -262,12 +266,9 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
         curState = stateStack.pop()
         curDay, candList, lastDateAssigned, numDoubleDays, numFlagDuties = curState.restoreState()
 
-        # logging.debug("""  -- TOP OF SCHEDULE LOOP --
-        #                     Current Day: {}
-        #                     Candidate List: {}
-        #                     lastDateAssigned: {}
-        #                     numDoubleDays: {}
-        #               """.format(curDay,candList,lastDateAssigned,numDoubleDays))
+        # logging.debug("--TOP OF SCHEDULE LOOP--\n" +
+        #               "Current Day: {}\nCandidate List: {}\nlastDateAssigned: {}\nnumDoubleDays: {}"
+        #               .format(curDay, candList, lastDateAssigned, numDoubleDays))
         # input("  Hit 'Enter' to continue ")
 
         # If there are no more candidate RAs for a given day, then go back to
@@ -333,11 +334,7 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
         for key in sorted(cal.keys()):
 
             day = cal[key]
-            # logging.debug(""" -- Top of Parsing Loop --
-            #                     Prev: {}
-            #                     Key: {}
-            #                     Day: {}
-            #             """.format(prev,key,day))
+            # logging.debug(" -- Top of Parsing Loop --\nPrev: {}\nKey: {}\nDay: {}".format(prev,key,day))
             d = day.getDate()
 
             # If the date is the same as the previous date, and the date is not -1

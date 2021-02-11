@@ -114,6 +114,7 @@ class TestHelperFunctions_fileAllowed(unittest.TestCase):
 
         # -- Arrange --
 
+        # Create the objects used in this test
         format1 = "MM-DD-YYYY"
         expectedFormat1Str = "01-14-2021"
 
@@ -126,20 +127,49 @@ class TestHelperFunctions_fileAllowed(unittest.TestCase):
         format4 = "MM-YYYY-DD"
         expectedFormat4Str = "01-2021-14"
 
+        partialFormat1 = "MM"
+        expectedPartialFormat1Str = "01"
+
+        partialFormat2 = "DD"
+        expectedPartialFormat2Str = "14"
+
+        partialFormat3 = "YYYY"
+        expectedPartialFormat3Str = "2021"
+
+        invalidFormat = "AA-BB-CCCC"
+        expectedInvalidFormatStr = "--"
+
         # -- Act --
 
+        # Call the method being tested using the fully formatted format strings
         format1Res = formatDateStr(14, 1, 2021, format=format1)
         format2Res = formatDateStr(14, 1, 2021, format=format2)
         format3Res = formatDateStr(14, 1, 2021, format=format3)
         format4Res = formatDateStr(14, 1, 2021, format=format4)
 
+        # Call the method being tested using the partially formatted format strings
+        partFormat1Res = formatDateStr(14, 1, 2021, format=partialFormat1)
+        partFormat2Res = formatDateStr(14, 1, 2021, format=partialFormat2)
+        partFormat3Res = formatDateStr(14, 1, 2021, format=partialFormat3)
+
+        # Call the method being tested using the format string with invalid characters
+        invalidFormatRes = formatDateStr(14, 1, 2021, format=invalidFormat)
+
         # -- Assert
 
-        # Assert that the formatted date strings came out as expected
+        # Assert that the fully formatted date strings came out as expected
         self.assertEqual(expectedFormat1Str, format1Res)
         self.assertEqual(expectedFormat2Str, format2Res)
         self.assertEqual(expectedFormat3Str, format3Res)
         self.assertEqual(expectedFormat4Str, format4Res)
+
+        # Assert that the partially formatted date strings came out as expected
+        self.assertEqual(expectedPartialFormat1Str, partFormat1Res)
+        self.assertEqual(expectedPartialFormat2Str, partFormat2Res)
+        self.assertEqual(expectedPartialFormat3Str, partFormat3Res)
+
+        # Assert that the format string with invalid characters came out as expected
+        self.assertEqual(expectedInvalidFormatStr, invalidFormatRes)
 
     def test_whenProvidedDivider_returnsDateUsingProvidedDivider(self):
         # Test to ensure that when provided a divider character, the
