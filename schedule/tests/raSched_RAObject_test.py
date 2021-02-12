@@ -34,40 +34,272 @@ class TestRAObject(unittest.TestCase):
         self.patcher_loggingERROR.stop()
 
     def test_hasExpectedMethods(self):
+        # Test to ensure that the RA Object has the following methods:
+        #  - getConflicts
+        #  - getId
+        #  - getStartDate
+        #  - getPoints
+        #  - addPoints
+        #  - removePoints
+        #  - getName
+        #  - getHallId
+
         # -- Arrange --
         # -- Act --
         # -- Assert --
-        pass
+
+        self.assertTrue(hasattr(RA, "getConflicts"))
+        self.assertTrue(hasattr(RA, "getId"))
+        self.assertTrue(hasattr(RA, "getStartDate"))
+        self.assertTrue(hasattr(RA, "getPoints"))
+        self.assertTrue(hasattr(RA, "addPoints"))
+        self.assertTrue(hasattr(RA, "removePoints"))
+        self.assertTrue(hasattr(RA, "getName"))
+        self.assertTrue(hasattr(RA, "getHallId"))
 
     def test_hasExpectedProperties(self):
+        # Test to ensure that the RA Object has the following properties:
+        #  - firstName
+        #  - lastName
+        #  - fullName
+        #  - id
+        #  - hallId
+        #  - conflicts
+        #  - dateStarted
+        #  - points
+
         # -- Arrange --
+
+        # Create the objects used in this test
+        desiredFirstName = "User"
+        desiredLastName = "Test"
+        desiredID = 99
+        desiredHallID = 12
+        desiredDateStarted = date(2021, 2, 12)
+        desiredConflicts = [1, 2, 3]
+        desiredPoints = 1234
+
+        # Create the RA Object being tested
+        testRAObject = RA(
+            desiredFirstName,
+            desiredLastName,
+            desiredID,
+            desiredHallID,
+            desiredDateStarted,
+            desiredConflicts,
+            desiredPoints
+        )
+
         # -- Act --
         # -- Assert --
-        pass
+
+        # Assert that the above properties exist and are as we expect
+        self.assertIsInstance(testRAObject.firstName, str)
+        self.assertIsInstance(testRAObject.lastName, str)
+        self.assertIsInstance(testRAObject.fullName, str)
+        self.assertIsInstance(testRAObject.id, int)
+        self.assertIsInstance(testRAObject.hallId, int)
+        self.assertIsInstance(testRAObject.dateStarted, date)
+        self.assertIsInstance(testRAObject.conflicts, list)
+        self.assertIsInstance(testRAObject.points, int)
 
     def test_hasExpectedDefaultValues(self):
+        # Test to ensure that when omitting non-required parameters
+        #  when constructing an RA Object, the default values are
+        #  as we would expect.
+
         # -- Arrange --
+
+        # Create the objects used in this test
+        desiredFirstName = "User"
+        desiredLastName = "Test"
+        desiredID = 99
+        desiredHallID = 12
+        desiredDateStarted = date(2021, 2, 12)
+        expectedConflicts = []
+        expectedPoints = 0
+
         # -- Act --
+
+        # Create the RA Object being tested
+        testRAObject = RA(
+            desiredFirstName,
+            desiredLastName,
+            desiredID,
+            desiredHallID,
+            desiredDateStarted
+        )
+
         # -- Assert --
-        pass
+
+        # Assert that the values that weren't provided are set to the expected defaults
+        self.assertEqual(expectedConflicts, testRAObject.conflicts)
+        self.assertEqual(expectedPoints, testRAObject.points)
 
     def test_magicMethodStr_returnsExpectedString(self):
+        # Test to ensure that the __str__ magic method returns the expected result
+
         # -- Arrange --
+
+        # Create the objects to be used in this test
+        desiredFirstName = "User"
+        desiredLastName = "Test"
+        desiredID = 99
+        desiredHallID = 12
+        desiredDateStarted = date(2021, 2, 12)
+        desiredPoints=14
+
+        expectedResult1 = "User1 Test has 0 points"
+        expectedResult2 = "User2 Test has {} points".format(desiredPoints)
+
+        # Create the RA Object being tested
+        testRAObject1 = RA(
+            desiredFirstName + str(1),
+            desiredLastName,
+            desiredID,
+            desiredHallID,
+            desiredDateStarted
+        )
+        testRAObject2 = RA(
+            desiredFirstName + str(2),
+            desiredLastName,
+            desiredID,
+            desiredHallID,
+            desiredDateStarted,
+            points=desiredPoints
+        )
+
         # -- Act --
+
+        # Call the method being tested
+        result1 = testRAObject1.__str__()
+        result2 = testRAObject2.__str__()
+
         # -- Assert --
-        pass
+
+        # Assert that we received the expected results
+        self.assertEqual(expectedResult1, result1)
+        self.assertEqual(expectedResult2, result2)
 
     def test_magicMethodRepr_returnsExpectedRepr(self):
+        # Test to ensure that the __repr__ magic method returns
+        #  the expected result
+
         # -- Arrange --
+
+        # Create the objects to be used in this test
+        desiredFirstName = "User"
+        desiredLastName = "Test"
+        desiredID = 99
+        desiredHallID = 12
+        desiredDateStarted = date(2021, 2, 12)
+        desiredPoints = 14
+
+        expectedResult1 = "RA(Id: {}, Name: {})".format(desiredID, desiredFirstName + "1")
+        expectedResult2 = "RA(Id: {}, Name: {})".format(desiredID, desiredFirstName + "2")
+
+        # Create the RA Object being tested
+        testRAObject1 = RA(
+            desiredFirstName + str(1),
+            desiredLastName,
+            desiredID,
+            desiredHallID,
+            desiredDateStarted
+        )
+        testRAObject2 = RA(
+            desiredFirstName + str(2),
+            desiredLastName,
+            desiredID,
+            desiredHallID,
+            desiredDateStarted,
+            points=desiredPoints
+        )
+
         # -- Act --
+
+        # Call the method being tested
+        result1 = testRAObject1.__repr__()
+        result2 = testRAObject2.__repr__()
+
         # -- Assert --
-        pass
+
+        # Assert that we received the expected results
+        self.assertEqual(expectedResult1, result1)
+        self.assertEqual(expectedResult2, result2)
 
     def test_magicMethodIter_iteratesOverConflicts(self):
-        for pos, conflict in enumerate(self.ra):
-            self.assertEqual(self.ra.conflicts[pos], conflict)
+        # Test to ensure that the __iter__ magic method iterates over the RA
+        #  Object's conflicts.
+
+        # -- Arrange --
+        # Create the objects to be used in this test
+        desiredFirstName = "User"
+        desiredLastName = "Test"
+        desiredID = 99
+        desiredHallID = 12
+        desiredDateStarted = date(2021, 2, 12)
+        desiredConflicts = [i for i in range(20)]
+
+        # Create the RA Object being tested
+        testRAObject = RA(
+            desiredFirstName + str(1),
+            desiredLastName,
+            desiredID,
+            desiredHallID,
+            desiredDateStarted,
+            desiredConflicts
+        )
+
+        # -- Act --
+        # -- Assert --
+
+        # Iterate using the __iter__ method
+        for pos, conflict in enumerate(testRAObject.__iter__()):
+            # Assert that we are seeing the expected value.
+            self.assertEqual(testRAObject.conflicts[pos], conflict)
 
     def test_magicMethodEq_returnsTrueIfAndOnlyIfAllDesiredAttributesMatch(self):
+        # Test to ensure that the magic method __eq__ returns True if and
+        #  only if all of the following attributes are the same.
+
+        # -- Arrange --
+
+        # Create the objects to be used in this test
+        desiredFirstName = "User"
+        desiredLastName = "Test"
+        desiredID = 99
+        desiredHallID = 12
+        desiredDateStarted = date(2021, 2, 12)
+        desiredConflicts = [i for i in range(20)]
+
+        # Create the RA Object being tested
+        testRAObject1 = RA(
+            desiredFirstName + str(1),
+            desiredLastName,
+            desiredID,
+            desiredHallID,
+            desiredDateStarted,
+            desiredConflicts
+        )
+        testRAObject2 = RA(
+            desiredFirstName + str(1),
+            desiredLastName,
+            desiredID,
+            desiredHallID,
+            desiredDateStarted,
+            desiredConflicts
+        )
+        testRAObject3 = RA(
+            desiredFirstName + str(1),
+            desiredLastName,
+            desiredID,
+            desiredHallID,
+            desiredDateStarted,
+            desiredConflicts
+        )
+        # -- Act --
+        # -- Assert --
+
         ra1 = RA("1","1",1,0,date(2017,1,1))
         ra2 = RA("1","1",1,0,date(2017,1,1))
         ra3 = RA("2","2",3,0,date(2017,1,1))
