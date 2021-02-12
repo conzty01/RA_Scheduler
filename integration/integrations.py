@@ -580,4 +580,4 @@ def exportToGCal():
     cur.close()
 
     # Otherwise report that it was a success!
-    return retStatus
+    return jsonify(retStatus)
