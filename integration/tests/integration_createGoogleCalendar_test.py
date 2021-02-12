@@ -287,8 +287,8 @@ class TestIntegration_createGoogleCalendar(unittest.TestCase):
         #  the whitespace must match exactly.
         self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
             """UPDATE google_calendar_info
-                   SET calendar_id = %s
-                   WHERE id = %s""",
+                       SET calendar_id = %s
+                       WHERE id = %s""",
             (expectedCreateGoogleCalendarReturnValue, desiredCalendarInfoID)
         )
 
@@ -356,8 +356,8 @@ class TestIntegration_createGoogleCalendar(unittest.TestCase):
         #  the whitespace must match exactly.
         self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
             """UPDATE google_calendar_info
-                   SET calendar_id = %s
-                   WHERE id = %s""",
+                       SET calendar_id = %s
+                       WHERE id = %s""",
             (expectedCreateGoogleCalendarReturnValue, desiredCalendarInfoID)
         )
 

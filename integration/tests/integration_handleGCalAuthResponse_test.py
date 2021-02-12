@@ -502,7 +502,9 @@ class TestIntegration_handleGCalAuthResponse(unittest.TestCase):
         mocked_createGoogleCalendar.assert_called_once_with(expectedInfoID)
 
         # Assert that the DB was rolled back
-        self.mocked_appGlobals.conn.rollback.assert_called_once()
+        self.mocked_loggingWARNING.assert_called_once_with(
+            "Unable to Create Google Calendar for Hall: {}".format(self.user_hall_id)
+        )
 
         # Assert that appGlobals.conn.commit was never called
         self.mocked_appGlobals.conn.commit.assert_not_called()
