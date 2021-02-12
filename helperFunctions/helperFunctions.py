@@ -33,7 +33,7 @@ def getAuth():
     # The email returned from Google
     uEmail = current_user.username
 
-    logging.debug(uEmail)
+    #logging.debug(uEmail)
 
     # Create a DB cursor
     cur = ag.conn.cursor()
