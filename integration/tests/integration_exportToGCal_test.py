@@ -694,9 +694,9 @@ class TestIntegration_exportToGCal(unittest.TestCase):
 
     @patch("integration.integrations.getSchedule2", autospec=True)
     @patch("integration.integrations.getBreakDuties", autospec=True)
-    def test_withAuthorizedUser_withTokenInDB_ifCalCreationError_returnsExpectedResponse(self,
-                                                                                         mocked_getBreakDuties,
-                                                                                         mocked_getSchedule2):
+    def test_withAuthorizedUser_withTokenInDB_ifScheduleExportError_returnsExpectedResponse(self,
+                                                                                            mocked_getBreakDuties,
+                                                                                            mocked_getSchedule2):
         # Test to ensure that when this method is called with an authorized user,
         #  and a token has already been added in the DB and the export fails, this
         #  method returns a response to the user indicating that they should reconnect
@@ -768,7 +768,7 @@ class TestIntegration_exportToGCal(unittest.TestCase):
     @patch("integration.integrations.getSchedule2", autospec=True)
     @patch("integration.integrations.getBreakDuties", autospec=True)
     def test_withAuthorizedUser_withTokenInDB_whenSuccessful_returnsSuccessfulResponse(self, mocked_getBreakDuties,
-                                                                                     mocked_getSchedule2):
+                                                                                       mocked_getSchedule2):
         # Test to ensure that when this method is called with an authorized user,
         #  and a token has already been added in the DB, when the export succeeds, this
         #  method returns a response to the user indicating that the export was successful.
@@ -834,3 +834,4 @@ class TestIntegration_exportToGCal(unittest.TestCase):
 
         # Assert that we received the expected response
         self.assertDictEqual(expectedResponse, resp.json)
+
