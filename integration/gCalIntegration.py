@@ -321,17 +321,6 @@ class gCalIntegratinator:
             # Set the name of the exception
             self.exceptionName = "GoogleCalendarCreationError"
 
-    class InvalidCalendarIdError(BaseGCalIntegratinatorException):
-        """GCalIntegratinator Exception to be raised if the provided Google
-            Calendar calendar ID is invalid."""
-
-        def __init__(self, *args):
-            # Pass the arguments to the parent class.
-            super().__init__(*args)
-
-            # Set the name of the exception
-            self.exceptionName = "InvalidCalendarIdError"
-
     class InvalidCalendarCredentialsError(BaseGCalIntegratinatorException):
         """GCalIntegratinator Exception to be raised if the provided
             Google Calendar credentials are invalid."""
