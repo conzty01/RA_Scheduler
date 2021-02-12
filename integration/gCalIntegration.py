@@ -304,7 +304,7 @@ class gCalIntegratinator:
             # If a message has been defined
             if self.message is not None:
                 # Then put the message in the string representation
-                return "{}, {}".format(self.exceptionName, self.message)
+                return "{}".format(self.message)
 
             else:
                 # Otherwise return a default string
@@ -316,7 +316,7 @@ class gCalIntegratinator:
 
         def __init__(self, *args):
             # Pass the arguments to the parent class.
-            super().__init__(args)
+            super().__init__(*args)
 
             # Set the name of the exception
             self.exceptionName = "GoogleCalendarCreationError"
@@ -327,7 +327,7 @@ class gCalIntegratinator:
 
         def __init__(self, *args):
             # Pass the arguments to the parent class.
-            super().__init__(args)
+            super().__init__(*args)
 
             # Set the name of the exception
             self.exceptionName = "InvalidCalendarIdError"
@@ -338,7 +338,7 @@ class gCalIntegratinator:
 
         def __init__(self, *args):
             # Pass the arguments to the parent class.
-            super().__init__(args)
+            super().__init__(*args)
 
             # Set the name of the exception
             self.exceptionName = "InvalidCalendarCredentialsError"
@@ -349,7 +349,7 @@ class gCalIntegratinator:
 
         def __init__(self, *args):
             # Pass the arguments to the parent class.
-            super().__init__(args)
+            super().__init__(*args)
 
             # Set the name of the exception
             self.exceptionName = "ExpiredCalendarCredentialsError"
@@ -360,7 +360,7 @@ class gCalIntegratinator:
 
         def __init__(self, wrappedException, *args):
             # Pass the arguments to the parent class.
-            super().__init__(args)
+            super().__init__(*args)
 
             # Set the name of the exception
             self.exceptionName = "ScheduleExportError"
@@ -374,7 +374,7 @@ class gCalIntegratinator:
 
         def __init__(self, location, wrappedException, *args):
             # Pass the arguments to the parent class.
-            super().__init__(self, *args)
+            super().__init__(self, args)
 
             # Set the name of the exception
             self.exceptionName = "GCalIntegratinatorUnknownError"
