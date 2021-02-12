@@ -1,6 +1,7 @@
 from flask import request, jsonify, redirect, url_for, Blueprint, abort
 from integration.gCalIntegration import gCalIntegratinator
 from flask_login import login_required
+from psycopg2 import IntegrityError
 from calendar import monthrange
 from io import BytesIO
 import logging
@@ -82,26 +83,85 @@ def createGoogleCalendar(calInfoId):
 
     logging.debug("Creating Google Calendar")
 
-    # Call the gCalInterface's createGoogleCalendar method to create the calendar
-    #  on Google's side of things. This method will return the calId associated
-    #  with the new Google Calendar.
-    calId = gCalInterface.createGoogleCalendar(token)
+    # Build a try/except to catch any issues that arise during the calendar
+    #  creation process.
+    try:
+        # Call the gCalInterface's createGoogleCalendar method to create the calendar
+        #  on Google's side of things. This method will return the calId associated
+        #  with the new Google Calendar.
+        calId = gCalInterface.createGoogleCalendar(token)
 
-    logging.debug("Updating Google Calendar Information")
+        logging.debug("Updating Google Calendar Information")
 
-    # Add the calendar_id into the Google Calendar Info table
-    cur.execute("""UPDATE google_calendar_info
-                   SET calendar_id = %s
-                   WHERE id = %s""", (calId, calInfoId))
+        # Add the calendar_id into the Google Calendar Info table
+        cur.execute("""UPDATE google_calendar_info
+                       SET calendar_id = %s
+                       WHERE id = %s""", (calId, calInfoId))
 
-    # Commit the changes to the DB
-    ag.conn.commit()
+        # Commit the changes to the DB
+        ag.conn.commit()
+
+        # Return a successful standard return
+        retStatus = stdRet(1, "successful")
+
+    except gCalIntegratinator.InvalidCalendarCredentialsError as e:
+        # If we receive an InvalidCalendarCredentialsError, then that means the
+        #  credentials we parsed are not the expected credentials object.
+
+        # Log the occurrence
+        logging.error("Calendar Creation - Invalid Credential Object: Received {} Object".format(token))
+
+        # We should notify the user that they will need to attempt to reconnect
+        #  their Google Calendar Account.
+        retStatus = stdRet(-1, "Reconnect Google Calendar Account")
+
+    except gCalIntegratinator.ExpiredCalendarCredentialsError as e:
+        # If we receive an ExpiredCalendarCredentialsError, then we were unable to
+        #  refresh the user's credentials.
+
+        # Log the occurrence
+        logging.error("Calendar Creation - Unable to Refresh Google Calendar Credentials: "
+                      "Expired - {}, Refresh Token - {}".format(token.expired, bool(token.refresh_token)))
+
+        # We should notify the user that they will need to reconnect their Google Calendar Account.
+        retStatus = stdRet(-1, "Reconnect Google Calendar Account")
+
+    except gCalIntegratinator.UnexpectedError as e:
+        # If we receive an UnexpectedError, then something happened during when validating credentials.
+
+        # Log the occurrence
+        logging.error("Calendar Creation - Unexpected Error Occurred During: {} - {}"
+                      .format(e.exceptionLocation, e.wrappedException))
+
+        # We should notify the user that an error occurred
+        retStatus = stdRet(-1, "Unexpected Error Occurred. Please try again later.")
+
+    except gCalIntegratinator.CalendarCreationError as e:
+        # If we receive a CalendarCreationError, then we were unable to create a new Google Calendar.
+
+        # Log the occurrence
+        logging.error("Calendar Creation - Unable to Create new Google Calendar: {}".format(str(e)))
+
+        # We should notify the user that an error occurred
+        retStatus = stdRet(-1, "Unable to Create new Google Calendar. Please try again later.")
+
+    except IntegrityError as e:
+        # If we receive a psycopg2.IntegrityError, then we had an issue updating the DB.
+
+        # Log the occurrence
+        logging.error("Calendar Creation - Unable to Create new Google Calendar: Integrity Error")
+
+        # In order for the server to recover the DB connection, we must rollback the change
+        ag.conn.rollback()
+
+        # We should notify the user that an error occurred
+        retStatus = stdRet(-1, "Unexpected Error Occurred. Please try again later.")
 
     # Close the DB cursor
     cur.close()
 
     # Return a successful standard return
-    return stdRet(1, "successful")
+    return retStatus
 
 
 # -------------------------------------
@@ -280,16 +340,7 @@ def handleGCalAuthResponse():
     # If the calendar creation failed...
     if res["status"] < 0:
         # Then log the occurrence
-        logging.warning("Unable to Create Google Calendar for Hall: {} - Rolling back changes"
-                        .format(authedUser.hall_id()))
-
-        # And rollback the Google Calendar Account Connection creation
-        ag.conn.rollback()
-
-        # TODO: I suspect that this rollback statement is unnecessary and possibly cumbersome
-        #        in an environment where multiple DB changes are made in short proximity to
-        #        each other. At this time, however, I do not have any evidence of this and will
-        #        leave the result as-is.
+        logging.warning("Unable to Create Google Calendar for Hall: {}" .format(authedUser.hall_id()))
 
     else:
         # Otherwise commit the changes made to the DB
@@ -468,26 +519,65 @@ def exportToGCal():
     # Load the flag label
     flaggedDutyLabel = cur.fetchone()[0]
 
-    # Pass the combined regular and break duty schedule to the Integratinator to be exported.
-    status = gCalInterface.exportScheduleToGoogleCalendar(token, gCalId, regSched + breakSched, flaggedDutyLabel)
+    try:
+        # Pass the combined regular and break duty schedule to the Integratinator to be exported.
+        gCalInterface.exportScheduleToGoogleCalendar(token, gCalId, regSched + breakSched, flaggedDutyLabel)
 
-    # If the export failed
-    if status < 0:
-        # Log that an error was encountered for future reference.
-        logging.warning("Error: {} encountered while exporting to Google Calendar for Hall: {}"
-                        .format(status, authedUser.hall_id()))
+        # Notify the user that the export was successful
+        retStatus = stdRet(1, "successful")
 
-        # Close the DB cursor
-        cur.close()
+    except gCalIntegratinator.InvalidCalendarCredentialsError as e:
+        # If we receive an InvalidCalendarCredentialsError, then that means the
+        #  credentials we parsed are not the expected credentials object.
 
-        # Then we will need to let the user know that they will need
-        #  to connect/reconnect their Google Calendar Account. This is
-        #  a default suggestion as there currently is no implementation
-        #  that gives us a more granular look at what went wrong.
-        return jsonify(stdRet(0, "Reconnect Google Calendar Account"))
+        # Log the occurrence
+        logging.error("Exporting Schedule - Invalid Credential Object: Received {} Object".format(token))
+
+        # We should notify the user that they will need to attempt to reconnect
+        #  their Google Calendar Account.
+        retStatus = stdRet(-1, "Reconnect Google Calendar Account")
+
+    except gCalIntegratinator.ExpiredCalendarCredentialsError as e:
+        # If we receive an ExpiredCalendarCredentialsError, then we were unable to
+        #  refresh the user's credentials.
+
+        # Log the occurrence
+        logging.error("Exporting Schedule - Unable to Refresh Google Calendar Credentials: "
+                      "Expired - {}, Refresh Token - {}".format(token.expired, bool(token.refresh_token)))
+
+        # We should notify the user that they will need to reconnect their Google Calendar Account.
+        retStatus = stdRet(-1, "Reconnect Google Calendar Account")
+
+    except gCalIntegratinator.UnexpectedError as e:
+        # If we receive an UnexpectedError, then something happened during when validating credentials.
+
+        # Log the occurrence
+        logging.error("Exporting Schedule - Unexpected Error Occurred During: {} - {}"
+                      .format(e.exceptionLocation, e.wrappedException))
+
+        # We should notify the user that an error occurred
+        retStatus = stdRet(-1, "Unexpected Error Occurred. Please try again later.")
+
+    except gCalIntegratinator.CalendarCreationError as e:
+        # If we receive a CalendarCreationError, then we were unable to create a new Google Calendar.
+
+        # Log the occurrence
+        logging.error("Exporting Schedule - Unable to Create new Google Calendar: {}".format(str(e)))
+
+        # We should notify the user that an error occurred
+        retStatus = stdRet(-1, "Unable to Create new Google Calendar. Please try again later.")
+
+    except gCalIntegratinator.ScheduleExportError as e:
+        # If we receive a ScheduleExportError, then we had an issue exporting the schedule to Google Calendar.
+
+        # Log the occurrence
+        logging.error("Exporting Schedule - Error Received When Exporting: {}".format(e.wrappedException))
+
+        # We should notify the user that an error occurred
+        retStatus = stdRet(-1, "Unexpected Error Occurred. Please try again later.")
 
     # Close the DB cursor
     cur.close()
 
     # Otherwise report that it was a success!
-    return jsonify(stdRet(1, "successful"))
+    return retStatus

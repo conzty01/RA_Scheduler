@@ -138,7 +138,7 @@ class gCalIntegratinator:
             logging.error(str(e))
 
             # Raise an UnknownError
-            raise self.UnexpectedError("Calendar Credential Validation", str(e))
+            raise self.UnexpectedError("Calendar Credential Validation", e, str(e))
 
         # If we made it this far without raising an exception,
         #  then the credentials are valid.
@@ -281,10 +281,7 @@ class gCalIntegratinator:
             # Wrap the exception in a ScheduleExportError and raise it
             raise self.ScheduleExportError(e, "Unable to export schedule to Google Calendar.")
 
-        # Once finished with the export, return back a True status
         logging.info("Export complete")
-
-        return True
 
     class BaseGCalIntegratinatorException(Exception):
         # Base GCalIntegratinator Exception
@@ -374,7 +371,7 @@ class gCalIntegratinator:
         """GCalIntegratinator Exception to be raised if an unknown
             error occurs within the GCalIntegratintor object"""
 
-        def __init__(self, location, *args):
+        def __init__(self, location, wrappedException, *args):
             # Pass the arguments to the parent class.
             super().__init__(self, *args)
 
@@ -383,6 +380,9 @@ class gCalIntegratinator:
 
             # Set the location of where the error occurred.
             self.exceptionLocation = location
+
+            # Set the wrapped exception
+            self.wrappedException = wrappedException
 
 
 class Event:
