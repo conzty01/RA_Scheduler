@@ -87,19 +87,15 @@ class gCalIntegratinator:
             }
         }
 
-    def _checkIfValidCreds(self, creds):
-        # Check to see if the client credentials are valid
-
-        # Expected Return Statuses:
-        #   -3: Invalid Credentials Received
-        #   -2: Need to Renew Credentials
-        #   -1: Unknown Error Occurred
-        #    0: Credentials are valid
-        #    1: Credentials are valid but needed refresh
+    def _validateCredentials(self, creds):
+        # Check to see if the client credentials are valid and that they have not
+        #  expired. This method can have the following outcomes:
+        #
+        #  If the credentials are valid, then the credentials will be returned
+        #  If the credentials are not valid, an InvalidCalendarCredentialsError will be raised.
+        #  If the credentials have expired, an ExpiredCalendarCredentialsError will be raised.
 
         logging.debug("Checking Credentials")
-
-        retStatus = 1
 
         try:
             # Are the credentials invalid?
@@ -109,29 +105,44 @@ class gCalIntegratinator:
                 #  then refresh the credentials
                 if creds.expired and creds.refresh_token:
                     creds.refresh(Request())
-                    retStatus = 0
 
                 else:
                     # Otherwise we will need to prompt the user to log in
                     #  and approve integration again.
                     logging.debug("Manual Credential Refresh Required")
-                    retStatus = -2
+                    raise self.ExpiredCalendarCredentialsError("Manual Credential Refresh Required")
 
             else:
                 # If the credentials are valid, return successful
                 logging.debug("Credentials Valid")
 
-
         except AttributeError:
+            # If we receive an AttributeError, then we did not receive the expected
+            #  credentials object.
+
+            # Log the occurrence
             logging.info("Invalid Credentials Received")
-            retStatus = -3
+
+            # Raise an InvalidCalendarCredentialsError
+            raise self.InvalidCalendarCredentialsError("Invalid Credentials Received")
+
+        except self.ExpiredCalendarCredentialsError as e:
+            # If we receive an ExpiredCalendarCredentialsError, then simply pass that up to
+            #  the calling method.
+            raise e
 
         except Exception as e:
-            logging.error(str(e))
-            retStatus = -1
+            # If we receive some other, unexpected Exception, then notify the calling method
 
-        logging.debug("Credential Status: {}".format(retStatus))
-        return retStatus
+            # Log the occurrence
+            logging.error(str(e))
+
+            # Raise an UnknownError
+            raise self.UnexpectedError("Calendar Credential Validation", e, str(e))
+
+        # If we made it this far without raising an exception,
+        #  then the credentials are valid.
+        return creds
 
     def generateAuthURL(self, redirect_uri):
         # Generate and return an authorization url as well as a state
@@ -163,44 +174,48 @@ class gCalIntegratinator:
         logging.info("Creating Google Calendar")
 
         # Check to make sure the credentials are valid
-        if self._checkIfValidCreds(client_creds) < 0:
-            logging.debug("Issue with Credentials")
-            # If they are not valid, stop processing and report the
-            #  result back to server.
-            return self._checkIfValidCreds(client_creds)
+        client_creds = self._validateCredentials(client_creds)
 
         # Build the Google Calendar service with appropriate version
         service = build(self.serviceName, self.serviceVersion, credentials=client_creds)
 
+        # Create the body of the request to create a new Google Calendar.
         newCalBody = {
             "summary": "RA Duty Schedule",
-            "description": "Calendar for the Resident Assistant Duty Schedule.\n\nCreated and added to by the RA Duty Scheduler Application (RADSA)."
+            "description": "Calendar for the Resident Assistant Duty Schedule.\n\n"
+                           "Created and added to by the RA Duty Scheduler Application (RADSA)."
         }
 
-        created_calendar = service.calendars().insert(body=newCalBody).execute()
+        try:
+            # Call the Google Calendar API Service to have the new calendar created
+            created_calendar = service.calendars().insert(body=newCalBody).execute()
+
+        except Exception as e:
+            # If we received an exception, then wrap it in an CalendarCreationError and
+            #  pass that up to the calling function.
+
+            # Log the occurrence
+            logging.error("Error encountered when attempting to create Google Calendar: {}".format(str(e)))
+
+            # Raise the CalendarCreationError
+            raise self.CalendarCreationError(str(e))
 
         logging.info("Calendar Creation Complete")
 
-        # logging.debug("Closing Calendar Creation Service")
-        # service.close()
-
+        # Return the ID of the new calendar.
         return created_calendar["id"]
 
     def exportScheduleToGoogleCalendar(self, client_creds, calendarId, schedule, flaggedDutyLabel):
         # Export the provided schedule to Google Calendar
 
         # Check to make sure the credentials are valid
-        if self._checkIfValidCreds(client_creds) < 0:
-            logging.debug("Issue with Credentials")
-            # If they are not valid, stop processing and report the
-            #  result back to server.
-            return self._checkIfValidCreds(client_creds)
+        client_creds = self._validateCredentials(client_creds)
+
+        # Create the Google Calendar Service
+        service = build(self.serviceName, self.serviceVersion, credentials=client_creds)
 
         # Check to see if the 'RA Duty Schedule' calendar exists. If not, create
         #  the calendar.
-
-        service = build(self.serviceName, self.serviceVersion, credentials=client_creds)
-
         try:
             logging.debug("Verifying that the 'RA Schedule Calendar' exists.")
             res = service.calendarList().get(calendarId=calendarId).execute()
@@ -210,23 +225,32 @@ class gCalIntegratinator:
             # An HttpError occurred which could indicate that the calendar no longer exists.
             #  If this is the case, the HttpError would be a 404 error.
 
+            # Log the occurrence of this issue.
             logging.info("'RA Schedule Calendar' not found for client.")
+            logging.error(str(e))
 
-            # Create the calendar using the client_creds
-            calendarId = self.createGoogleCalendar(client_creds)
+            # Plan B is to create a new Google Calendar.
+            try:
+                # Create the calendar using the client_creds
+                calendarId = self.createGoogleCalendar(client_creds)
+
+            except self.CalendarCreationError as subE:
+                # An error occurred when attempting to create the Calendar.
+
+                # Wrap the exception in a ScheduleExportError and raise it
+                raise self.ScheduleExportError(subE, "Unable to locate valid Google Calendar.")
 
         # Once we are able to locate the calendar, start adding the events to it!
-
         try:
-            # Iterate through the schedule
             logging.info("Exporting schedule")
+
+            # Iterate through the schedule
             for duty in schedule:
 
                 # Check to see if this duty should be flagged
                 if "flagged" in duty["extendedProps"].keys() and duty["extendedProps"]["flagged"]:
                     # If so, then set the summary and description messages to include the flagged
                     #  duty label.
-
                     summaryMsg = duty["title"] + " ({})".format(flaggedDutyLabel)
                     descriptionMsg = duty["title"] + " has been assigned for {} duty.".format(flaggedDutyLabel)
 
@@ -250,14 +274,105 @@ class gCalIntegratinator:
             #  Bad Request/malformed data. If this occurs, stop processing and report back to the
             #  server.
 
+            # Log the occurrence
             logging.info("Error encountered while pushing Event: {} to Google Calendar".format(duty["start"]))
+            logging.error(str(e))
 
-            return -5
+            # Wrap the exception in a ScheduleExportError and raise it
+            raise self.ScheduleExportError(e, "Unable to export schedule to Google Calendar.")
 
-        # Once finished with the export, return back a status of 1
         logging.info("Export complete")
 
-        return 1
+    class BaseGCalIntegratinatorException(Exception):
+        # Base GCalIntegratinator Exception
+
+        def __init__(self, *args):
+            # If args are provided
+            if args:
+                # Then set the message as the first argument
+                self.message = args[0]
+                logging.debug("BASE ERROR CREATION: {}".format(args))
+
+            else:
+                # Otherwise set the message to None
+                self.message = None
+
+            # Set the exception name to GCalIntegratinatorError
+            self.exceptionName = "GCalIntegratinatorError"
+
+        def __str__(self):
+            # If a message has been defined
+            if self.message is not None:
+                # Then put the message in the string representation
+                return "{}".format(self.message)
+
+            else:
+                # Otherwise return a default string
+                return "{} has been raised".format(self.exceptionName)
+
+    class CalendarCreationError(BaseGCalIntegratinatorException):
+        """GCalIntegratinator Exception to be raised when an error occurs
+            during the creation of the a Google Calendar."""
+
+        def __init__(self, *args):
+            # Pass the arguments to the parent class.
+            super().__init__(*args)
+
+            # Set the name of the exception
+            self.exceptionName = "GoogleCalendarCreationError"
+
+    class InvalidCalendarCredentialsError(BaseGCalIntegratinatorException):
+        """GCalIntegratinator Exception to be raised if the provided
+            Google Calendar credentials are invalid."""
+
+        def __init__(self, *args):
+            # Pass the arguments to the parent class.
+            super().__init__(*args)
+
+            # Set the name of the exception
+            self.exceptionName = "InvalidCalendarCredentialsError"
+
+    class ExpiredCalendarCredentialsError(BaseGCalIntegratinatorException):
+        """GCalIntegratinator Exception to be raised if the provided Google
+            Calendar calendar credentials have expired."""
+
+        def __init__(self, *args):
+            # Pass the arguments to the parent class.
+            super().__init__(*args)
+
+            # Set the name of the exception
+            self.exceptionName = "ExpiredCalendarCredentialsError"
+
+    class ScheduleExportError(BaseGCalIntegratinatorException):
+        """GCalIntegratinator Exception to be raised if an error is encountered
+            when attempting to export a schedule to Google Calendar."""
+
+        def __init__(self, wrappedException, *args):
+            # Pass the arguments to the parent class.
+            super().__init__(*args)
+
+            # Set the name of the exception
+            self.exceptionName = "ScheduleExportError"
+
+            # Set the wrappedException
+            self.wrappedException = wrappedException
+
+    class UnexpectedError(BaseGCalIntegratinatorException):
+        """GCalIntegratinator Exception to be raised if an unknown
+            error occurs within the GCalIntegratintor object"""
+
+        def __init__(self, location, wrappedException, *args):
+            # Pass the arguments to the parent class.
+            super().__init__(self, args)
+
+            # Set the name of the exception
+            self.exceptionName = "GCalIntegratinatorUnknownError"
+
+            # Set the location of where the error occurred.
+            self.exceptionLocation = location
+
+            # Set the wrapped exception
+            self.wrappedException = wrappedException
 
 
 class Event:
@@ -274,46 +389,46 @@ class Event:
 
             "start": {          # The (inclusive) start time of the event. For a recurring event, this is the
                                 #  start time of the first instance.
-                "date": date      # The date, in the format "yyyy-mm-dd", if this is an all-day event.
+                "date": date    # The date, in the format "yyyy-mm-dd", if this is an all-day event.
             },
 
             "end": {            # The (exclusive) end time of the event. For a recurring event,
                                 #  this is the end time of the first instance.
-                "date": date      # The date, in the format "yyyy-mm-dd", if this is an all-day event.
+                "date": date    # The date, in the format "yyyy-mm-dd", if this is an all-day event.
             },
 
             "status": "confirmed",  # Status of the event. Optional. Possible values are:
                                     #    - "confirmed" - The event is confirmed. This is the default status.
                                     #    - "tentative" - The event is tentatively confirmed.
-                                    #    - "cancelled" - The event is cancelled (deleted). The list method returns cancelled
-                                    #                    events only on incremental sync (when syncToken or updatedMin are
-                                    #                    specified) or if the showDeleted flag is set to true. The get
-                                    #                    method always returns them. A cancelled status represents two
-                                    #                    different states depending on the event type:
-                                    #                           - Cancelled exceptions of an uncancelled recurring event
-                                    #                              indicate that this instance should no longer be presented
-                                    #                              to the user. Clients should store these events for the
-                                    #                              lifetime of the parent recurring event.
-                                    #                              Cancelled exceptions are only guaranteed to have values
-                                    #                              for the id, recurringEventId and originalStartTime fields
-                                    #                              populated. The other fields might be empty.
-                                    #                           - All other cancelled events represent deleted events.
-                                    #                              Clients should remove their locally synced copies. Such
-                                    #                              cancelled events will eventually disappear, so do not
-                                    #                              rely on them being available indefinitely.
-                                    #  Deleted events are only guaranteed to have the id field populated. On the organizer's
-                                    #   calendar, cancelled events continue to expose event details (summary,
-                                    #   location, etc.) so that they can be restored (undeleted). Similarly, the events to
-                                    #   which the user was invited and that they manually removed continue to provide
-                                    #   details. However, incremental sync requests with showDeleted set to false will
-                                    #   not return these details.
+                                    #    - "cancelled" - The event is cancelled (deleted). The list method returns
+                                    #                    cancelled events only on incremental sync (when syncToken or
+                                    #                    updatedMin are specified) or if the showDeleted flag is set to
+                                    #                    true. The get method always returns them. A cancelled status
+                                    #                    represents two different states depending on the event type:
+                                    #                       - Cancelled exceptions of an uncancelled recurring event
+                                    #                          indicate that this instance should no longer be presented
+                                    #                          to the user. Clients should store these events for the
+                                    #                          lifetime of the parent recurring event.
+                                    #                          Cancelled exceptions are only guaranteed to have values
+                                    #                          for the id, recurringEventId and originalStartTime fields
+                                    #                          populated. The other fields might be empty.
+                                    #                       - All other cancelled events represent deleted events.
+                                    #                          Clients should remove their locally synced copies. Such
+                                    #                          cancelled events will eventually disappear, so do not
+                                    #                          rely on them being available indefinitely.
+                                    #  Deleted events are only guaranteed to have the id field populated. On the
+                                    #   organizer's calendar, cancelled events continue to expose event details
+                                    #   (summary, location, etc.) so that they can be restored (undeleted). Similarly,
+                                    #   the events to which the user was invited and that they manually removed continue
+                                    #   to provide details. However, incremental sync requests with showDeleted set to
+                                    #   false will not return these details.
                                     #  If an event changes its organizer (for example via the move operation) and the
                                     #   original organizer is not on the attendee list, it will leave behind a cancelled
                                     #   event where only the id field is guaranteed to be populated.
 
             "transparency": "opaque",   # Whether the event blocks time on the calendar. Optional. Possible values are:
-                                        #   - "opaque" - Default value. The event does block time on the calendar. This is
-                                        #                 equivalent to setting Show me as to Busy in the Calendar UI.
+                                        #   - "opaque" - Default value. The event does block time on the calendar. This
+                                        #                is equivalent to setting Show me as to Busy in the Calendar UI.
                                         #   - "transparent" - The event does not block time on the calendar. This is
                                         #                      equivalent to setting Show me as to Available in the
                                         #                      Calendar UI.
@@ -325,31 +440,4 @@ class Event:
 
 
 if __name__ == "__main__":
-
-    from unittest.mock import patch, MagicMock, PropertyMock
-
     g = gCalIntegratinator()
-
-    #  -- ARRANGE --
-
-    # Create the Mocked objects
-    #  In this test, when the credentials are called, they should raise
-    #   an AttributeError
-    mockedClientCreds = MagicMock()
-    mocked_RefreshMethod = MagicMock(side_effect=ValueError)
-
-    # Mock the client credentials
-    credsMockAttrs = {
-        "valid": False,
-        "expired": True,
-        "refresh_token": True,
-        "refresh": mocked_RefreshMethod
-    }
-
-    # Configure the Mocked Client Creds
-    mockedClientCreds.configure_mock(**credsMockAttrs)
-
-    #  -- ACT --
-
-    validationStatus = g._checkIfValidCreds(mockedClientCreds)
-

@@ -150,7 +150,8 @@ class TestIntegration_returnGCalRedirect(unittest.TestCase):
         #  to the default value which is 1.
         self.mocked_authLevel.return_value = 1
 
-    def test_withoutAuthorizedUser_returnsNotAuthorizedResponse(self):
+    @patch("integration.integrations.abort", autospec=True)
+    def test_withoutAuthorizedUser_returnsNotAuthorizedResponse(self, mocked_abort):
         # Test to ensure that when this method is called without an authorized user,
         #  a NOT AUTHORIZED response is returned. An authorized user is a user that
         #  has an auth_level of at least 3 (HD).
@@ -162,24 +163,25 @@ class TestIntegration_returnGCalRedirect(unittest.TestCase):
         self.mocked_appGlobals.conn.reset_mock()
         self.resetAuthLevel()
 
-        expectedResponse = stdRet(-1, "NOT AUTHORIZED")
+        # Create a custom exception to be used for this test
+        custException = EOFError
+
+        # Configure the mocked_abort object to behave as expected
+        mocked_abort.side_effect = custException
 
         # -- Act --
 
-        # Make a request to the desired API endpoint
-        resp = self.server.get("/int/GCalRedirect",
-                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+        # Make a request to the desired API endpoint and assert that we received an error
+        self.assertRaises(custException, self.server.get, "/int/GCalRedirect",
+                          base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
 
         # -- Assert --
 
-        # Assert that appGlobals.conn.commit was never called
-        self.mocked_appGlobals.conn.commit.assert_not_called()
+        # Assert that the mocked_abort was called with the expected value
+        mocked_abort.assert_called_once_with(403)
 
-        # Assert that the response we received is json
-        self.assertTrue(resp.is_json)
-
-        # Assert that we received the expected response
-        self.assertDictEqual(expectedResponse, resp.json)
+        # Assert that no additional call to the DB was made
+        self.mocked_appGlobals.conn.cursor().commit.assert_not_called()
 
     @patch("integration.integrations.redirect", autospec=True)
     def test_withAuthorizedUser_callsGCalIntegratinatorGenerateAuthURLMethod(self, mocked_redirect):

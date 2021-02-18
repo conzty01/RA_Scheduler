@@ -99,11 +99,16 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         #  -- ASSERT  --
 
         self.assertTrue(hasattr(gCalIntegratinator, "_getCredsFromEnv"))
-        self.assertTrue(hasattr(gCalIntegratinator, "_checkIfValidCreds"))
+        self.assertTrue(hasattr(gCalIntegratinator, "_validateCredentials"))
         self.assertTrue(hasattr(gCalIntegratinator, "generateAuthURL"))
         self.assertTrue(hasattr(gCalIntegratinator, "handleAuthResponse"))
         self.assertTrue(hasattr(gCalIntegratinator, "createGoogleCalendar"))
-        self.assertTrue(hasattr(gCalIntegratinator, "exportScheduleToGoogleCalendar"))
+        self.assertTrue(hasattr(gCalIntegratinator, "BaseGCalIntegratinatorException"))
+        self.assertTrue(hasattr(gCalIntegratinator, "CalendarCreationError"))
+        self.assertTrue(hasattr(gCalIntegratinator, "InvalidCalendarCredentialsError"))
+        self.assertTrue(hasattr(gCalIntegratinator, "ExpiredCalendarCredentialsError"))
+        self.assertTrue(hasattr(gCalIntegratinator, "ScheduleExportError"))
+        self.assertTrue(hasattr(gCalIntegratinator, "UnexpectedError"))
 
     def test_HasExpectedProperties(self):
         # Test to make sure the Integration Object has the following properties:
@@ -150,7 +155,7 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         #  -- ASSERT  --
         self.assertEqual(gCalIntObj.scopes, defaultScopes)
 
-    def test_HasUsesProvidedScopes(self):
+    def test_UsesProvidedScopes(self):
         # Test to make sure the Integration Object uses the scopes passed
         #  in to it
         #  - https://www.googleapis.com/auth/calendar.app.created
@@ -268,12 +273,12 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
 
         #  -- ACT --
 
-        validationStatus = gCalIntObj._checkIfValidCreds(mockedClientCreds)
+        validCreds = gCalIntObj._validateCredentials(mockedClientCreds)
 
         #  -- ASSERT --
 
         # Assert that we received a validation status of 1
-        self.assertEqual(validationStatus, 1)
+        self.assertEqual(mockedClientCreds, validCreds)
 
         # Assert that the .expired .refresh_token properties
         #  and .refresh method were not called
@@ -309,12 +314,12 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
 
         #  -- ACT --
 
-        validationStatus = gCalIntObj._checkIfValidCreds(mockedClientCreds)
+        validCreds = gCalIntObj._validateCredentials(mockedClientCreds)
 
         #  -- ASSERT --
 
         # Assert that we received a validation status of 0
-        self.assertEqual(validationStatus, 0)
+        self.assertEqual(mockedClientCreds, validCreds)
 
         # Assert that .refresh was called passing it a Request() Object
         mocked_RefreshMethod.assert_called_once()
@@ -347,13 +352,14 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         mockedClientCreds.configure_mock(**credsMockAttrs)
 
         #  -- ACT --
-
-        validationStatus = gCalIntObj._checkIfValidCreds(mockedClientCreds)
-
         #  -- ASSERT --
 
-        # Assert that we received a validation status of -2
-        self.assertEqual(validationStatus, -2)
+        # Call the method being tested and assert that we received an ExpiredCalendarCredentialsError
+        self.assertRaises(
+            gCalIntegratinator.ExpiredCalendarCredentialsError,     # Expected Exception
+            gCalIntObj._validateCredentials,                        # Method to be called
+            mockedClientCreds                                       # Parameters to pass to method
+        )
 
         # Assert that .refresh was not called
         mocked_RefreshMethod.assert_not_called()
@@ -387,13 +393,17 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         mockedClientCreds.configure_mock(**credsMockAttrs)
 
         #  -- ACT --
-
-        validationStatus = gCalIntObj._checkIfValidCreds(mockedClientCreds)
-
         #  -- ASSERT --
 
-        # Assert that we received a validation status of -3
-        self.assertEqual(validationStatus, -3)
+        # Call the method being tested and assert that we received an InvalidCalendarCredentialsError
+        self.assertRaises(
+            gCalIntegratinator.InvalidCalendarCredentialsError,     # Expected Exception
+            gCalIntObj._validateCredentials,                        # Method to be called
+            mockedClientCreds                                       # Parameters to pass to method
+        )
+
+        # Assert that .refresh was called once
+        mocked_RefreshMethod.assert_called_once()
 
     def test_checkIfValidCreds_HandlesUnknownError(self):
         # Test to make sure _checkIfValidCreds handles if an unknown error
@@ -410,7 +420,7 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         #  In this test, when the credentials are called, they should raise
         #   an AttributeError
         mockedClientCreds = MagicMock()
-        mocked_RefreshMethod = MagicMock(side_effect=KeyError)
+        mocked_RefreshMethod = MagicMock(side_effect=KeyError("Test Error"))
 
         # Mock the client credentials
         credsMockAttrs = {
@@ -424,13 +434,14 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         mockedClientCreds.configure_mock(**credsMockAttrs)
 
         #  -- ACT --
-
-        validationStatus = gCalIntObj._checkIfValidCreds(mockedClientCreds)
-
         #  -- ASSERT --
 
-        # Assert that we received a validation status of -3
-        self.assertEqual(validationStatus, -1)
+        # Call the method being tested and assert that we received an UnexpectedError
+        self.assertRaises(
+            gCalIntegratinator.UnexpectedError,     # Expected Exception
+            gCalIntObj._validateCredentials,        # Method to be called
+            mockedClientCreds                       # Parameters to pass to method
+        )
 
     def test_getCredsFromEnv_ReturnsConfigurationInExpectedFormat(self):
         # Test to ensure that the proper values get imported from
@@ -626,16 +637,19 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
             "refresh": MagicMock(side_effect=AttributeError)
         })
 
-        #  -- ACT --
-
         # Create the gCalIntObj
         gCalIntObj = gCalIntegratinator()
 
-        # Call the createGoogleCalendar method
-        result = gCalIntObj.createGoogleCalendar(mocked_creds)
-
+        #  -- ACT --
         #  -- ASSERT --
-        self.assertEqual(-3, result)
+
+        # Call the createGoogleCalendar method and assert that we received an
+        #  InvalidCalendarCredentialsError
+        self.assertRaises(
+            gCalIntegratinator.InvalidCalendarCredentialsError,     # Expected Exception
+            gCalIntObj.createGoogleCalendar,                        # Method to be called
+            mocked_creds                                            # Parameters to pass to method
+        )
 
     def test_createGoogleCalendar_buildsCalendarV3Service(self):
         # Test to ensure that createGoogleCalendar builds the Calendar V3
@@ -683,7 +697,8 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         # Create the expected calendar body object
         expectedCalBody = {
             "summary": "RA Duty Schedule",
-            "description": "Calendar for the Resident Assistant Duty Schedule.\n\nCreated and added to by the RA Duty Scheduler Application (RADSA)."
+            "description": "Calendar for the Resident Assistant Duty Schedule.\n\n"
+                           "Created and added to by the RA Duty Scheduler Application (RADSA)."
         }
 
         # Create the gCalIntObj
@@ -732,6 +747,54 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         #  -- ASSERT --
         self.assertEqual(expectedID, result)
 
+    def test_createGoogleCalendar_IfGoogleAPIServiceThrowsException_raisesCalendarCreationError(self):
+        # Test to ensure that in createGoogleCalendar if the Google Calendar API service
+        #  throws an Exception, the method will raise a CalendarCreationError passing
+        #  it the exception raised by the Google Calendar API service.
+
+        #  -- ARRANGE --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+        self.mocked_flowInstance.reset_mock()
+
+        # Mock the client credentials
+        mocked_creds = MagicMock(**{"valid": True})
+
+        # Get the mocked "service" that is returned from the build function
+        mocked_service = self.mocked_build("calendar", "v3", credentials=mocked_creds)
+
+        # Configure the service to raise an Exception
+        mocked_service.calendars().insert().execute.side_effect = KeyError
+
+        # Reset the mocked "build" function so that the last few calls do not
+        #  count towards it
+        self.mocked_build.reset_mock()
+
+        # Create the expected calendar body object
+        expectedCalBody = {
+            "summary": "RA Duty Schedule",
+            "description": "Calendar for the Resident Assistant Duty Schedule.\n\n"
+                           "Created and added to by the RA Duty Scheduler Application (RADSA)."
+        }
+
+        # Create the gCalIntObj
+        gCalIntObj = gCalIntegratinator()
+
+        #  -- ACT --
+        #  -- ASSERT --
+
+        # Call the createGoogleCalendar method and assert that it raises the expected error
+        self.assertRaises(
+            gCalIntegratinator.CalendarCreationError,
+            gCalIntObj.createGoogleCalendar,
+            mocked_creds
+        )
+
+        # Assert that the Google Calendar API Service was called as expected
+        mocked_service.calendars().insert.assert_called_once_with(body=expectedCalBody)
+        mocked_service.calendars().insert().execute.assert_called_once()
+
     def test_exportScheduleToGoogleCalendar_checksIfCredentialsAreValid(self):
         # Test to ensure that exportScheduleToGoogleCalendar checks to ensure
         #  that the passed credentials are valid
@@ -755,16 +818,19 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         schedule = []
         desiredFlagLabel = "On-Call"
 
-        #  -- ACT --
-
         # Create the gCalIntObj
         gCalIntObj = gCalIntegratinator()
 
-        # Call the createGoogleCalendar method
-        result = gCalIntObj.exportScheduleToGoogleCalendar(mocked_creds, calendarId, schedule, desiredFlagLabel)
-
+        #  -- ACT --
         #  -- ASSERT --
-        self.assertEqual(-3, result)
+
+        # Call the createGoogleCalendar method and assert that we received an
+        #  InvalidCalendarCredentialsError
+        self.assertRaises(
+            gCalIntegratinator.InvalidCalendarCredentialsError,         # Expected Exception
+            gCalIntObj.exportScheduleToGoogleCalendar,                  # Method to be called
+            mocked_creds, calendarId, schedule, desiredFlagLabel        # Parameters to pass to method
+        )
 
     def test_exportScheduleToGoogleCalendar_buildsCalendarV3Service(self):
         # Test to ensure that exportScheduleToGoogleCalendar builds the
@@ -854,9 +920,17 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         # Get the mocked "service" that is returned from the build function
         mocked_service = self.mocked_build("calendar", "v3", credentials=mocked_creds)
 
+        # Create Mocks for the HttpError to use when attempting to print
+        mocked_response = MagicMock(**{
+            "reason": None,
+            "status": 999
+        })
+
         # Configure the mocked service to raise an HttpError when called
-        mocked_service.calendarList().get().execute.side_effect = HttpError(bytes("Test".encode("UTF-8")),
-                                                                            bytes("Test".encode("UTF-8")))
+        mocked_service.calendarList().get().execute.side_effect = HttpError(
+            mocked_response,
+            bytes("Test".encode("UTF-8"))
+        )
 
         # Reset the mocked "build" function so that the last call does not
         #  count towards it
@@ -891,24 +965,75 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         # Assert that, when no calendar was returned (HttpError), a calendar was created
         #  via the API
         mocked_service.calendars().insert().execute.assert_called_once()
-    # def test_exportScheduleToGoogleCalendar_HandlesUnknownHttpErrorCalendarLookup(self):
-    #     # Test to ensure that exportScheduleToGoogleCalendar handles receiving
-    #     #  an unknown HttpError from the Google API when
-    #
-    # This test is not needed at this stage as the gCalIntegratinator does
-    #  not distinguish between HttpErrors received when checking for duplicate calendars.
-    #  Instead, it simply handles all errors in the same way.
-    #
-    #     #  -- ARRANGE --
-    #     # Reset all of the mocked objects that will be used in this test
-    #     self.mocked_flow.reset_mock()
-    #     self.mocked_flowInstance.reset_mock()
-    #     self.mocked_build.reset_mock()
-    #
-    #     #  -- ACT --
-    #
-    #     #  -- ASSERT --
-    #     pass
+
+    @patch("integration.gCalIntegration.gCalIntegratinator.createGoogleCalendar", autospec=True)
+    def test_exportScheduleToGoogleCalendar_WhenUnableToGenerateNewCalendar_RaisesScheduleExportError(self,
+                                                                                                      mocked_createCal):
+        # Test to ensure that exportScheduleToGoogleCalendar handles a case where
+        #  it is unable to locate an existing calendar for the user, and while handling
+        #  this scenario, if another error occurs, the method will raise a ScheduleExportError.
+
+        #  -- ARRANGE --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_flow.reset_mock()
+        self.mocked_flowInstance.reset_mock()
+
+        # Mock the client credentials
+        mocked_creds = MagicMock(**{"valid": True})
+
+        # Get the mocked "service" that is returned from the build function
+        mocked_service = self.mocked_build("calendar", "v3", credentials=mocked_creds)
+
+        # Create Mocks for the HttpError to use when attempting to print
+        mocked_response = MagicMock(**{
+            "reason": None,
+            "status": 999
+        })
+
+        # Configure the mocked service to raise an HttpError when called
+        mocked_service.calendarList().get().execute.side_effect = HttpError(
+            mocked_response,
+            bytes("Test".encode("UTF-8"))
+        )
+
+        # Configure the mocked_createCal function so that it raises an error
+        mocked_createCal.side_effect = gCalIntegratinator.CalendarCreationError
+
+        # Reset the mocked "build" function so that the last call does not
+        #  count towards it
+        self.mocked_build.reset_mock()
+
+        # Create the calendarId and schedule objects that get passed in
+        calendarId = "TEST CALENDAR ID"
+        schedule = [{
+            "start": "00/00/0000",
+            "title": "TEST EVENT TITLE",
+            "extendedProps": {
+                "dutyType": "std",
+                "flagged": False,
+                "pts": 1
+            }
+        }]
+        desiredFlagLabel = "On-Call"
+
+        # Create the gCalIntObj
+        gCalIntObj = gCalIntegratinator()
+
+        #  -- ACT --
+        #  -- ASSERT --
+
+        # Call the createGoogleCalendar method and assert that we received an
+        #  InvalidCalendarCredentialsError
+        self.assertRaises(
+            gCalIntegratinator.ScheduleExportError,  # Expected Exception
+            gCalIntObj.exportScheduleToGoogleCalendar,  # Method to be called
+            mocked_creds, calendarId, schedule, desiredFlagLabel  # Parameters to pass to method
+        )
+
+        # Assert that the Integration Object queried Google for the calendar
+        mocked_service.calendarList().get.assert_called_once_with(calendarId=calendarId)
+        mocked_service.calendarList().get().execute.assert_called_once()
 
     def test_exportScheduleToGoogleCalendar_SendsEntireScheduleToGoogleCalendarAPI(self):
         # Test to ensure that exportScheduleToGoogleCalendar sends the entire schedule
@@ -961,7 +1086,7 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         self.assertEqual(len(schedule), numberEventsAdded)
 
         # Assert that the retun indicates that the export was successful
-        self.assertEqual(1, result)
+        self.assertIsNone(result)
 
     def test_exportScheduleToGoogleCalendar_withFlaggedDuty_BuildAppropriateEventObject(self):
         # Test to ensure that exportScheduleToGoogleCalendar formats the Event title and
@@ -1086,9 +1211,17 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         # Get the mocked "service" that is returned from the build function
         mocked_service = self.mocked_build("calendar", "v3", credentials=mocked_creds)
 
+        # Create Mocks for the HttpError to use when attempting to print
+        mocked_response = MagicMock(**{
+            "reason": None,
+            "status": 999
+        })
+
         # Configure the mocked service to raise an HttpError when called
-        mocked_service.events().insert().execute.side_effect = HttpError(bytes("Test".encode("UTF-8")),
-                                                                            bytes("Test".encode("UTF-8")))
+        mocked_service.events().insert().execute.side_effect = HttpError(
+            mocked_response,
+            bytes("Test".encode("UTF-8"))
+        )
 
         # Reset the mocked "build" function so that the last call does not
         #  count towards it
@@ -1111,16 +1244,18 @@ class TestGCalIntegratinatorObject(unittest.TestCase):
         gCalIntObj = gCalIntegratinator()
 
         #  -- ACT --
-
-        # Call the createGoogleCalendar method
-        result = gCalIntObj.exportScheduleToGoogleCalendar(mocked_creds, calendarId, schedule, desiredFlagLabel)
-
         #  -- ASSERT --
+
+        # Call the createGoogleCalendar method and assert that we received an
+        #  InvalidCalendarCredentialsError
+        self.assertRaises(
+            gCalIntegratinator.ScheduleExportError,                 # Expected Exception
+            gCalIntObj.exportScheduleToGoogleCalendar,              # Method to be called
+            mocked_creds, calendarId, schedule, desiredFlagLabel    # Parameters to pass to method
+        )
+
         # Assert that the Integration Object queried Google for the calendar
         mocked_service.events().insert().execute.assert_called_once()
-
-        # Assert that the return result received was -5
-        self.assertEqual(-5, result)
 
 
 class TestEventObject(unittest.TestCase):

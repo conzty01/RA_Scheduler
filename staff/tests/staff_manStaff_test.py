@@ -144,11 +144,37 @@ class TestStaff_manStaff(unittest.TestCase):
         #  to the default value which is 1.
         self.mocked_authLevel.return_value = 1
 
-    def test_withoutAuthorizedUser_returnsNotAuthorizedJSON(self):
-        # -- Arrange --
+    @patch("staff.staff.abort", autospec=True)
+    def test_withoutAuthorizedUser_returnsNotAuthorizedJSON(self, mocked_abort):
+        # Test to ensure that when a user that is NOT authorized to view the
+        #  Manage Hall page navigates to the page, they receive a
+        #  response that indicates that they are not authorized. An authorized
+        #  user is a user that has an auth_level of at least 3 (HD).
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+
+        # Reset the auth_level to 1
+        self.resetAuthLevel()
+
+        # Create a custom exception to be used for this test
+        custException = EOFError
+
+        # Configure the mocked_abort object to behave as expected
+        mocked_abort.side_effect = custException
+
         # -- Act --
         # -- Assert --
-        pass
+
+        # Request the desired page and assert that we received an error
+        self.assertRaises(custException, self.server.get, "/staff/",
+                          base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # Assert that the mocked_abort was called with the expected value
+        mocked_abort.assert_called_once_with(403)
+
+        # Assert that no additional call to the DB was made
+        self.mocked_appGlobals.conn.cursor().execute.assert_not_called()
 
     def test_withAuthorizedUser_callsGetRAStatsMethod(self):
         # -- Arrange --

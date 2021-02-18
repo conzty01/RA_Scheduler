@@ -1,4 +1,6 @@
+from integration.gCalIntegration import gCalIntegratinator
 from unittest.mock import MagicMock, patch
+from psycopg2 import IntegrityError
 from scheduleServer import app
 import unittest
 
@@ -138,7 +140,6 @@ class TestIntegration_createGoogleCalendar(unittest.TestCase):
         self.patcher_loggingWARNING.stop()
         self.patcher_loggingCRITICAL.stop()
         self.patcher_loggingERROR.stop()
-
 
     def resetAuthLevel(self):
         # This function serves to reset the auth_level of the session
@@ -287,8 +288,8 @@ class TestIntegration_createGoogleCalendar(unittest.TestCase):
         #  the whitespace must match exactly.
         self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
             """UPDATE google_calendar_info
-                   SET calendar_id = %s
-                   WHERE id = %s""",
+                       SET calendar_id = %s
+                       WHERE id = %s""",
             (expectedCreateGoogleCalendarReturnValue, desiredCalendarInfoID)
         )
 
@@ -356,8 +357,8 @@ class TestIntegration_createGoogleCalendar(unittest.TestCase):
         #  the whitespace must match exactly.
         self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
             """UPDATE google_calendar_info
-                   SET calendar_id = %s
-                   WHERE id = %s""",
+                       SET calendar_id = %s
+                       WHERE id = %s""",
             (expectedCreateGoogleCalendarReturnValue, desiredCalendarInfoID)
         )
 
@@ -366,6 +367,310 @@ class TestIntegration_createGoogleCalendar(unittest.TestCase):
 
         # Assert that appGlobals.conn.cursor().close was called
         self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received our expected result
+        self.assertEqual(expectedResponse, resp)
+
+        # Assert that the mocked BytesIO object constructed of the memview object
+        mocked_bytesIO.assert_called_once_with(expectedMemView)
+
+        # Assert that the mocked BytesIO method is passed
+        mocked_pickle.load.assert_called_once_with(mocked_bytesIO())
+
+        # Assert that the pickle.load result is passed to the createGoogleCalendar method
+        self.mocked_integrationPart.createGoogleCalendar.assert_called_once_with(expectedPickleToken)
+
+    @patch("integration.integrations.BytesIO", autospec=True)
+    @patch("integration.integrations.pickle", autospec=True)
+    def test_withTokenInDB_ifInvalidCalendarCredentialError_returnsExpectedResponse(self, mocked_pickle,
+                                                                                    mocked_bytesIO):
+        # Test to ensure that if this function is called and a token exists
+        #  in the DB, if an InvalidCalendarCredentialError is received, the
+        #  method returns the expected result.
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+        self.mocked_integrationPart.reset_mock()
+
+        # Create the objects needed for this test.
+        desiredCalendarInfoID = 4
+        expectedResponse = stdRet(-1, "Reconnect Google Calendar Account")
+        expectedMemView = MagicMock()
+        expectedPickleToken = MagicMock()
+
+        # Set the return value of the mocked pickle.load method
+        mocked_pickle.load.return_value = expectedPickleToken
+
+        # Set the return result of the gCalIntegratinator.createGoogleCalendar method.
+        self.mocked_integrationPart.createGoogleCalendar.side_effect = gCalIntegratinator \
+            .InvalidCalendarCredentialsError
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedMemView,),  # First call returns the token
+        ]
+
+        # -- Act --
+
+        # Bundle the call up in a test_request_context so that we can test
+        #  the function as if we were calling it from the server.
+
+        with app.test_request_context("/int/GCalRedirect",
+                                      base_url=self.mocked_appGlobals.baseOpts["HOST_URL"]):
+            # Make a request to the desired API endpoint
+            resp = createGoogleCalendar(desiredCalendarInfoID)
+
+        # -- Assert --
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received our expected result
+        self.assertEqual(expectedResponse, resp)
+
+        # Assert that the mocked BytesIO object constructed of the memview object
+        mocked_bytesIO.assert_called_once_with(expectedMemView)
+
+        # Assert that the mocked BytesIO method is passed
+        mocked_pickle.load.assert_called_once_with(mocked_bytesIO())
+
+        # Assert that the pickle.load result is passed to the createGoogleCalendar method
+        self.mocked_integrationPart.createGoogleCalendar.assert_called_once_with(expectedPickleToken)
+
+    @patch("integration.integrations.BytesIO", autospec=True)
+    @patch("integration.integrations.pickle", autospec=True)
+    def test_withTokenInDB_ifExpiredCalendarCredentialsError_returnsExpectedResponse(self, mocked_pickle,
+                                                                                     mocked_bytesIO):
+        # Test to ensure that if this function is called and a token exists
+        #  in the DB, if an ExpiredCalendarCredentialsError is received, the
+        #  method returns the expected result.
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+        self.mocked_integrationPart.reset_mock()
+
+        # Create the objects needed for this test.
+        desiredCalendarInfoID = 4
+        expectedResponse = stdRet(-1, "Reconnect Google Calendar Account")
+        expectedMemView = MagicMock()
+        expectedPickleToken = MagicMock()
+
+        # Set the return value of the mocked pickle.load method
+        mocked_pickle.load.return_value = expectedPickleToken
+
+        # Set the return result of the gCalIntegratinator.createGoogleCalendar method.
+        self.mocked_integrationPart.createGoogleCalendar.side_effect = gCalIntegratinator \
+            .ExpiredCalendarCredentialsError
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedMemView,),  # First call returns the token
+        ]
+
+        # -- Act --
+
+        # Bundle the call up in a test_request_context so that we can test
+        #  the function as if we were calling it from the server.
+
+        with app.test_request_context("/int/GCalRedirect",
+                                      base_url=self.mocked_appGlobals.baseOpts["HOST_URL"]):
+            # Make a request to the desired API endpoint
+            resp = createGoogleCalendar(desiredCalendarInfoID)
+
+        # -- Assert --
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received our expected result
+        self.assertEqual(expectedResponse, resp)
+
+        # Assert that the mocked BytesIO object constructed of the memview object
+        mocked_bytesIO.assert_called_once_with(expectedMemView)
+
+        # Assert that the mocked BytesIO method is passed
+        mocked_pickle.load.assert_called_once_with(mocked_bytesIO())
+
+        # Assert that the pickle.load result is passed to the createGoogleCalendar method
+        self.mocked_integrationPart.createGoogleCalendar.assert_called_once_with(expectedPickleToken)
+
+    @patch("integration.integrations.BytesIO", autospec=True)
+    @patch("integration.integrations.pickle", autospec=True)
+    def test_withTokenInDB_ifUnexpectedError_returnsExpectedResponse(self, mocked_pickle, mocked_bytesIO):
+        # Test to ensure that if this function is called and a token exists
+        #  in the DB, if an UnexpectedError is received, the
+        #  method returns the expected result.
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+        self.mocked_integrationPart.reset_mock()
+
+        # Create the objects needed for this test.
+        desiredCalendarInfoID = 4
+        expectedResponse = stdRet(-1, "Unexpected Error Occurred. Please try again later.")
+        expectedMemView = MagicMock()
+        expectedPickleToken = MagicMock()
+
+        # Set the return value of the mocked pickle.load method
+        mocked_pickle.load.return_value = expectedPickleToken
+
+        # Set the return result of the gCalIntegratinator.createGoogleCalendar method.
+        self.mocked_integrationPart.createGoogleCalendar.side_effect = gCalIntegratinator \
+            .UnexpectedError("Test Location", "Test Wrapped Exception")
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedMemView,),  # First call returns the token
+        ]
+
+        # -- Act --
+
+        # Bundle the call up in a test_request_context so that we can test
+        #  the function as if we were calling it from the server.
+
+        with app.test_request_context("/int/GCalRedirect",
+                                      base_url=self.mocked_appGlobals.baseOpts["HOST_URL"]):
+            # Make a request to the desired API endpoint
+            resp = createGoogleCalendar(desiredCalendarInfoID)
+
+        # -- Assert --
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received our expected result
+        self.assertEqual(expectedResponse, resp)
+
+        # Assert that the mocked BytesIO object constructed of the memview object
+        mocked_bytesIO.assert_called_once_with(expectedMemView)
+
+        # Assert that the mocked BytesIO method is passed
+        mocked_pickle.load.assert_called_once_with(mocked_bytesIO())
+
+        # Assert that the pickle.load result is passed to the createGoogleCalendar method
+        self.mocked_integrationPart.createGoogleCalendar.assert_called_once_with(expectedPickleToken)
+
+    @patch("integration.integrations.BytesIO", autospec=True)
+    @patch("integration.integrations.pickle", autospec=True)
+    def test_withTokenInDB_ifCalendarCreationError_returnsExpectedResponse(self, mocked_pickle, mocked_bytesIO):
+        # Test to ensure that if this function is called and a token exists
+        #  in the DB, if an CalendarCreationError is received, the
+        #  method returns the expected result.
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+        self.mocked_integrationPart.reset_mock()
+
+        # Create the objects needed for this test.
+        desiredCalendarInfoID = 4
+        expectedResponse = stdRet(-1, "Unable to Create new Google Calendar. Please try again later.")
+        expectedMemView = MagicMock()
+        expectedPickleToken = MagicMock()
+
+        # Set the return value of the mocked pickle.load method
+        mocked_pickle.load.return_value = expectedPickleToken
+
+        # Set the return result of the gCalIntegratinator.createGoogleCalendar method.
+        self.mocked_integrationPart.createGoogleCalendar.side_effect = gCalIntegratinator \
+            .CalendarCreationError
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedMemView,),  # First call returns the token
+        ]
+
+        # -- Act --
+
+        # Bundle the call up in a test_request_context so that we can test
+        #  the function as if we were calling it from the server.
+
+        with app.test_request_context("/int/GCalRedirect",
+                                      base_url=self.mocked_appGlobals.baseOpts["HOST_URL"]):
+            # Make a request to the desired API endpoint
+            resp = createGoogleCalendar(desiredCalendarInfoID)
+
+        # -- Assert --
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we received our expected result
+        self.assertEqual(expectedResponse, resp)
+
+        # Assert that the mocked BytesIO object constructed of the memview object
+        mocked_bytesIO.assert_called_once_with(expectedMemView)
+
+        # Assert that the mocked BytesIO method is passed
+        mocked_pickle.load.assert_called_once_with(mocked_bytesIO())
+
+        # Assert that the pickle.load result is passed to the createGoogleCalendar method
+        self.mocked_integrationPart.createGoogleCalendar.assert_called_once_with(expectedPickleToken)
+
+    @patch("integration.integrations.BytesIO", autospec=True)
+    @patch("integration.integrations.pickle", autospec=True)
+    def test_withTokenInDB_ifIntegrityError_returnsExpectedResponse(self, mocked_pickle, mocked_bytesIO):
+        # Test to ensure that if this function is called and a token exists
+        #  in the DB, if an CalendarCreationError is received, the
+        #  method returns the expected result.
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+        self.mocked_integrationPart.reset_mock()
+
+        # Create the objects needed for this test.
+        desiredCalendarInfoID = 4
+        expectedResponse = stdRet(-1, "Unexpected Error Occurred. Please try again later.")
+        expectedMemView = MagicMock()
+        expectedPickleToken = MagicMock()
+
+        # Set the return value of the mocked pickle.load method
+        mocked_pickle.load.return_value = expectedPickleToken
+
+        # Configure the DB connection to return an IntegrityError
+        self.mocked_appGlobals.conn.commit.side_effect = IntegrityError
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedMemView,),  # First call returns the token
+        ]
+
+        # -- Act --
+
+        # Bundle the call up in a test_request_context so that we can test
+        #  the function as if we were calling it from the server.
+
+        with app.test_request_context("/int/GCalRedirect",
+                                      base_url=self.mocked_appGlobals.baseOpts["HOST_URL"]):
+            # Make a request to the desired API endpoint
+            resp = createGoogleCalendar(desiredCalendarInfoID)
+
+        # -- Assert --
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that we rolled back
+        self.mocked_appGlobals.conn.rollback.assert_called_once()
 
         # Assert that we received our expected result
         self.assertEqual(expectedResponse, resp)

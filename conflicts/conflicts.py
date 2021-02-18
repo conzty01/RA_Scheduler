@@ -1,4 +1,4 @@
-from flask import render_template, request, jsonify, Blueprint
+from flask import render_template, request, jsonify, Blueprint, abort
 from flask_login import login_required
 import logging
 
@@ -55,8 +55,8 @@ def editCons():
         logging.info("User Not Authorized - RA: {} attempted to reach Edit Conflicts page for Hall: {}"
                      .format(authedUser.ra_id(), authedUser.hall_id()))
 
-        # Notify the user that they are not authorized.
-        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+        # Raise an 403 Access Denied HTTP Exception that will be handled by flask
+        abort(403)
 
     # Create a DB Cursor
     cur = ag.conn.cursor()

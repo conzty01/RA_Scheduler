@@ -1,4 +1,4 @@
-from flask import render_template, request, jsonify, Blueprint
+from flask import render_template, request, jsonify, Blueprint, abort
 from flask_login import login_required
 from psycopg2 import IntegrityError
 from schedule import scheduler4_1
@@ -40,8 +40,8 @@ def editSched():
         # Log the occurrence.
         logging.info("User Not Authorized - RA: {}".format(authedUser.ra_id()))
 
-        # Notify the user that they are not authorized.
-        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+        # Raise an 403 Access Denied HTTP Exception that will be handled by flask
+        abort(403)
 
     # Get the information for the current school year.
     #  This will be used to calculate duty points for the RAs.

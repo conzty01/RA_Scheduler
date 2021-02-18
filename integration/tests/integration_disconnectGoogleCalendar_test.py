@@ -185,7 +185,8 @@ class TestIntegration_disconnectGoogleCalendar(unittest.TestCase):
         # Assert that appGlobals.conn.cursor().close was called
         self.mocked_appGlobals.conn.cursor().close.assert_called_once()
 
-    def test_withoutAuthorizedUser_returnsNotAuthorizedResponse(self):
+    @patch("integration.integrations.abort", autospec=True)
+    def test_withoutAuthorizedUser_returnsNotAuthorizedResponse(self, mocked_abort):
         # Test to ensure that when this method is called without an authorized user,
         #  they receive a "not authorized" response.
 
@@ -196,19 +197,25 @@ class TestIntegration_disconnectGoogleCalendar(unittest.TestCase):
         self.mocked_appGlobals.conn.reset_mock()
         self.resetAuthLevel()
 
+        # Create a custom exception to be used for this test
+        custException = EOFError
+
+        # Configure the mocked_abort object to behave as expected
+        mocked_abort.side_effect = custException
+
         # -- Act --
 
-        # Make a request to the desired API endpoint
-        resp = self.server.get("/int/disconnectGCal",
-                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+        # Make a request to the desired endpoint and assert that we received an error
+        self.assertRaises(custException, self.server.get, "/int/disconnectGCal",
+                          base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
 
         # -- Assert --
 
-        # Assert that appGlobals.conn.commit was never called
-        self.mocked_appGlobals.conn.commit.assert_not_called()
+        # Assert that the mocked_abort was called with the expected value
+        mocked_abort.assert_called_once_with(403)
 
-        # Assert that appGlobals.conn.cursor().close was called
-        self.mocked_appGlobals.conn.cursor().close.assert_not_called()
+        # Assert that no additional call to the DB was made
+        self.mocked_appGlobals.conn.cursor().commit.assert_not_called()
 
     @patch("integration.integrations.redirect", autospec=True)
     @patch("integration.integrations.url_for", autospec=True)
