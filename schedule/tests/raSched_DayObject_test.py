@@ -615,6 +615,62 @@ class TestDayObject(unittest.TestCase):
         #  an OverflowError being raised.
         self.assertRaises(OverflowError, testDayObject.addRA, ra2)
 
+    def test_addRA_withFlagDutySlot_whenFillsLastDutySlot_setsFlag(self):
+        # Test to ensure that when the addRA method is called with 1 open
+        #  duty slot, if the setFlag attribute is set, the method adds the
+        #  RA and sets the flag of the DutySlot Object.
+
+        # -- Arrange --
+
+        # Create the objects used in this test
+        ra1 = RA("R", "E", 99, 1, date(2017, 2, 17))
+        desiredDate = date(2021, 2, 8)
+        desiredDOW = 0
+
+        # Create the Day object to be used in this test
+        testDayObject = Day(desiredDate, desiredDOW, numDutySlots=1, flagDutySlot=True)
+
+        # -- Act --
+
+        # Add an RA to the duty slot
+        testDayObject.addRA(ra1)
+
+        # -- Assert --
+
+        # Assert that the RA Object was added
+        self.assertIn(ra1, testDayObject.getRAs())
+
+        # Assert that the last duty slot is flagged
+        self.assertTrue(testDayObject.ras[-1].getFlag())
+
+    def test_addRA_withFlagDutySlot_whenDoesNotFillLastDutySlot_doesNotSetFlag(self):
+        # Test to ensure that when the addRA method is called with more than 1 open
+        #  duty slot, if the setFlag attribute is set, the method adds the
+        #  RA and does NOT set the flag of the DutySlot Object.
+
+        # -- Arrange --
+
+        # Create the objects used in this test
+        ra1 = RA("R", "E", 99, 1, date(2017, 2, 17))
+        desiredDate = date(2021, 2, 8)
+        desiredDOW = 0
+
+        # Create the Day object to be used in this test
+        testDayObject = Day(desiredDate, desiredDOW, numDutySlots=2, flagDutySlot=True)
+
+        # -- Act --
+
+        # Add an RA to the duty slot
+        testDayObject.addRA(ra1)
+
+        # -- Assert --
+
+        # Assert that the RA Object was added
+        self.assertIn(ra1, testDayObject.getRAs())
+
+        # Assert that the last duty slot is flagged
+        self.assertFalse(testDayObject.ras[-1].getFlag())
+
     def test_addRAWithoutPoints_withDutySlotsLeft_addsRAToDutySlots(self):
         # Test to ensure that when the addRaWithoutPoints is called with an
         #  open duty slots left, the method adds the provided RA to the
@@ -699,11 +755,67 @@ class TestDayObject(unittest.TestCase):
 
         # Assert that attempting to add another RA object results in
         #  an OverflowError being raised.
-        self.assertRaises(OverflowError, testDayObject.addRA, ra2)
+        self.assertRaises(OverflowError, testDayObject.addRaWithoutPoints, ra2)
 
         # Assert that attempting to add yet another RA object results in
         #  an OverflowError being raised.
-        self.assertRaises(OverflowError, testDayObject.addRA, ra2)
+        self.assertRaises(OverflowError, testDayObject.addRaWithoutPoints, ra2)
+
+    def test_addRaWithoutPoints_withFlagDutySlot_whenFillsLastDutySlot_setsFlag(self):
+        # Test to ensure that when the addRaWithoutPoints method is called with 1 open
+        #  duty slot, if the setFlag attribute is set, the method adds the
+        #  RA and sets the flag of the DutySlot Object.
+
+        # -- Arrange --
+
+        # Create the objects used in this test
+        ra1 = RA("R", "E", 99, 1, date(2017, 2, 17))
+        desiredDate = date(2021, 2, 8)
+        desiredDOW = 0
+
+        # Create the Day object to be used in this test
+        testDayObject = Day(desiredDate, desiredDOW, numDutySlots=1, flagDutySlot=True)
+
+        # -- Act --
+
+        # Add an RA to the duty slot
+        testDayObject.addRaWithoutPoints(ra1)
+
+        # -- Assert --
+
+        # Assert that the RA Object was added
+        self.assertIn(ra1, testDayObject.getRAs())
+
+        # Assert that the last duty slot is flagged
+        self.assertTrue(testDayObject.ras[-1].getFlag())
+
+    def test_addRaWithoutPoints_withFlagDutySlot_whenDoesNotFillLastDutySlot_doesNotSetFlag(self):
+        # Test to ensure that when the addRaWithoutPoints method is called with more than 1 open
+        #  duty slot, if the setFlag attribute is set, the method adds the
+        #  RA and does NOT set the flag of the DutySlot Object.
+
+        # -- Arrange --
+
+        # Create the objects used in this test
+        ra1 = RA("R", "E", 99, 1, date(2017, 2, 17))
+        desiredDate = date(2021, 2, 8)
+        desiredDOW = 0
+
+        # Create the Day object to be used in this test
+        testDayObject = Day(desiredDate, desiredDOW, numDutySlots=2, flagDutySlot=True)
+
+        # -- Act --
+
+        # Add an RA to the duty slot
+        testDayObject.addRaWithoutPoints(ra1)
+
+        # -- Assert --
+
+        # Assert that the RA Object was added
+        self.assertIn(ra1, testDayObject.getRAs())
+
+        # Assert that the last duty slot is flagged
+        self.assertFalse(testDayObject.ras[-1].getFlag())
 
     def test_removeRA_removesAndReturnsRAFromDutySlots(self):
         # Test to ensure that when the removeRA method is called, the method removes
