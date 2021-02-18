@@ -74,8 +74,10 @@
                   <span class="fa fa-user"></span>
                 </a>
                 <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navbarProfDropdown">
-                  <!--<a class="dropdown-item" href="/profile">Profile</a>-->
-                  <a class="dropdown-item" href="{{url_for('logout')}}">Log out</a>
+                    <!--<a class="dropdown-item" href="/profile">Profile</a>-->
+                    <a class="dropdown-item" target="_blank" href="{{ url_for('forwardToGitReports') }}">Report an Issue</a>
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item" href="{{url_for('logout')}}">Log out</a>
                 </div>
               </li>
             </ul>

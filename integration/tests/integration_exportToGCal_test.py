@@ -1,3 +1,4 @@
+from integration.gCalIntegration import gCalIntegratinator
 from unittest.mock import MagicMock, patch
 from scheduleServer import app
 import unittest
@@ -405,7 +406,7 @@ class TestIntegration_exportToGCal(unittest.TestCase):
 
     @patch("integration.integrations.getSchedule2", autospec=True)
     @patch("integration.integrations.getBreakDuties", autospec=True)
-    def test_withAuthorizedUser_withTokenInDB_ifExportFails_returnsReconnectResponse(self, mocked_getBreakDuties,
+    def test_withAuthorizedUser_withTokenInDB_ifInvalidCreds_returnsExpectedResponse(self, mocked_getBreakDuties,
                                                                                      mocked_getSchedule2):
         # Test to ensure that when this method is called with an authorized user,
         #  and a token has already been added in the DB and the export fails, this
@@ -427,7 +428,8 @@ class TestIntegration_exportToGCal(unittest.TestCase):
         self.mocked_authLevel.return_value = 2
 
         # Configure the result of the gCalIntegratinator.exportScheduleToGoogleCalendar method
-        self.mocked_integrationPart.exportScheduleToGoogleCalendar.return_value = -1
+        self.mocked_integrationPart.exportScheduleToGoogleCalendar.side_effect = gCalIntegratinator\
+            .InvalidCalendarCredentialsError
 
         # Create the objects needed for this test
         desiredMonthNum = 3
@@ -436,7 +438,7 @@ class TestIntegration_exportToGCal(unittest.TestCase):
         expectedID = "longCalendarID@calendar.google.com"
         expectedRegularDutyDict = [1, 2, 3, 4, 5]
         expectedBreakDutyDict = [6, 7, 8, 9, 10]
-        expectedResponse = stdRet(0, "Reconnect Google Calendar Account")
+        expectedResponse = stdRet(-1, "Reconnect Google Calendar Account")
         expectedFlaggedDutyLabel = "On-Call"
 
         # Configure the appGlobals.conn.cursor.execute mock to return different values
@@ -476,8 +478,297 @@ class TestIntegration_exportToGCal(unittest.TestCase):
 
     @patch("integration.integrations.getSchedule2", autospec=True)
     @patch("integration.integrations.getBreakDuties", autospec=True)
-    def test_withAuthorizedUser_withTokenInDB_whenSuccessful_returnsSuccessfulResponse(self, mocked_getBreakDuties,
+    def test_withAuthorizedUser_withTokenInDB_ifExpiredCreds_returnsExpectedResponse(self, mocked_getBreakDuties,
                                                                                      mocked_getSchedule2):
+        # Test to ensure that when this method is called with an authorized user,
+        #  and a token has already been added in the DB and the export fails, this
+        #  method returns a response to the user indicating that they should reconnect
+        #  their Google Calendar account. An authorized user is a user that has an
+        #  auth_level of at least 2 (AHD).
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+        self.mocked_integrationPart.reset_mock()
+        self.mocked_bytesIO.reset_mock()
+        self.mocked_pickle.reset_mock()
+        self.resetAuthLevel()
+
+        # Set the auth_level to be used for this test.
+        self.mocked_authLevel.return_value = 2
+
+        # Configure the result of the gCalIntegratinator.exportScheduleToGoogleCalendar method
+        self.mocked_integrationPart.exportScheduleToGoogleCalendar.side_effect = gCalIntegratinator \
+            .ExpiredCalendarCredentialsError
+
+        # Create the objects needed for this test
+        desiredMonthNum = 3
+        desiredYear = 1997
+        expectedToken = MagicMock()
+        expectedID = "longCalendarID@calendar.google.com"
+        expectedRegularDutyDict = [1, 2, 3, 4, 5]
+        expectedBreakDutyDict = [6, 7, 8, 9, 10]
+        expectedResponse = stdRet(-1, "Reconnect Google Calendar Account")
+        expectedFlaggedDutyLabel = "On-Call"
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedID, expectedToken),  # First call returns the token
+            (expectedFlaggedDutyLabel,)  # Second call is for the flagged duty label
+        ]
+
+        # Configure the results of the mocked_getBreakDuties and mocked_getSchedule2 functions
+        mocked_getBreakDuties.return_value = expectedBreakDutyDict
+        mocked_getSchedule2.return_value = expectedRegularDutyDict
+
+        # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/int/api/exportToGCal",
+                               query_string=dict(
+                                   monthNum=desiredMonthNum,
+                                   year=desiredYear,
+                               ),
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that the response we received is json
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received the expected response
+        self.assertDictEqual(expectedResponse, resp.json)
+
+    @patch("integration.integrations.getSchedule2", autospec=True)
+    @patch("integration.integrations.getBreakDuties", autospec=True)
+    def test_withAuthorizedUser_withTokenInDB_ifUnexpectedError_returnsExpectedResponse(self, mocked_getBreakDuties,
+                                                                                        mocked_getSchedule2):
+        # Test to ensure that when this method is called with an authorized user,
+        #  and a token has already been added in the DB and the export fails, this
+        #  method returns a response to the user indicating that they should reconnect
+        #  their Google Calendar account. An authorized user is a user that has an
+        #  auth_level of at least 2 (AHD).
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+        self.mocked_integrationPart.reset_mock()
+        self.mocked_bytesIO.reset_mock()
+        self.mocked_pickle.reset_mock()
+        self.resetAuthLevel()
+
+        # Set the auth_level to be used for this test.
+        self.mocked_authLevel.return_value = 2
+
+        # Configure the result of the gCalIntegratinator.exportScheduleToGoogleCalendar method
+        self.mocked_integrationPart.exportScheduleToGoogleCalendar.side_effect = gCalIntegratinator \
+            .UnexpectedError("Test Location", "Test Wrapped Error")
+
+        # Create the objects needed for this test
+        desiredMonthNum = 3
+        desiredYear = 1997
+        expectedToken = MagicMock()
+        expectedID = "longCalendarID@calendar.google.com"
+        expectedRegularDutyDict = [1, 2, 3, 4, 5]
+        expectedBreakDutyDict = [6, 7, 8, 9, 10]
+        expectedResponse = stdRet(-1, "Unexpected Error Occurred. Please try again later.")
+        expectedFlaggedDutyLabel = "On-Call"
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedID, expectedToken),  # First call returns the token
+            (expectedFlaggedDutyLabel,)  # Second call is for the flagged duty label
+        ]
+
+        # Configure the results of the mocked_getBreakDuties and mocked_getSchedule2 functions
+        mocked_getBreakDuties.return_value = expectedBreakDutyDict
+        mocked_getSchedule2.return_value = expectedRegularDutyDict
+
+        # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/int/api/exportToGCal",
+                               query_string=dict(
+                                   monthNum=desiredMonthNum,
+                                   year=desiredYear,
+                               ),
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that the response we received is json
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received the expected response
+        self.assertDictEqual(expectedResponse, resp.json)
+
+    @patch("integration.integrations.getSchedule2", autospec=True)
+    @patch("integration.integrations.getBreakDuties", autospec=True)
+    def test_withAuthorizedUser_withTokenInDB_ifCalCreationError_returnsExpectedResponse(self, mocked_getBreakDuties,
+                                                                                         mocked_getSchedule2):
+        # Test to ensure that when this method is called with an authorized user,
+        #  and a token has already been added in the DB and the export fails, this
+        #  method returns a response to the user indicating that they should reconnect
+        #  their Google Calendar account. An authorized user is a user that has an
+        #  auth_level of at least 2 (AHD).
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+        self.mocked_integrationPart.reset_mock()
+        self.mocked_bytesIO.reset_mock()
+        self.mocked_pickle.reset_mock()
+        self.resetAuthLevel()
+
+        # Set the auth_level to be used for this test.
+        self.mocked_authLevel.return_value = 2
+
+        # Configure the result of the gCalIntegratinator.exportScheduleToGoogleCalendar method
+        self.mocked_integrationPart.exportScheduleToGoogleCalendar.side_effect = gCalIntegratinator \
+            .CalendarCreationError
+
+        # Create the objects needed for this test
+        desiredMonthNum = 3
+        desiredYear = 1997
+        expectedToken = MagicMock()
+        expectedID = "longCalendarID@calendar.google.com"
+        expectedRegularDutyDict = [1, 2, 3, 4, 5]
+        expectedBreakDutyDict = [6, 7, 8, 9, 10]
+        expectedResponse = stdRet(-1, "Unable to Create new Google Calendar. Please try again later.")
+        expectedFlaggedDutyLabel = "On-Call"
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedID, expectedToken),  # First call returns the token
+            (expectedFlaggedDutyLabel,)  # Second call is for the flagged duty label
+        ]
+
+        # Configure the results of the mocked_getBreakDuties and mocked_getSchedule2 functions
+        mocked_getBreakDuties.return_value = expectedBreakDutyDict
+        mocked_getSchedule2.return_value = expectedRegularDutyDict
+
+        # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/int/api/exportToGCal",
+                               query_string=dict(
+                                   monthNum=desiredMonthNum,
+                                   year=desiredYear,
+                               ),
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that the response we received is json
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received the expected response
+        self.assertDictEqual(expectedResponse, resp.json)
+
+    @patch("integration.integrations.getSchedule2", autospec=True)
+    @patch("integration.integrations.getBreakDuties", autospec=True)
+    def test_withAuthorizedUser_withTokenInDB_ifScheduleExportError_returnsExpectedResponse(self,
+                                                                                            mocked_getBreakDuties,
+                                                                                            mocked_getSchedule2):
+        # Test to ensure that when this method is called with an authorized user,
+        #  and a token has already been added in the DB and the export fails, this
+        #  method returns a response to the user indicating that they should reconnect
+        #  their Google Calendar account. An authorized user is a user that has an
+        #  auth_level of at least 2 (AHD).
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+        self.mocked_integrationPart.reset_mock()
+        self.mocked_bytesIO.reset_mock()
+        self.mocked_pickle.reset_mock()
+        self.resetAuthLevel()
+
+        # Set the auth_level to be used for this test.
+        self.mocked_authLevel.return_value = 2
+
+        # Configure the result of the gCalIntegratinator.exportScheduleToGoogleCalendar method
+        self.mocked_integrationPart.exportScheduleToGoogleCalendar.side_effect = gCalIntegratinator \
+            .ScheduleExportError("Test Wrapped Exception")
+
+        # Create the objects needed for this test
+        desiredMonthNum = 3
+        desiredYear = 1997
+        expectedToken = MagicMock()
+        expectedID = "longCalendarID@calendar.google.com"
+        expectedRegularDutyDict = [1, 2, 3, 4, 5]
+        expectedBreakDutyDict = [6, 7, 8, 9, 10]
+        expectedResponse = stdRet(-1, "Unexpected Error Occurred. Please try again later.")
+        expectedFlaggedDutyLabel = "On-Call"
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (expectedID, expectedToken),  # First call returns the token
+            (expectedFlaggedDutyLabel,)  # Second call is for the flagged duty label
+        ]
+
+        # Configure the results of the mocked_getBreakDuties and mocked_getSchedule2 functions
+        mocked_getBreakDuties.return_value = expectedBreakDutyDict
+        mocked_getSchedule2.return_value = expectedRegularDutyDict
+
+        # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/int/api/exportToGCal",
+                               query_string=dict(
+                                   monthNum=desiredMonthNum,
+                                   year=desiredYear,
+                               ),
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that appGlobals.conn.commit was never called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+        # Assert that the response we received is json
+        self.assertTrue(resp.is_json)
+
+        # Assert that we received the expected response
+        self.assertDictEqual(expectedResponse, resp.json)
+
+    @patch("integration.integrations.getSchedule2", autospec=True)
+    @patch("integration.integrations.getBreakDuties", autospec=True)
+    def test_withAuthorizedUser_withTokenInDB_whenSuccessful_returnsSuccessfulResponse(self, mocked_getBreakDuties,
+                                                                                       mocked_getSchedule2):
         # Test to ensure that when this method is called with an authorized user,
         #  and a token has already been added in the DB, when the export succeeds, this
         #  method returns a response to the user indicating that the export was successful.
@@ -543,3 +834,4 @@ class TestIntegration_exportToGCal(unittest.TestCase):
 
         # Assert that we received the expected response
         self.assertDictEqual(expectedResponse, resp.json)
+

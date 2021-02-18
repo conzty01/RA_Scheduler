@@ -1,4 +1,4 @@
-from flask import render_template, request, jsonify, Blueprint
+from flask import render_template, request, jsonify, Blueprint, abort
 from flask_login import login_required
 from psycopg2.extras import Json
 from calendar import month_name
@@ -36,8 +36,8 @@ def manHall():
         logging.info("User Not Authorized - RA: {} attempted to reach Manage Hall page"
                      .format(authedUser.ra_id()))
 
-        # Notify the user that they are not authorized.
-        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+        # Raise an 403 Access Denied HTTP Exception that will be handled by flask
+        abort(403)
 
     # Render and return the appropriate template.
     return render_template("hall/hall.html", opts=ag.baseOpts, curView=4,

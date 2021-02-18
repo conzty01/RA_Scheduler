@@ -315,9 +315,10 @@ class TestBreakBP_editBreaks(unittest.TestCase):
             linkedHalls=self.helper_getAuth.getAllAssociatedResHalls()
         )
 
-    def test_WithUnauthorizedUser_ReturnsNotAuthorizedJSON(self):
+    @patch("breaks.breaks.abort", autospec=True)
+    def test_WithUnauthorizedUser_ReturnsNotAuthorizedResponse(self, mocked_abort):
         # Test to ensure that when a user that is NOT authorized to view the
-        #  Edit Breaks Portal navigates to the page, they receive a JSON
+        #  Edit Breaks Portal navigates to the page, they receive a
         #  response that indicates that they are not authorized. An authorized
         #  user is a user that has an auth_level of at least 2 (AHD).
 
@@ -329,22 +330,21 @@ class TestBreakBP_editBreaks(unittest.TestCase):
         # Reset the auth_level to 1
         self.resetAuthLevel()
 
+        # Create a custom exception to be used for this test
+        custException = EOFError
+
+        # Configure the mocked_abort object to behave as expected
+        mocked_abort.side_effect = custException
+
         # -- Act --
-
-        # Request the desired page.
-        resp = self.server.get("/breaks/editBreaks",
-                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
-
         # -- Assert --
 
-        # Assert that we received a json response
-        self.assertTrue(resp.is_json)
+        # Request the desired page and assert that we received an error
+        self.assertRaises(custException, self.server.get, "/breaks/editBreaks",
+                          base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
 
-        # Assert that the json is formatted as expected
-        self.assertEqual(resp.json, stdRet(-1, "NOT AUTHORIZED"))
-
-        # Assert that we received a 200 status code
-        self.assertEqual(resp.status_code, 200)
+        # Assert that the mocked_abort was called with the expected value
+        mocked_abort.assert_called_once_with(403)
 
         # Assert that no additional call to the DB was made
         self.mocked_appGlobals.conn.cursor().execute.assert_not_called()
