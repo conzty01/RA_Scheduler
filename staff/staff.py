@@ -476,11 +476,10 @@ def removeStaffer():
 
     else:
         # Otherwise go ahead and remove the RA from the hall
-        cur.execute("""
-            UPDATE staff_membership 
-            SET res_hall_id = 0 
-            WHERE ra_id = %s
-            AND res_hall_id = %s;""", (raID, authedUser.hall_id()))
+        cur.execute(
+            "DELETE FROM staff_membership WHERE ra_id = %s AND res_hall_id = %s",
+            (raID, authedUser.hall_id())
+        )
 
         # Commit the change to the DB
         ag.conn.commit()
