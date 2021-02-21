@@ -141,17 +141,17 @@ def getRABreakStats(hallId=None, startDateStr=None, endDateStr=None):
 
     # Query the DB for the list of RAs on the provided staff and the count of break
     #  duties that they have been assigned to for the given time period.
-    cur.execute("""SELECT ra.id, ra.first_name, ra.last_name, COALESCE(numQuery.count, 0)
-                   FROM (SELECT ra.id AS rid, COUNT(break_duties.id) AS count
-                         FROM break_duties JOIN day ON (day.id=break_duties.day_id)
-                                           JOIN ra ON (ra.id=break_duties.ra_id)
-                         WHERE break_duties.hall_id = %s
-                         AND day.date BETWEEN TO_DATE(%s, 'YYYY-MM-DD')
-                                          AND TO_DATE(%s, 'YYYY-MM-DD')
-                        GROUP BY rid) AS numQuery
-                        JOIN staff_membership AS sm ON (sm.ra_id = numQuery.rid)
-                   RIGHT JOIN ra ON (numQuery.rid = ra.id)
-                   WHERE sm.res_hall_id = %s;""", (hallId, startDateStr, endDateStr, hallId))
+    cur.execute("""
+        SELECT ra.id, ra.first_name, ra.last_name, COALESCE(numQuery.count, 0)
+        FROM ra LEFT JOIN (
+            SELECT ra_id as rid, COUNT(break_duties.id)
+            FROM break_duties JOIN day ON (day.id = break_duties.day_id)
+            WHERE day.date BETWEEN TO_DATE(%s, 'YYYY-MM-DD') AND TO_DATE(%s, 'YYYY-MM-DD')
+            GROUP BY ra_id
+        ) AS numQuery ON (ra.id = numQuery.rid)
+        JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
+        WHERE sm.res_hall_id = %s
+    """, (startDateStr, endDateStr, hallId))
 
     # Load the results from the DB
     raList = cur.fetchall()

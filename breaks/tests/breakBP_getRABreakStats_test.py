@@ -211,19 +211,17 @@ class TestBreakBP_getRABreakStats(unittest.TestCase):
         # Assert that the when the appGlobals.conn.cursor().execute was called,
         #  it was a select statement. Since this line is using triple-quote strings,
         #  the whitespace must match exactly.
-        self.mocked_appGlobals.conn.cursor().execute.assert_called_once_with(
-            """SELECT ra.id, ra.first_name, ra.last_name, COALESCE(numQuery.count, 0)
-                   FROM (SELECT ra.id AS rid, COUNT(break_duties.id) AS count
-                         FROM break_duties JOIN day ON (day.id=break_duties.day_id)
-                                           JOIN ra ON (ra.id=break_duties.ra_id)
-                         WHERE break_duties.hall_id = %s
-                         AND day.date BETWEEN TO_DATE(%s, 'YYYY-MM-DD')
-                                          AND TO_DATE(%s, 'YYYY-MM-DD')
-                        GROUP BY rid) AS numQuery
-                        JOIN staff_membership AS sm ON (sm.ra_id = numQuery.rid)
-                   RIGHT JOIN ra ON (numQuery.rid = ra.id)
-                   WHERE sm.res_hall_id = %s;""",
-            (self.user_hall_id, desiredStartStr, desiredEndStr, self.user_hall_id)
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_once_with("""
+        SELECT ra.id, ra.first_name, ra.last_name, COALESCE(numQuery.count, 0)
+        FROM ra LEFT JOIN (
+            SELECT ra_id as rid, COUNT(break_duties.id)
+            FROM break_duties JOIN day ON (day.id = break_duties.day_id)
+            WHERE day.date BETWEEN TO_DATE(%s, 'YYYY-MM-DD') AND TO_DATE(%s, 'YYYY-MM-DD')
+            GROUP BY ra_id
+        ) AS numQuery ON (ra.id = numQuery.rid)
+        JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
+        WHERE sm.res_hall_id = %s
+    """, (desiredStartStr, desiredEndStr, self.user_hall_id)
         )
 
         # Assert that appGlobals.conn.commit was never called
@@ -303,19 +301,17 @@ class TestBreakBP_getRABreakStats(unittest.TestCase):
         # Assert that the when the appGlobals.conn.cursor().execute was called,
         #  it was a select statement. Since this line is using triple-quote strings,
         #  the whitespace must match exactly.
-        self.mocked_appGlobals.conn.cursor().execute.assert_called_once_with(
-            """SELECT ra.id, ra.first_name, ra.last_name, COALESCE(numQuery.count, 0)
-                   FROM (SELECT ra.id AS rid, COUNT(break_duties.id) AS count
-                         FROM break_duties JOIN day ON (day.id=break_duties.day_id)
-                                           JOIN ra ON (ra.id=break_duties.ra_id)
-                         WHERE break_duties.hall_id = %s
-                         AND day.date BETWEEN TO_DATE(%s, 'YYYY-MM-DD')
-                                          AND TO_DATE(%s, 'YYYY-MM-DD')
-                        GROUP BY rid) AS numQuery
-                        JOIN staff_membership AS sm ON (sm.ra_id = numQuery.rid)
-                   RIGHT JOIN ra ON (numQuery.rid = ra.id)
-                   WHERE sm.res_hall_id = %s;""",
-            (self.user_hall_id, desiredStartStr, desiredEndStr, self.user_hall_id)
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_once_with("""
+        SELECT ra.id, ra.first_name, ra.last_name, COALESCE(numQuery.count, 0)
+        FROM ra LEFT JOIN (
+            SELECT ra_id as rid, COUNT(break_duties.id)
+            FROM break_duties JOIN day ON (day.id = break_duties.day_id)
+            WHERE day.date BETWEEN TO_DATE(%s, 'YYYY-MM-DD') AND TO_DATE(%s, 'YYYY-MM-DD')
+            GROUP BY ra_id
+        ) AS numQuery ON (ra.id = numQuery.rid)
+        JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
+        WHERE sm.res_hall_id = %s
+    """, (desiredStartStr, desiredEndStr, self.user_hall_id)
         )
 
         # Assert that appGlobals.conn.commit was never called
