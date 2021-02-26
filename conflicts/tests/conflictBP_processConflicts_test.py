@@ -317,15 +317,14 @@ class TestConflictBP_getRAConflicts(unittest.TestCase):
         # Assert that the when the appGlobals.conn.cursor().execute was last called,
         #  it was an Delete statement. Since this line is using triple-quote strings,
         #  the whitespace must match exactly.
-        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
-            """DELETE FROM conflicts
-                       WHERE conflicts.day_id IN (
-                            SELECT conflicts.day_id
-                            FROM conflicts
-                                JOIN day ON (conflicts.day_id = day.id)
-                            WHERE TO_CHAR(day.date, 'YYYY-MM-DD') IN %s
-                            AND conflicts.ra_id = %s
-                        );""", (tuple(set(desiredNewConflicts[15:])), self.user_ra_id))
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_with("""
+            DELETE FROM conflicts
+            WHERE conflicts.day_id IN (
+                SELECT conflicts.day_id
+                FROM conflicts JOIN day ON (conflicts.day_id = day.id)
+                WHERE TO_CHAR(day.date, 'YYYY-MM-DD') IN %s
+                AND conflicts.ra_id = %s
+            );""", (tuple(set(desiredNewConflicts[15:])), self.user_ra_id))
 
         # Assert that appGlobals.conn.commit was never called
         self.mocked_appGlobals.conn.commit.assert_called_once()
