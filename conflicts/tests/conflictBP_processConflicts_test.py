@@ -393,15 +393,14 @@ class TestConflictBP_getRAConflicts(unittest.TestCase):
         # Assert that the when the appGlobals.conn.cursor().execute was called,
         #  one of the calls was the following. Since this line is using triple-
         #  quote strings, the whitespace must match exactly.
-        self.mocked_appGlobals.conn.cursor().execute.assert_any_call(
-            """DELETE FROM conflicts
-                       WHERE conflicts.day_id IN (
-                            SELECT conflicts.day_id
-                            FROM conflicts
-                                JOIN day ON (conflicts.day_id = day.id)
-                            WHERE TO_CHAR(day.date, 'YYYY-MM-DD') IN %s
-                            AND conflicts.ra_id = %s
-                        );""", (tuple(deleteSet), self.user_ra_id)
+        self.mocked_appGlobals.conn.cursor().execute.assert_any_call("""
+            DELETE FROM conflicts
+            WHERE conflicts.day_id IN (
+                SELECT conflicts.day_id
+                FROM conflicts JOIN day ON (conflicts.day_id = day.id)
+                WHERE TO_CHAR(day.date, 'YYYY-MM-DD') IN %s
+                AND conflicts.ra_id = %s
+            );""", (tuple(deleteSet), self.user_ra_id)
         )
 
         # Assert that the when the appGlobals.conn.cursor().execute was called,
