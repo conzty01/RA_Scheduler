@@ -283,7 +283,7 @@ class TestSchedule_addNewDuty(unittest.TestCase):
         # Assert that appGlobals.conn.cursor().close was called
         self.mocked_appGlobals.conn.cursor().close.assert_called_once()
 
-    def test_withAuthorizedUser_withoutValidSchedule_returnsInvalidScheduleResponse(self):
+    def test_withAuthorizedUser_withoutValidSchedule_returnsCreatesNewScheduleEntry(self):
         # Test to ensure that when an authorized user attempts to use this API,
         #  if no schedule is available, this will create a new schedule record.
 
@@ -331,7 +331,7 @@ class TestSchedule_addNewDuty(unittest.TestCase):
         # Assert that one of the times appGlobals.conn.cursor().execute was called,
         #  it was a query to insert a new schedule record.
         self.mocked_appGlobals.conn.cursor().execute.assert_any_call(
-            "INSERT INTO schedule (hall_id, month_id) VALUES (%s, %s) RETURNING id",
+            "INSERT INTO schedule (hall_id, month_id, created) VALUES (%s, %s, NOW()) RETURNING id",
             (self.user_hall_id, expectedMonthID)
         )
 
