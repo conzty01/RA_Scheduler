@@ -1054,7 +1054,7 @@ def addNewDuty():
                      .format(monthId, authedUser.hall_id()))
 
         # Insert the schedule entry into the DB
-        cur.execute("INSERT INTO schedule (hall_id, month_id) VALUES (%s, %s) RETURNING id",
+        cur.execute("INSERT INTO schedule (hall_id, month_id, created) VALUES (%s, %s, NOW()) RETURNING id",
                     (authedUser.hall_id(), monthId))
 
         # Load the schedule ID from the DB
