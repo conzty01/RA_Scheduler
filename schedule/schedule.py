@@ -611,7 +611,7 @@ def runScheduler():
                                       ldaTolerance=ldat, doubleNum=mulNumAssigned,
                                       prevDuties=prevRADuties, breakDuties=breakDuties,
                                       setDDFlag=flagMultiDuty, regDutyPts=regDutyPts,
-                                      regNumAssigned=regNumAssigned)
+                                      regNumAssigned=regNumAssigned, assignConflicts=False)
 
         # If we were unable to schedule with the previous parameters,
         if len(sched) == 0:
