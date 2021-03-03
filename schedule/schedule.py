@@ -1,7 +1,7 @@
 from flask import render_template, request, jsonify, Blueprint, abort
 from flask_login import login_required
 from psycopg2 import IntegrityError
-from schedule import scheduler4_1
+from schedule import scheduler5_0
 from schedule.ra_sched import RA
 import copy as cp
 import calendar
@@ -605,7 +605,7 @@ def runScheduler():
     successful = False
     while not completed:
         # While we are not finished scheduling, create a candidate schedule
-        sched = scheduler4_1.schedule(copy_raList, year, monthNum, doubleDateNum=mulNumAssigned,
+        sched = scheduler5_0.schedule(copy_raList, year, monthNum, doubleDateNum=mulNumAssigned,
                                       doubleDatePts=mulDutyPts, noDutyDates=copy_noDutyList,
                                       doubleDays=mulDutyDays, doublePts=mulDutyPts,
                                       ldaTolerance=ldat, doubleNum=mulNumAssigned,
@@ -622,8 +622,11 @@ def runScheduler():
                 # If the LDATolerance is greater than 1
                 #  then decrement the LDATolerance by 1 and try again
 
-                logging.info("DECREASE LDAT: {}".format(ldat))
                 ldat -= 1
+                logging.info(
+                    "ResHall: {} , Month: {} - DECREASING LDAT TO: {}"
+                    .format(hallId, monthId, ldat)
+                )
 
                 # Create new deep copies of the ra_list and noDutyList
                 copy_raList = cp.deepcopy(ra_list)

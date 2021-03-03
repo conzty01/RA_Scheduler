@@ -790,8 +790,8 @@ class State:
         return State(
             self.curDay,
             self.candList,
-            self.lda.copy(),
-            self.ndd.copy(),
+            self.lda,
+            self.ndd,
             self.ldaTol,
             self.nddTol,
             self.nfd,
@@ -837,7 +837,7 @@ class State:
         self.curDay.addRA(candRA)
 
         # Update lastDateAssigned
-        self.lda[candRA] = self.curDay.getDate()
+        self.lda[candRA].append(self.curDay.getDate())
 
         # If doubleDay, then update numDoubleDays
         if self.isDoubleDay():
@@ -915,8 +915,8 @@ class State:
             # If an RA has been assigned a duty recently
             #  This is skipped when the LDA is 0, meaning the RA has not been
             #  assigned for duty yet this month.
-            if lastDateAssigned[ra] != 0 and \
-               day.getDate() - lastDateAssigned[ra] < ldaTolerance:
+            if lastDateAssigned[ra][-1] != 0 and \
+               day.getDate() - lastDateAssigned[ra][-1] < ldaTolerance:
                 # Then the RA is no longer a duty candidate
                 isCand = False
                 # print("      Removed: Recent Duty")
@@ -985,12 +985,43 @@ class State:
         #  scope that is beyond genCandScore. Additionally, these parameters can
         #  be recalculated for each RA that is passed to the lambda function.
         # print("  Sorting")
-        retList.sort(key=lambda ra: genCandScore(ra, day, lastDateAssigned[ra],
+        retList.sort(key=lambda ra: genCandScore(ra, day, lastDateAssigned[ra][-1],
                                                  numDoubleDays[ra], isDoubleDay, datePts,
                                                  doubleDayAvg, ptsAvg, numFlagDuties[ra],
                                                  flagDutyAvg))
 
         return retList
+
+    def removeAssignedRAs(self):
+        # Remove all of the assigned RAs from the current Day. This will also
+        #  update the lastDutyAssigned, numDoubleDays and numFlagDuties dicts as
+        #  necessary.
+
+        # Iterate over all RAs assigned to duties on the current day
+        for dutySlot in self.curDay.iterDutySlots():
+
+            # Check to see if this slot has been assigned
+            if dutySlot.isAssigned():
+                # Get the assigned RA
+                assignedRA = dutySlot.getAssignment()
+
+                # Remove this day from the lastDateAssigned dict
+                self.lda[assignedRA].pop()
+
+                # If this day is a doubleDay
+                if self.curDay.isDoubleDay():
+                    # Then also decrement the numDoubleDays dict
+                    self.ndd[assignedRA] -= 1
+
+                # If this duty slot is flagged
+                if dutySlot.getFlag():
+                    # Then also decrement the numFlagDuties
+                    self.nfd[assignedRA] -= 1
+
+                # Lastly, remove the RA from duty
+                self.curDay.removeRA(assignedRA)
+
+            # If it is not assigned, skip this duty slot
 
 
 if __name__ == "__main__":
