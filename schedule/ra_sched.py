@@ -500,6 +500,10 @@ class Day:
             # If not, then return False
             return False
 
+    def getLastDutySlotAssignment(self):
+        # Return the RA that was assigned to the last Duty Slot
+        return self.ras[-1].getAssignment()
+
     # ------------------------
     # -- Supporting Classes --
     # ------------------------
@@ -779,14 +783,29 @@ class State:
             self.candList = raList
 
         else:
-            # Otherwise we will calculate the ordered candidate list for this state.
-            self.candList = self.getSortedWorkableRAs(raList, self.curDay, self.lda,
-                                                      self.curDay.isDoubleDay(), self.ndd,
-                                                      self.curDay.getPoints(), self.ldaTol,
-                                                      self.nddTol, self.nfd)
+            # Otherwise we will calculate the ordered candidate list and
+            #  conflict list for this state.
+            self.candList, self.conList = self.getSortedWorkableRAs(
+                raList, self.curDay, self.lda, self.curDay.isDoubleDay(),
+                self.ndd, self.curDay.getPoints(), self.ldaTol,
+                self.nddTol, self.nfd
+            )
 
     def __deepcopy__(self):
         # Return a new State object with all of the same attributes as this State
+        return State(
+            self.curDay,
+            self.candList,
+            self.lda.copy(),
+            self.ndd.copy(),
+            self.ldaTol,
+            self.nddTol,
+            self.nfd.copy(),
+            self.predetermined
+        )
+
+    def __copy__(self):
+        # Return a new State object that is a shallow copy of this State
         return State(
             self.curDay,
             self.candList,
@@ -798,9 +817,32 @@ class State:
             self.predetermined
         )
 
+    def __eq__(self, other):
+        # Return True if this state is considered equal to
+        #  the other state
+
+        # Check to ensure that the other object is indeed
+        #  a State object
+        if type(other) != State:
+            # If not, then raise a TypeError
+            raise TypeError("Cannot compare State object with {} object".format(type(other)))
+
+        return self.curDay.getDate() == other.curDay.getDate() and \
+            self.ldaTol == other.ldaTol and \
+            self.nddTol == other.nddTol and \
+            self.ndd == other.ndd and \
+            self.nfd == other.nfd and \
+            self.lda == other.lda and \
+            self.candList == other.candList and \
+            self.predetermined == other.predetermined
+
     def deepcopy(self):
         # Call the __deepcopy__ magic method
         return self.__deepcopy__()
+
+    def copy(self):
+        # Call the __copy__ magic method
+        return self.__copy__()
 
     def restoreState(self):
         # Return the values of the current state
@@ -809,6 +851,10 @@ class State:
     def hasEmptyCandList(self):
         # Return a boolean denoting whether the candidate list is empty or not
         return len(self.candList) == 0
+
+    def hasEmptyConList(self):
+        # Return a boolean denoting whether the conflict list is empty or not
+        return len(self.conList) == 0
 
     def returnedFromPreviousState(self):
         # Return a boolean denoting whether this state has been visited again
@@ -833,7 +879,11 @@ class State:
         # Get the next candidate RA for the curDay's duty
         candRA = self.getNextCandidate()
 
-        # Assign the candidate RA for th curDay's duty
+        # If flagged duty, then update numFlagDuties
+        if self.curDay.nextDutySlotIsFlagged():
+            self.nfd[candRA] += 1
+
+        # Assign the candidate RA for the curDay's duty
         self.curDay.addRA(candRA)
 
         # Update lastDateAssigned
@@ -850,7 +900,11 @@ class State:
                              numDoubleDays, datePts, ldaTolerance, nddTolerance,
                              numFlagDuties):
         # Create and return a new sorted list of RAs that are available for duty
-        #  on the provided day.
+        #  on the provided day. Also create and return a new sorted list of RAs
+        #  that are NOT available for duty on the provided day.
+
+        # Initialize the conflict list
+        conList = []
 
         # Calculate the average number of points amongst RAs
         # Set the sum to 0
@@ -910,6 +964,10 @@ class State:
             if day.getDate() in ra.getConflicts():
                 # Then the RA is no longer a duty candidate
                 isCand = False
+
+                # Append the RA to the list of RAs that have
+                #  conflicts with this date.
+                conList.append(ra)
                 # print("      Removed: Conflict")
 
             # If an RA has been assigned a duty recently
@@ -985,12 +1043,24 @@ class State:
         #  scope that is beyond genCandScore. Additionally, these parameters can
         #  be recalculated for each RA that is passed to the lambda function.
         # print("  Sorting")
-        retList.sort(key=lambda ra: genCandScore(ra, day, lastDateAssigned[ra][-1],
-                                                 numDoubleDays[ra], isDoubleDay, datePts,
-                                                 doubleDayAvg, ptsAvg, numFlagDuties[ra],
-                                                 flagDutyAvg))
+        retList.sort(
+            key=lambda ra: genCandScore(
+                ra, day, lastDateAssigned[ra][-1],
+                numDoubleDays[ra], isDoubleDay, datePts,
+                doubleDayAvg, ptsAvg, numFlagDuties[ra],
+                flagDutyAvg
+            )
+        )
+        conList.sort(
+            key=lambda ra: genCandScore(
+                ra, day, lastDateAssigned[ra][-1],
+                numDoubleDays[ra], isDoubleDay, datePts,
+                doubleDayAvg, ptsAvg, numFlagDuties[ra],
+                flagDutyAvg
+            )
+        )
 
-        return retList
+        return retList, conList
 
     def removeAssignedRAs(self):
         # Remove all of the assigned RAs from the current Day. This will also
@@ -1022,6 +1092,54 @@ class State:
                 self.curDay.removeRA(assignedRA)
 
             # If it is not assigned, skip this duty slot
+
+    def getNextConflictCandidate(self):
+        # Remove and return the next conflict candidate
+        return self.conList.pop(0)
+
+    def assignNextConflictRA(self):
+        # Assign the next RA with a duty conflict on
+        #  curDay's duty.
+
+        # Get the next conflict RA for the curDay's duty
+        conRA = self.getNextConflictCandidate()
+
+        # If flagged duty, then update numFlagDuties
+        if self.curDay.nextDutySlotIsFlagged():
+            self.nfd[conRA] += 1
+
+        # Assign the conflict RA for the curDay's duty
+        self.curDay.addRA(conRA)
+
+        # Update lastDateAssigned
+        self.lda[conRA].append(self.curDay.getDate())
+
+        # If doubleDay, then update numDoubleDays
+        if self.isDoubleDay():
+            self.ndd[conRA] += 1
+
+        # Return the selected candidate RA
+        return conRA
+
+    def assignRA(self, ra):
+        # Assign the provided RA for duty on this day.
+
+        # If flagged duty, then update numFlagDuties
+        if self.curDay.nextDutySlotIsFlagged():
+            self.nfd[ra] += 1
+
+        # Assign the candidate RA for the curDay's duty
+        self.curDay.addRA(ra)
+
+        # Update lastDateAssigned
+        self.lda[ra].append(self.curDay.getDate())
+
+        # If doubleDay, then update numDoubleDays
+        if self.isDoubleDay():
+            self.ndd[ra] += 1
+
+        # Return the selected candidate RA
+        return ra
 
 
 if __name__ == "__main__":

@@ -7,7 +7,8 @@ import logging
 def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2,
              doubleNum=2, doubleDates=set(), doubleDateNum=2, doubleDatePts=1,
              ldaTolerance=8, nddTolerance=.1, prevDuties=[], breakDuties=[],
-             setDDFlag=False, regDutyPts=1, regNumAssigned=1, assignConflicts=False):
+             setDDFlag=False, regDutyPts=1, regNumAssigned=1, assignConflicts=False,
+             conAssignState=None):
     # This algorithm will schedule RAs for duties based on ...
     #
     # The algorithm returns a Schedule object that contains Day objects which, in
@@ -57,6 +58,9 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
     #                        days they have entered conflicts for. This is only
     #                        used if there are no other eligible RAs available on
     #                        that day.
+    #     conAssignState  = State object denoting the furthest state that was reached
+    #                        before attempting to override conflicts. This object is
+    #                        only used if the assignConflicts parameter is set to True.
 
     logging.info("Starting Scheduling Process")
 
@@ -261,6 +265,20 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
 
     stateStack.push(startState)
 
+    # Set the internally used furthest state to the first state so that we
+    #  can keep track of it.
+    furthestState = startState
+
+    # The RA assigned to the conflict state that got us the furthest through
+    #  the month without running into another roadblocking state
+    postConStateFurthestRA = None
+
+    # Roadblocking state that exists after the provided conAssignState
+    subConAssignState = None
+
+    # Have we already seen the conAssignState?
+    alreadySeenConAssignState = False   # TODO: Possibly startState == conAssignState and assignConflicts?
+
     logging.debug(" Finished Initializing First Day")
 
     logging.debug(" Beginning Scheduling")
@@ -275,33 +293,146 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
         #               .format(curDay, candList, lastDateAssigned, numDoubleDays))
         # input("  Hit 'Enter' to continue ")
 
-        # If there are no more candidate RAs for a given day, then go back to
-        #  the previous state.
+        # If there are no more candidate RAs for a given day...
         if curState.hasEmptyCandList():
             # logging.debug("   NO CANDIDATES")
-            continue
 
-        # Check to see if we have come back from a subsequent state. This will
-        #  be asserted if an RA has been assigned a duty for the current day.
-        if curState.returnedFromPreviousState():
-            # If we are returning from a subsequent day, then remove the RA(s)
-            #  that were previously assigned.
-            # logging.debug("   REVISTED DAY")
-            curState.removeAssignedRAs()
+            # Check to see if this run has been configured to override duty conflicts
+            if assignConflicts:
+                # If so, then check to see if we have reached the provided
+                #  assign conflicts state
+                if curState == conAssignState:
+                    # logging.debug("   REACHED ASSIGN CONFLICTS STATE")
+                    # If we have reached the Assign Conflicts State
 
-        curState.assignNextRA()
-        # logging.debug("   Chosen RA: {}".format(candRA))
+                    # If we have NOT already seen this state before.
+                    if not curState.returnedFromPreviousState():
+                        # logging.debug("   OVERRIDING DUTY CONFLICT")
+                        # Then this is the first time we have reached this state.
 
-        # Put the updated current state back on the stateStack
-        curStateCopy = curState.deepcopy()
-        stateStack.push(curStateCopy)
+                        # Assign an RA for duty that has a conflict on this day.
+                        postConStateFurthestRA = curState.assignNextConflictRA()
 
-        # Get the next Day
-        nextDay = cal[curDay]
+                        # This day is now the new furthest day.
+                        furthestState = curState.deepcopy()
 
-        # Generate the next State
-        nextState = State(nextDay, raList, lastDateAssigned, numDoubleDays,
-                          ldaTolerance, nddTolerance, numFlagDuties)
+                        # Set the subConAssignState to the current state
+                        subConAssignState = curState.deepcopy()
+
+                        # Set the alreadySeenConAssignState to True
+                        alreadySeenConAssignState = True
+
+                    else:
+                        # logging.debug("   REMOVING PREVIOUS CONFLICT OVERRIDE RA")
+                        # Otherwise we have reached this state before and have come back
+                        #  due to a roadblock on a future day.
+
+                        #  In this implementation, we will keep track of how far we got
+                        #  with the previously assigned conflict RA and try somebody new.
+                        #  If we come to another roadblock that is impassable without
+                        #  assigning over conflicts again, then we will pick the RA that
+                        #  got us the furthest and repeat these steps on the next roadblock.
+
+                        # Check to see if there are any other RAs with duty conflicts for
+                        #  this day that can be overridden.
+                        if not curState.hasEmptyConList():
+                            # If there are, then check to see if the currently assigned RA
+                            #  got us further through the month than the previous
+                            #  postConStateFurthestRA
+                            if furthestState == subConAssignState:
+                                # If so, then we have a new furthest RA
+                                postConStateFurthestRA = curDay.getLastDutySlotAssignment()
+
+                            # Remove all previously assigned RAs from this day
+                            curState.removeAssignedRAs()
+
+                            # Select the next conflict RA to be assigned and try again
+                            curState.assignNextConflictRA()
+
+                        else:
+                            # If there is not, then re-assign the RA that got us the furthest
+
+                            # Remove all previously assigned RAs from this day
+                            curState.removeAssignedRAs()
+
+                            # Assign the RA that got us the furthest
+                            curState.assignRA(postConStateFurthestRA)
+
+                    # Regardless of which path above was taken, put the updated
+                    #  current state back on the stateStack
+                    curStateCopy = curState.copy()
+                    stateStack.push(curStateCopy)
+
+                    # Get the next Day
+                    nextDay = cal[curDay]
+
+                    # Generate the next State
+                    nextState = State(nextDay, raList, lastDateAssigned, numDoubleDays,
+                                      ldaTolerance, nddTolerance, numFlagDuties)
+
+                elif curState == subConAssignState:
+                    # logging.debug("   REACHED SUBSEQUENT ROADBLOCKING STATE")
+                    # Else if we have reached a subsequent roadblocking state.
+
+                    # Then assign an RA who has a conflict with this day
+                    #  and keep going.
+
+                    pass
+
+                else:
+                    # Otherwise, this run is configured to override duty conflicts,
+                    #  however we have reached a day with no available duties per
+                    #  the normal workflow.
+
+                    # Check to see if we have reached a new furthest subsequent
+                    #  conflict assignment state
+                    if curState > subConAssignState:
+                        # If so, then set this state as being a new furthest
+                        #  subsequent conflict assignment state
+                        subConAssignState = curState.deepcopy()
+
+                    # Go back to the previous state.
+                    continue
+
+            else:
+                # Otherwise, simply go back to the previous state.
+                continue
+
+        else:
+            # Otherwise, this day is eligible to have an RA assigned for duty.
+
+            # Check to see if we have come back from a subsequent state. This will
+            #  be asserted if an RA has been assigned a duty for the current day.
+            if curState.returnedFromPreviousState():
+                # If we are returning from a subsequent day, then remove the RA(s)
+                #  that were previously assigned.
+                # logging.debug("   REVISTED DAY")
+                curState.removeAssignedRAs()
+
+            # Check to see if we have reached a new furthest state
+            if curDay.getDate() > furthestState.curDay.getDate():
+                # If so, set this state as the new furthest
+                furthestState = curState.deepcopy()
+
+            # Check to see if we have already seen the conAssignState and we have
+            #  reached a new furthest subsequent conflict assignment state
+            if alreadySeenConAssignState and curDay.getDate() > subConAssignState.curDay.getDate():
+                # If so, set this state as the new furthest subConAssignState
+                subConAssignState = curState.deepcopy()
+
+            curState.assignNextRA()
+            # logging.debug("   Chosen RA: {}".format(candRA))
+
+            # Put the updated current state back on the stateStack
+            curStateCopy = curState.copy()
+            stateStack.push(curStateCopy)
+
+            # Get the next Day
+            nextDay = cal[curDay]
+
+            # Generate the next State
+            nextState = State(nextDay, raList, lastDateAssigned, numDoubleDays,
+                              ldaTolerance, nddTolerance, numFlagDuties)
 
         # If there is at least one RA that can be scheduled for the next day,
         #  or the current day is the end of the month, then add the next day to
@@ -311,8 +442,6 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
             # logging.debug("   MOVING TO NEXT DAY")
             # Add the next day on the stack
             stateStack.push(nextState)
-
-            curDay = nextDay  # Move on to the next day
 
         # input()
 
@@ -325,7 +454,7 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
         # If the stateStack is empty, then the algorithm could not create a
         #  schedule with zero conflicts.
         logging.info(" Could Not Generate Schedule")
-        return []
+        return [], furthestState
 
     def parseSchedule(cal):
         # logging.debug("Parsing Generated Schedule")
@@ -370,7 +499,7 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
 
     logging.info("Finished Scheduling Process")
 
-    return Schedule(year, month, noDutyDates, parseSchedule(cal), doubleDays, doubleDates)
+    return Schedule(year, month, noDutyDates, parseSchedule(cal), doubleDays, doubleDates), furthestState
 
 
 if __name__ == "__main__":
