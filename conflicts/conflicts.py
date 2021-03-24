@@ -500,14 +500,14 @@ def processConflicts():
 
         # Execute a DELETE statement to remove the previously entered conflicts
         #  that are no longer needed.
-        cur.execute("""DELETE FROM conflicts
-                       WHERE conflicts.day_id IN (
-                            SELECT conflicts.day_id
-                            FROM conflicts
-                                JOIN day ON (conflicts.day_id = day.id)
-                            WHERE TO_CHAR(day.date, 'YYYY-MM-DD') IN %s
-                            AND conflicts.ra_id = %s
-                        );""", (tuple(deleteSet), authedUser.ra_id()))
+        cur.execute("""
+            DELETE FROM conflicts
+            WHERE conflicts.day_id IN (
+                SELECT conflicts.day_id
+                FROM conflicts JOIN day ON (conflicts.day_id = day.id)
+                WHERE TO_CHAR(day.date, 'YYYY-MM-DD') IN %s
+                AND conflicts.ra_id = %s
+            );""", (tuple(deleteSet), authedUser.ra_id()))
 
         # Set the flag to indicate that we have made changes to the DB
         madeChanges = True
