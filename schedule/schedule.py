@@ -624,7 +624,7 @@ def runScheduler():
             ldaTolerance=ldat, doubleNum=mulNumAssigned, prevDuties=prevRADuties,
             breakDuties=breakDuties, setDDFlag=flagMultiDuty, regDutyPts=regDutyPts,
             regNumAssigned=regNumAssigned, assignConflicts=overrideConflictsThisPass,
-            conAssignState=furthestStateReached
+            curBlockingState=furthestStateReached
         )
 
         # If we were unable to schedule with the previous parameters,

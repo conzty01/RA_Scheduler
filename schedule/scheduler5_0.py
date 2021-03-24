@@ -8,7 +8,7 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
              doubleNum=2, doubleDates=set(), doubleDateNum=2, doubleDatePts=1,
              ldaTolerance=8, nddTolerance=.1, prevDuties=[], breakDuties=[],
              setDDFlag=False, regDutyPts=1, regNumAssigned=1, assignConflicts=False,
-             conAssignState=None):
+             curBlockingState=None):
     # This algorithm will schedule RAs for duties based on ...
     #
     # The algorithm returns a Schedule object that contains Day objects which, in
@@ -16,51 +16,51 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
     #
     # The breakdown of the parameters that this algorithm accepts is as follows:
     #
-    #     raList          = list containing RA objects that are to be scheduled
-    #     year            = year for scheduling
-    #     month           = month for scheduling
-    #     noDutyDates     = list of integers that represent dates where no RAs
-    #                        should be on duty.
-    #     doubleDays      = set containing integers denoting the day of the week
-    #                        where multiple RAs should be scheduled. These integers
-    #                        line up with the representation that is in the datetime
-    #                        module. The mapping is as follows:
+    #     raList           = list containing RA objects that are to be scheduled
+    #     year             = year for scheduling
+    #     month            = month for scheduling
+    #     noDutyDates      = list of integers that represent dates where no RAs
+    #                         should be on duty.
+    #     doubleDays       = set containing integers denoting the day of the week
+    #                         where multiple RAs should be scheduled. These integers
+    #                         line up with the representation that is in the datetime
+    #                         module. The mapping is as follows:
     #
-    #                         Mon, Tues, Wed, Thurs, Fri, Sat, Sun
-    #                          0    1     2     3     4    5    6
+    #                          Mon, Tues, Wed, Thurs, Fri, Sat, Sun
+    #                           0    1     2     3     4    5    6
     #
-    #     doublePts       = number of points that are earned on a double day
-    #     doubleNum       = number of RAs to be assigned on a double day
-    #     doubleDates     = set containing integers denoting the date of the month
-    #                        where multiple RAs should be assigned. This is different
-    #                        than the 'doubleDays' set in that it represents *dates*
-    #                        where multiple RAs should be assigned-- not *days of the
-    #                        week*. If a date happens to be in both the doubleDates
-    #                        set and the doubleDays set, it acts like a double day.
-    #     doubleDateNum   = number of RAs to be assigned on a double date
-    #     doubleDatePts   = number of points that are earned on a double date
-    #     ldaTolerance    = number of days before an RA is to be considered for duty
-    #     nddTolerance    = tolerance for whether an RA should be considered for
-    #                        duty on a double day. This tolerance helps prevent RAs
-    #                        from being scheduled for two consecutive double days in
-    #                        a row since they could be many days apart
-    #     prevDuties      = list containing tuples of an RA object and date object
-    #                        that corresponds with the last few days of duty of the
-    #                        previous month. This helps prevent RAs from being
-    #                        assigned for duties in close succession at the
-    #                        change of the month.
-    #     breakDuties     = list containing integers that represent dates where
-    #                        the scheduler should skip due to the occurrence of a
-    #                        previously scheduled break duty on that date.
-    #     setDDFlag       = boolean representing whether or not to set the special
-    #                        flag on one of the duties for double duty days.
-    #     assignConflicts = boolean representing whether or not to assign RAs on
-    #                        days they have entered conflicts for. This is only
-    #                        used if there are no other eligible RAs available on
-    #                        that day.
-    #     conAssignState  = State object denoting the furthest state that was reached
-    #                        before attempting to override conflicts. This object is
-    #                        only used if the assignConflicts parameter is set to True.
+    #     doublePts        = number of points that are earned on a double day
+    #     doubleNum        = number of RAs to be assigned on a double day
+    #     doubleDates      = set containing integers denoting the date of the month
+    #                         where multiple RAs should be assigned. This is different
+    #                         than the 'doubleDays' set in that it represents *dates*
+    #                         where multiple RAs should be assigned-- not *days of the
+    #                         week*. If a date happens to be in both the doubleDates
+    #                         set and the doubleDays set, it acts like a double day.
+    #     doubleDateNum    = number of RAs to be assigned on a double date
+    #     doubleDatePts    = number of points that are earned on a double date
+    #     ldaTolerance     = number of days before an RA is to be considered for duty
+    #     nddTolerance     = tolerance for whether an RA should be considered for
+    #                         duty on a double day. This tolerance helps prevent RAs
+    #                         from being scheduled for two consecutive double days in
+    #                         a row since they could be many days apart
+    #     prevDuties       = list containing tuples of an RA object and date object
+    #                         that corresponds with the last few days of duty of the
+    #                         previous month. This helps prevent RAs from being
+    #                         assigned for duties in close succession at the
+    #                         change of the month.
+    #     breakDuties      = list containing integers that represent dates where
+    #                         the scheduler should skip due to the occurrence of a
+    #                         previously scheduled break duty on that date.
+    #     setDDFlag        = boolean representing whether or not to set the special
+    #                         flag on one of the duties for double duty days.
+    #     assignConflicts  = boolean representing whether or not to assign RAs on
+    #                         days they have entered conflicts for. This is only
+    #                         used if there are no other eligible RAs available on
+    #                         that day.
+    #     curBlockingState = State object denoting the furthest state that was reached
+    #                         before attempting to override conflicts. This object is
+    #                         only used if the assignConflicts parameter is set to True.
 
     logging.info("Starting Scheduling Process")
 
@@ -271,13 +271,11 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
 
     # The RA assigned to the conflict state that got us the furthest through
     #  the month without running into another roadblocking state
-    postConStateFurthestRA = None
+    curBlockingState_furthestRA = None
+    nextBlockingState = startState
 
-    # Roadblocking state that exists after the provided conAssignState
-    subConAssignState = None
-
-    # Have we already seen the conAssignState?
-    alreadySeenConAssignState = False   # TODO: Possibly startState == conAssignState and assignConflicts?
+    # Have we already seen and assigned the conAssignState?
+    alreadySeenBlockingState = False   # TODO: Possibly startState == conAssignState and assignConflicts?
 
     logging.debug(" Finished Initializing First Day")
 
@@ -301,26 +299,27 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
             if assignConflicts:
                 # If so, then check to see if we have reached the provided
                 #  assign conflicts state
-                if curState == conAssignState:
+                if curState == curBlockingState:
                     # logging.debug("   REACHED ASSIGN CONFLICTS STATE")
                     # If we have reached the Assign Conflicts State
 
                     # If we have NOT already seen this state before.
+                    # if not alreadySeenConAssignState:
                     if not curState.returnedFromPreviousState():
                         # logging.debug("   OVERRIDING DUTY CONFLICT")
                         # Then this is the first time we have reached this state.
 
                         # Assign an RA for duty that has a conflict on this day.
-                        postConStateFurthestRA = curState.assignNextConflictRA()
+                        curBlockingState_furthestRA = curState.assignNextConflictRA()
 
                         # This day is now the new furthest day.
                         furthestState = curState.deepcopy()
 
-                        # Set the subConAssignState to the current state
-                        subConAssignState = curState.deepcopy()
+                        # Set the curSubBlockingState to the current state
+                        curBlockingState = curState.deepcopy()
 
                         # Set the alreadySeenConAssignState to True
-                        alreadySeenConAssignState = True
+                        alreadySeenBlockingState = True
 
                     else:
                         # logging.debug("   REMOVING PREVIOUS CONFLICT OVERRIDE RA")
@@ -338,10 +337,10 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
                         if not curState.hasEmptyConList():
                             # If there are, then check to see if the currently assigned RA
                             #  got us further through the month than the previous
-                            #  postConStateFurthestRA
-                            if furthestState == subConAssignState:
+                            #  curBlockingState_furthestRA
+                            if furthestState >= nextBlockingState:
                                 # If so, then we have a new furthest RA
-                                postConStateFurthestRA = curDay.getLastDutySlotAssignment()
+                                curBlockingState_furthestRA = curDay.getLastDutySlotAssignment()
 
                             # Remove all previously assigned RAs from this day
                             curState.removeAssignedRAs()
@@ -356,28 +355,19 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
                             curState.removeAssignedRAs()
 
                             # Assign the RA that got us the furthest
-                            curState.assignRA(postConStateFurthestRA)
+                            curState.assignRA(curBlockingState_furthestRA)
 
-                    # Regardless of which path above was taken, put the updated
-                    #  current state back on the stateStack
-                    curStateCopy = curState.copy()
-                    stateStack.push(curStateCopy)
-
-                    # Get the next Day
-                    nextDay = cal[curDay]
-
-                    # Generate the next State
-                    nextState = State(nextDay, raList, lastDateAssigned, numDoubleDays,
-                                      ldaTolerance, nddTolerance, numFlagDuties)
-
-                elif curState == subConAssignState:
+                elif curState == nextBlockingState:
                     # logging.debug("   REACHED SUBSEQUENT ROADBLOCKING STATE")
                     # Else if we have reached a subsequent roadblocking state.
 
                     # Then assign an RA who has a conflict with this day
-                    #  and keep going.
+                    #  and keep going. This state will now become the
+                    #  curBlockingState.
+                    curBlockingState = curState.deepcopy()
 
-                    pass
+                    # Assign an RA for duty that has a conflict on this day.
+                    curBlockingState_furthestRA = curState.assignNextConflictRA()
 
                 else:
                     # Otherwise, this run is configured to override duty conflicts,
@@ -386,10 +376,10 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
 
                     # Check to see if we have reached a new furthest subsequent
                     #  conflict assignment state
-                    if curState > subConAssignState:
+                    if curState > nextBlockingState:
                         # If so, then set this state as being a new furthest
                         #  subsequent conflict assignment state
-                        subConAssignState = curState.deepcopy()
+                        nextBlockingState = curState.deepcopy()
 
                     # Go back to the previous state.
                     continue
@@ -409,39 +399,40 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
                 # logging.debug("   REVISTED DAY")
                 curState.removeAssignedRAs()
 
-            # Check to see if we have reached a new furthest state
-            if curDay.getDate() > furthestState.curDay.getDate():
-                # If so, set this state as the new furthest
-                furthestState = curState.deepcopy()
-
             # Check to see if we have already seen the conAssignState and we have
             #  reached a new furthest subsequent conflict assignment state
-            if alreadySeenConAssignState and curDay.getDate() > subConAssignState.curDay.getDate():
+            if alreadySeenBlockingState and curDay.getDate() > nextBlockingState.curDay.getDate():
                 # If so, set this state as the new furthest subConAssignState
-                subConAssignState = curState.deepcopy()
+                nextBlockingState = curState.deepcopy()
 
-            curState.assignNextRA()
-            # logging.debug("   Chosen RA: {}".format(candRA))
+        curState.assignNextRA()
+        # logging.debug("   Chosen RA: {}".format(candRA))
 
-            # Put the updated current state back on the stateStack
-            curStateCopy = curState.copy()
-            stateStack.push(curStateCopy)
+        # Put the updated current state back on the stateStack
+        curStateCopy = curState.copy()
+        stateStack.push(curStateCopy)
 
-            # Get the next Day
-            nextDay = cal[curDay]
+        # Get the next Day
+        nextDay = cal[curDay]
 
-            # Generate the next State
-            nextState = State(nextDay, raList, lastDateAssigned, numDoubleDays,
-                              ldaTolerance, nddTolerance, numFlagDuties)
+        # Generate the next State
+        nextState = State(nextDay, raList, lastDateAssigned, numDoubleDays,
+                          ldaTolerance, nddTolerance, numFlagDuties)
+
+        # Check to see if we have reached a new furthest state
+        if nextState.curDay.getDate() > furthestState.curDay.getDate():
+            # If so, set this state as the new furthest
+            furthestState = nextState.deepcopy()
 
         # If there is at least one RA that can be scheduled for the next day,
         #  or the current day is the end of the month, then add the next day to
         #  the stateStack. Otherwise, we will need to try a different path on
         #  the current state
-        if not (nextState.hasEmptyCandList()) or nextDay.getDate() == -1:
-            # logging.debug("   MOVING TO NEXT DAY")
-            # Add the next day on the stack
-            stateStack.push(nextState)
+        # if not (nextState.hasEmptyCandList()) or nextDay.getDate() == -1:
+
+        # logging.debug("   MOVING TO NEXT DAY")
+        # Add the next day on the stack
+        stateStack.push(nextState)
 
         # input()
 

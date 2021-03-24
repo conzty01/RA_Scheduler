@@ -746,10 +746,12 @@ class State:
             predetermined       (bool):    Boolean denoting if this state can is allowed to
                                             be changed/reevaluated. This is used to denote
                                             whether this particular date/duty was preset.
+            overrideConflicts   (bool):    Boolean denoting whether or not to allow for the
+                                            overriding of duty conflicts when necessary.
     """
 
     def __init__(self, day, raList, lastDateAssigned, numDoubleDays, ldaTolerance,
-                 nddTolerance, numFlagDuties, predetermined=False):
+                 nddTolerance, numFlagDuties, predetermined=False, overrideConflicts=False):
         # The current day of the state
         self.curDay = day
 
@@ -771,6 +773,9 @@ class State:
         # Whether the state was predetermined
         self.predetermined = predetermined
 
+        # Whether or not to override duty conflicts if needed
+        self.overrideCons = overrideConflicts
+
         # If this state has been predetermined, then the first RA in the raList
         #  will always be selected as the for duty on this day.
         if self.predetermined:
@@ -780,7 +785,7 @@ class State:
         elif len(raList) == 0:
             # Else if the provided raList is empty, then do not attempt to calculate
             #  an ordered candidate list (results in divide by 0 error if allowed)
-            self.candList = raList
+            self.candList = list()
 
         else:
             # Otherwise we will calculate the ordered candidate list and
@@ -879,15 +884,11 @@ class State:
         # Get the next candidate RA for the curDay's duty
         candRA = self.getNextCandidate()
 
-        # If flagged duty, then update numFlagDuties
-        if self.curDay.nextDutySlotIsFlagged():
-            self.nfd[candRA] += 1
-
         # Assign the candidate RA for the curDay's duty
         self.curDay.addRA(candRA)
 
         # Update lastDateAssigned
-        self.lda[candRA].append(self.curDay.getDate())
+        self.lda[candRA] = self.curDay.getDate()
 
         # If doubleDay, then update numDoubleDays
         if self.isDoubleDay():
