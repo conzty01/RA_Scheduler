@@ -639,6 +639,16 @@ def runScheduler():
 
                 # First check to see if we reached a new furthest state
                 if furthestStateCandidate > furthestStateReached:
+
+                    logging.debug(
+                        "ResHall: {}, Month: {} - New Furthest State Reached - {}, {}".format(
+                            hallId,
+                            monthId,
+                            furthestStateCandidate.curDay.getDate(),
+                            ldat
+                        )
+                    )
+
                     # If so, set it as the new furthest state
                     furthestStateReached = furthestStateCandidate
 
@@ -649,7 +659,7 @@ def runScheduler():
                 ldat -= 1
 
                 logging.info(
-                    "ResHall: {} , Month: {} - DECREASING LDAT TO: {}"
+                    "ResHall: {}, Month: {} - DECREASING LDAT TO: {}"
                     .format(hallId, monthId, ldat)
                 )
 
@@ -677,6 +687,11 @@ def runScheduler():
                     # Create new deep copies of the ra_list and noDutyList
                     copy_raList = cp.deepcopy(ra_list)
                     copy_noDutyList = cp.copy(noDutyList)
+
+                    logging.info(
+                        "ResHall: {}, Month: {} Last Attempt - overriding duty conflicts"
+                        .format(hallId, monthId)
+                    )
 
                 else:
                     # Otherwise, we were unable to generate a schedule.

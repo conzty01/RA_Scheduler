@@ -119,7 +119,7 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
 
                             # Second node for current date and point val
                             tmp = Day(
-                                curMonthDay,
+                                curMonthDay, # TODO: <- Possibly change to ID
                                 curWeekDay,
                                 dayID=i,
                                 customPointVal=doublePts,
@@ -286,9 +286,9 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
         curState = stateStack.pop()
         curDay, candList, lastDateAssigned, numDoubleDays, numFlagDuties = curState.restoreState()
 
-        # logging.debug("--TOP OF SCHEDULE LOOP--\n" +
-        #               "Current Day: {}\nCandidate List: {}\nlastDateAssigned: {}\nnumDoubleDays: {}"
-        #               .format(curDay, candList, lastDateAssigned, numDoubleDays))
+        logging.debug("--TOP OF SCHEDULE LOOP--\n" +
+                      "Current Day: {}\nCandidate List: {}\nlastDateAssigned: {}\nnumDoubleDays: {}"
+                      .format(curDay, candList, lastDateAssigned, numDoubleDays))
         # input("  Hit 'Enter' to continue ")
 
         # If there are no more candidate RAs for a given day...
@@ -361,13 +361,19 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
                     # logging.debug("   REACHED SUBSEQUENT ROADBLOCKING STATE")
                     # Else if we have reached a subsequent roadblocking state.
 
-                    # Then assign an RA who has a conflict with this day
-                    #  and keep going. This state will now become the
-                    #  curBlockingState.
-                    curBlockingState = curState.deepcopy()
+                    # Check to see if there are any RAs to assign
+                    if not curState.hasEmptyConList:
+                        # Then assign an RA who has a conflict with this day
+                        #  and keep going. This state will now become the
+                        #  curBlockingState.
+                        curBlockingState = curState.deepcopy()
 
-                    # Assign an RA for duty that has a conflict on this day.
-                    curBlockingState_furthestRA = curState.assignNextConflictRA()
+                        # Assign an RA for duty that has a conflict on this day.
+                        curBlockingState_furthestRA = curState.assignNextConflictRA()
+
+                    else:
+                        # If not, then go back to the previous state
+                        continue
 
                 else:
                     # Otherwise, this run is configured to override duty conflicts,
@@ -401,12 +407,12 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
 
             # Check to see if we have already seen the conAssignState and we have
             #  reached a new furthest subsequent conflict assignment state
-            if alreadySeenBlockingState and curDay.getDate() > nextBlockingState.curDay.getDate():
+            if alreadySeenBlockingState and curDay.getId() > nextBlockingState.curDay.getId():
                 # If so, set this state as the new furthest subConAssignState
                 nextBlockingState = curState.deepcopy()
 
-        curState.assignNextRA()
-        # logging.debug("   Chosen RA: {}".format(candRA))
+            curState.assignNextRA()
+            # logging.debug("   Chosen RA: {}".format(candRA))
 
         # Put the updated current state back on the stateStack
         curStateCopy = curState.copy()
@@ -420,7 +426,7 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
                           ldaTolerance, nddTolerance, numFlagDuties)
 
         # Check to see if we have reached a new furthest state
-        if nextState.curDay.getDate() > furthestState.curDay.getDate():
+        if nextState > furthestState:
             # If so, set this state as the new furthest
             furthestState = nextState.deepcopy()
 

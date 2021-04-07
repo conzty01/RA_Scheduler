@@ -786,6 +786,7 @@ class State:
             # Else if the provided raList is empty, then do not attempt to calculate
             #  an ordered candidate list (results in divide by 0 error if allowed)
             self.candList = list()
+            self.conList = list()
 
         else:
             # Otherwise we will calculate the ordered candidate list and
@@ -833,13 +834,45 @@ class State:
             raise TypeError("Cannot compare State object with {} object".format(type(other)))
 
         return self.curDay.getDate() == other.curDay.getDate() and \
+            self.curDay.getId() == other.curDay.getId() and \
             self.ldaTol == other.ldaTol and \
             self.nddTol == other.nddTol and \
-            self.ndd == other.ndd and \
-            self.nfd == other.nfd and \
-            self.lda == other.lda and \
             self.candList == other.candList and \
             self.predetermined == other.predetermined
+
+    def __lt__(self, other):
+        # Return True if this state is considered less than
+        #  the other state.
+
+        # Check to ensure that the other object is indeed
+        #  a State object
+        if other is None:
+            # If the other object is None, then return True
+            return True
+
+        elif not isinstance(other, State):
+            # If not, then raise a TypeError
+            raise TypeError("'<' not supported between instances of 'State' and '{}'".format(type(other)))
+
+        # Otherwise, return whether or this object's curDay is less than the other's
+        return self.curDay.getId() < other.curDay.getId()
+
+    def __gt__(self, other):
+        # Return True if this state is considered greater than
+        #  the other state.
+
+        # Check to ensure that the other object is indeed
+        #  a State object
+        if other is None:
+            # If the other object is None, then return True
+            return True
+
+        elif not isinstance(other, State):
+            # If the other object is not a State object, then raise a TypeError
+            raise TypeError("'>' not supported between instances of 'State' and '{}'".format(type(other)))
+
+        # Otherwise, return whether or this object's curDay is greater than the other's
+        return self.curDay.getId() > other.curDay.getId()
 
     def deepcopy(self):
         # Call the __deepcopy__ magic method
@@ -888,7 +921,7 @@ class State:
         self.curDay.addRA(candRA)
 
         # Update lastDateAssigned
-        self.lda[candRA] = self.curDay.getDate()
+        self.lda[candRA].append(self.curDay.getDate())
 
         # If doubleDay, then update numDoubleDays
         if self.isDoubleDay():
@@ -966,9 +999,6 @@ class State:
                 # Then the RA is no longer a duty candidate
                 isCand = False
 
-                # Append the RA to the list of RAs that have
-                #  conflicts with this date.
-                conList.append(ra)
                 # print("      Removed: Conflict")
 
             # If an RA has been assigned a duty recently
@@ -994,6 +1024,10 @@ class State:
                 # Then append them to the candidate list
                 retList.append(ra)
                 # print("      Valid Candidate")
+            else:
+                # Append the RA to the list of RAs that have
+                #  conflicts with this date.
+                conList.append(ra)
 
         def genCandScore(ra, day, lastDateAssigned, numDoubleDays, isDoubleDay,
                          datePts, doubleDayAvg, ptsAvg, numFlagDuties, flagDutyAvg):
