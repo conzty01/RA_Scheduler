@@ -1,7 +1,7 @@
 from flask import render_template, request, jsonify, Blueprint, abort
 from flask_login import login_required
 from psycopg2 import IntegrityError
-from schedule import scheduler4_1
+from schedule import scheduler5_0
 from schedule.ra_sched import RA
 import copy as cp
 import calendar
@@ -58,10 +58,21 @@ def editSched():
 
     # Load the necessary hall settings from the DB
     cur.execute("SELECT duty_flag_label FROM hall_settings WHERE res_hall_id = %s", (authedUser.hall_id(),))
+    # Load the query result
+    dfl = cur.fetchone()[0]
+
+    # Check to see if the google calendar integration is set up
+    cur.execute(
+        "SELECT EXISTS (SELECT token FROM google_calendar_info WHERE res_hall_id = %s)",
+        (authedUser.hall_id(),)
+    )
+    # Load the query result
+    gCalConn = cur.fetchone()[0]
 
     # Create a custom settings dictionary
     custSettings = {
-        "dutyFlagLabel": cur.fetchone()[0]
+        "dutyFlagLabel": dfl,
+        "gCalConnected": gCalConn
     }
 
     # Merge the base options into the custom settings dictionary to simplify passing
@@ -569,6 +580,15 @@ def runScheduler():
                    WHERE res_hall_id = %s""", (hallId,))
     dutyConfig, autoExcAdj, flagMultiDuty = cur.fetchone()
 
+    # Hall setting for overriding duty conflicts if needed
+    canOverrideConflicts = True
+
+    # Boolean for overriding duty conflicts on the next run
+    overrideConflictsThisPass = False
+
+    # Value of the LDAT that reached the furthest state
+    furthestStateLDAT = -1
+
     # AutoExcAdj is a currently unused feature that allows the scheduler to
     #  automatically create point_modifiers for RAs that have been excluded from
     #  being scheduled for the given month. This feature is unreleased because
@@ -588,41 +608,97 @@ def runScheduler():
     mulDutyPts = dutyConfig["multi_duty_pts"]
     mulDutyDays = dutyConfig["multi_duty_days"]
 
+    # Initialize the furthestState variable to None. This is used if we need to
+    #  attempt to generate a schedule by overriding an RA's duty conflicts.
+    furthestStateReached = None
+
     # Set completed to False and successful to False by default. These values
     #  will be manipulated in the while loop below as necessary.
     completed = False
     successful = False
     while not completed:
         # While we are not finished scheduling, create a candidate schedule
-        sched = scheduler4_1.schedule(copy_raList, year, monthNum, doubleDateNum=mulNumAssigned,
-                                      doubleDatePts=mulDutyPts, noDutyDates=copy_noDutyList,
-                                      doubleDays=mulDutyDays, doublePts=mulDutyPts,
-                                      ldaTolerance=ldat, doubleNum=mulNumAssigned,
-                                      prevDuties=prevRADuties, breakDuties=breakDuties,
-                                      setDDFlag=flagMultiDuty, regDutyPts=regDutyPts,
-                                      regNumAssigned=regNumAssigned)
+        sched, furthestStateCandidate = scheduler5_0.schedule(
+            copy_raList, year, monthNum, doubleDateNum=mulNumAssigned, doubleDatePts=mulDutyPts,
+            noDutyDates=copy_noDutyList, doubleDays=mulDutyDays, doublePts=mulDutyPts,
+            ldaTolerance=ldat, doubleNum=mulNumAssigned, prevDuties=prevRADuties,
+            breakDuties=breakDuties, setDDFlag=flagMultiDuty, regDutyPts=regDutyPts,
+            regNumAssigned=regNumAssigned, assignConflicts=overrideConflictsThisPass,
+            curBlockingState=furthestStateReached
+        )
 
         # If we were unable to schedule with the previous parameters,
         if len(sched) == 0:
             # Then we should attempt to modify the previous parameters
             #  and try again.
 
-            if ldat > 1:
-                # If the LDATolerance is greater than 1
-                #  then decrement the LDATolerance by 1 and try again
+            if ldat > 1 and not overrideConflictsThisPass:
+                # If the LDATolerance is greater than 1 and we did not
+                #  attempt to override conflicts on the last run, then
+                #  decrement the LDATolerance by 1 and try again.
 
-                logging.info("DECREASE LDAT: {}".format(ldat))
+                # First check to see if we reached a new furthest state
+                if furthestStateCandidate > furthestStateReached:
+
+                    logging.debug(
+                        "ResHall: {}, Month: {} - New Furthest State Reached - {}, {}".format(
+                            hallId,
+                            monthId,
+                            furthestStateCandidate.curDay.getDate(),
+                            ldat
+                        )
+                    )
+
+                    # If so, set it as the new furthest state
+                    furthestStateReached = furthestStateCandidate
+
+                    # Also set the LDAT that got us to this state
+                    furthestStateLDAT = ldat
+
+                # Decrement the LDATolerance by 1
                 ldat -= 1
+
+                logging.info(
+                    "ResHall: {}, Month: {} - DECREASING LDAT TO: {}"
+                    .format(hallId, monthId, ldat)
+                )
 
                 # Create new deep copies of the ra_list and noDutyList
                 copy_raList = cp.deepcopy(ra_list)
                 copy_noDutyList = cp.copy(noDutyList)
 
+                # Go around the loop and try again
+
             else:
-                # Otherwise the LDATolerance is not greater than 1. In this
-                #  case, we were unable to successfully generate a schedule
-                #  with the given parameters.
-                completed = True
+                # Otherwise the LDATolerance is not greater than 1, then check to see
+                #  if we should attempt to override conflicts. We should attempt to
+                #  override conflicts if the Hall setting is set and we have not already
+                #  attempted to override conflicts.
+                if canOverrideConflicts and not overrideConflictsThisPass:
+                    # Go around one more time with the configuration that resulted
+                    #  in the furthest state and attempt to override conflicts
+
+                    # Set the LDAT for this next pass
+                    ldat = furthestStateLDAT
+
+                    # Set the flag for overriding duty conflicts in the next run
+                    overrideConflictsThisPass = True
+
+                    # Create new deep copies of the ra_list and noDutyList
+                    copy_raList = cp.deepcopy(ra_list)
+                    copy_noDutyList = cp.copy(noDutyList)
+
+                    logging.info(
+                        "ResHall: {}, Month: {} Last Attempt - overriding duty conflicts"
+                        .format(hallId, monthId)
+                    )
+
+                else:
+                    # Otherwise, we were unable to generate a schedule.
+                    #  Mark that we have completed so we may exit the while loop
+                    #  and mark that we were not successful.
+                    completed = True
+                    successful = False
 
         else:
             # Otherwise, we were able to successfully create a schedule!

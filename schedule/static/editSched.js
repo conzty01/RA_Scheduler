@@ -4,44 +4,45 @@
 /* Functions for the editSched.html page */
 ///////////////////////////////////////////
 
+// Calendar button configurations to be passed
+//  into the initialization function.
+var schedButtons = {
+    customPrevButton: {
+        text: '<',
+        click: movePrev
+    },
+    customNextButton: {
+        text: '>',
+        click: moveNext
+    },
+    customTodayButton: {
+        text: 'Today',
+        click: moveToday
+    },
+    runSchedulerButton: {
+        text: 'Schedule',
+        click: showRunModal
+    },
+    addEventButton: {
+        text: 'Add Duty',
+        click: showAddDutyModal
+    }
+}
+var calToolbar = {
+    left: 'customPrevButton,customNextButton customTodayButton',
+    center: 'title',
+    right: 'addEventButton runSchedulerButton'
+}
+
 function initEditSchedCal() {
     initCal({
         height: "75%",
         initialView: 'dayGridMonth',
         dayMaxEventRows: true,
         moreLinkClick: "popover",
-        customButtons: {
-            customPrevButton: {
-                text: '<',
-                click: movePrev
-            },
-            customNextButton: {
-                text: '>',
-                click: moveNext
-            },
-            customTodayButton: {
-                text: 'Today',
-                click: moveToday
-            },
-            runSchedulerButton: {
-                text: 'Schedule',
-                click: showRunModal
-            },
-            addEventButton: {
-                text: 'Add Duty',
-                click: showAddDutyModal
-            },
-            exportScheduleButton: {
-                text: 'Export',
-                click: showExportModal
-            }
-        },
+        customButtons: schedButtons,
         dateClick: showAddDutyModal,
-        headerToolbar: {
-            left: 'customPrevButton,customNextButton customTodayButton',
-            center: 'title',
-            right: 'exportScheduleButton addEventButton runSchedulerButton'
-        },
+        headerToolbar: calToolbar,
         eventSources: [
             {
                 url: '/schedule/api/getSchedule',
