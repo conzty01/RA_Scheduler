@@ -807,7 +807,8 @@ class State:
             self.ldaTol,
             self.nddTol,
             self.nfd.copy(),
-            self.predetermined
+            self.predetermined,
+            self.overrideCons
         )
 
     def __copy__(self):
@@ -820,7 +821,8 @@ class State:
             self.ldaTol,
             self.nddTol,
             self.nfd,
-            self.predetermined
+            self.predetermined,
+            self.overrideCons
         )
 
     def __eq__(self, other):
