@@ -237,11 +237,14 @@ function saveModal() {
     }
 }
 
-function passModalSave(modalId, msg, extraWork=() => {}) {
+async function passModalSave(modalId, msg, extraWork=() => {}) {
 
     //console.log(msg);
 
     let modal = document.getElementById(modalId.slice(1));
+
+    // Wait for the msg to arrive (if needed)
+    await msg;
 
     // If the status is '1', then the save was successful
     switch (msg.status) {
@@ -281,6 +284,10 @@ function passModalSave(modalId, msg, extraWork=() => {}) {
 
             // Update the errorDiv with the message
             errDiv.getElementsByClassName("msg")[0].innerHTML = msg.msg;
+
+            // Hide the user info div
+            hideModalUserInfoDiv(modalId.slice(1));
+
             // Display the errorDiv
             errDiv.style.display = "block";
 
@@ -293,28 +300,51 @@ function passModalSave(modalId, msg, extraWork=() => {}) {
 }
 
 function showRunModal() {
+    // Show the runModal to the user.
+
+    // Grab the modal from the DOM.
     let title = document.getElementById("runModalLongTitle");
 
+    // Grab the date from the calendar view.
     title.textContent = appConfig.calDate.toLocaleString('default', { month: 'long', year: 'numeric' });
 
     // Hide any errors from previous scheduler runs
-    let modal = document.getElementById("runModal");
-    let errDiv = modal.getElementsByClassName("modalError")[0];
-    errDiv.style.display = "none";
+    hideModalErrorDiv("runModal");
 
+    // Hide any user info messages from previous scheduler runs
+    hideModalUserInfoDiv("runModal");
+
+    // Show the modal to the user.
     $('#runModal').modal('show');
+}
+
+function hideModalErrorDiv(modalName) {
+    // Hide the error div in the provided modal.
+
+    // Grab the modal
+    let modal = document.getElementById(modalName);
+    //Get the errorDiv within the modal
+    let errDiv = modal.getElementsByClassName("modalError")[0];
+    // Hide it from sight
+    errDiv.style.display = "none";
+}
+
+function hideModalUserInfoDiv(modalName) {
+    // Hide the user info div in the provided modal.
+
+    // Grab the modal
+    let modal = document.getElementById(modalName);
+    //Get the errorDiv within the modal
+    let infoDiv = modal.getElementsByClassName("modalUserInfo")[0];
+    // Hide it from sight
+    infoDiv.style.display = "none";
 }
 
 function runScheduler() {
     let noDutyDays = document.getElementById("runNoDutyDates").value;
-    //    let eligibleRAs = [];
-    //
-    //    // Assemble list of RA ids that are eligible for the scheduler
-    //    for (let li of document.getElementById("runRAList").getElementsByTagName("input")) {
-    //        if (li.checked) {
-    //            eligibleRAs.push(li.id);
-    //        }
-    //    }
+
+    // Hide any error message within the DIV
+    hideModalErrorDiv("runModal");
 
     // Get the list of selected eligibleRAs
     let eligibleRAs = $('#runRAList').val()
@@ -343,14 +373,94 @@ function runScheduler() {
     }
 
     //document.getElementById("loading").style.display = "block";
-    appConfig.base.callAPI("runScheduler",
-            data,
-            function(msg) {
-                passModalSave("#runModal", msg, () => {
-                    document.getElementById("runButton").disabled = false;
-                    $("body").css("cursor", "auto");
-                });
-            }, "POST", function(msg) {passModalSave("#runModal", {status:-1,msg:msg})});
+    appConfig.base.callAPI(
+        "runScheduler",
+        data,
+        function(msg) {checkPendingSchedule(msg)},
+        "POST",
+        function(msg) {passModalSave("#runModal", {status:-1,msg:msg})}
+    );
+}
+
+function schedulerMaxRetriesReached() {
+    // The scheduler was not able to create a schedule in the allotted
+    //  amount of time.
+
+    return {
+        status: 0,
+        msg: "Due to a high amount traffic, we are unable to create your duty schedule at this time. " +
+             "We have your request on record, and will get to it as soon as we are able. Please check again later."
+    };
+}
+
+function schedulerEvalStatus(res) {
+    // Evaluate whether or not the scheduler has completed. If it has
+    //  (either successfully or unsuccessfully) finished, return true,
+    //  otherwise return false.
+
+    // The provided res is expected to have the following three attributes:
+    //  status, msg, and sqid
+    return res.status !== 0;
+}
+
+function schedulerUpdateDisplayStatus(res, retriesLeft, backoff) {
+    // Determine whether or not to update the status message displayed
+    //  to the user while they wait for the scheduler.
+
+    // Determine what retry number we are currently on.
+    let retryNumber = 7 - retriesLeft;
+
+    // If we have retried a number of times already, then let's entertain the user while they wait.
+    let msg = "";
+    switch (retryNumber) {
+        case 1:
+            msg = "Queueing schedule request...";
+            break;
+
+        case 3:
+            msg = "Creating duty schedule...";
+            break;
+
+        case 5:
+            msg = "We are still working on your request-- thank you for your patience!";
+            break;
+
+    }
+
+    // Only update the message the user sees if it has changed.
+    if (msg !== "") {
+        // Grab the modal
+        let modal = document.getElementById("runModal");
+        // Grab the user info div
+        let infoDiv = modal.getElementsByClassName("modalUserInfo")[0];
+        // Update the user info div with the message
+        infoDiv.innerHTML = msg;
+        // Display the errorDiv
+        infoDiv.style.display = "block";
+    }
+}
+
+
+function checkPendingSchedule(retMsg) {
+    // Retrieve the status of the pending scheduler task with the provided SQID.
+    // retMsg should have three attributes: status, msg, and sqid
+
+    // Begin a fetch-retry loop that will reach out to checkSchedulerStatus API
+    //  with an exponential backoff and a max of 10 retries.
+    appConfig.base.fetchRetry(
+        appConfig.base.assembleAPIURLString("checkSchedulerStatus") + "?" + new URLSearchParams({sqid: retMsg.sqid}),
+        schedulerEvalStatus,
+        schedulerMaxRetriesReached,
+        schedulerUpdateDisplayStatus,
+        {method:'GET'},
+        7,      // Max number of retries
+        1000    // Starting backoff in milliseconds
+    ).then((res) => {
+        passModalSave("#runModal", res, () => {
+            document.getElementById("runButton").disabled = false;
+            $("body").css("cursor", "auto");
+        });
+    });
 }
 
 function showAddDutyModal(info=null) {
