@@ -1,7 +1,10 @@
 from flask import redirect, url_for, abort
 from flask_login import current_user
+from json import dumps
 import datetime
 import logging
+import pika
+from pika.exceptions import StreamLostError
 
 # import the appGlobals for these functions to use
 import appGlobals as ag
@@ -315,3 +318,94 @@ class AuthenticatedUser:
         # Mark the Res Hall at the provided index as being the user's currently selected
         #  Res Hall.
         self.__selectedHall = self.__resHalls[index]
+
+
+class RabbitConnectionManager:
+    """ Object managing a RabbitMQ connection.
+
+        Args:
+            rabbitConnStr       (str):     Connection string for connecting to a RabbitMQ instance.
+            rabbitQueueName     (str):     Name of the RabbitMQ queue to connect to.
+    """
+
+    def __init__(self, rabbitConnStr, rabbitQueueName):
+
+        # RabbitMQ Connection string
+        self.__rabbitConnStr = rabbitConnStr
+
+        # RabbitMQ Queue name
+        self.__rabbitQueueName = rabbitQueueName
+
+        # Establish the connection to the RabbitMQ instance
+        self.__rabbitConn, self.__channel = self.connectToRabbitMQ(self.__rabbitConnStr, self.__rabbitQueueName)
+
+        # A retry count
+        self.publishRetryCount = 0
+
+    def connectToRabbitMQ(self, rabbitConnStr, rabbitQueueName):
+        # Connect to the RabbitMQ instance that should be used in this session.
+
+        # TODO: Add error handling in case RabbitMQ cannot be reached
+
+        # Parse the URL parameters from the connection url
+        params = pika.URLParameters(rabbitConnStr)
+
+        # Create a blocking connection with the parsed parameters
+        rabbitConn = pika.BlockingConnection(params)
+
+        # Start a channel
+        channel = rabbitConn.channel()
+
+        # Connect to the genSched queue
+        channel.queue_declare(queue=rabbitQueueName)
+
+        # Return the connection and channel to the caller.
+        return rabbitConn, channel
+
+    def isConnectionOpen(self):
+        # Return True if the RabbitMQ connection is open.
+        return self.__rabbitConn.is_open
+
+    def publishMsg(self, msgBody, headers):
+        # Publish a message to the queue.
+
+        # TODO: add error handling in case we cannot publish
+
+        # Check to see if the RabbitMQ connection is still open
+        if not self.isConnectionOpen():
+            # Re-establish the connection to the RabbitMQ instance
+            self.__rabbitConn, self.__channel = self.connectToRabbitMQ(self.__rabbitConnStr, self.__rabbitQueueName)
+
+        try:
+            # Publish the message to the queue
+            self.__channel.basic_publish(
+                exchange="",
+                routing_key=self.__rabbitQueueName,
+                # Convert the msgBody to a JSON string and encode it in a byte array for pika
+                body=bytes(dumps(msgBody), "utf-8"),
+                properties=pika.BasicProperties(
+                    headers=headers
+                )
+            )
+
+            # Reset the publish attempt count
+            self.publishRetryCount = 0
+
+        except StreamLostError:
+            # There was a connection interruption.
+
+            # If we haven't attempted to retry the message
+            if self.publishRetryCount < 1:
+                # Increment the retry count
+                self.publishRetryCount += 1
+                # Attempt to publish the message again
+                self.publishMsg(msgBody, headers)
+
+            else:
+                # If we have run through all of our retry attempts
+                #  then return False, indicating that there was an
+                #  issue.
+                return False
+
+        # If we were able to successfully queue the message, return True
+        return True
