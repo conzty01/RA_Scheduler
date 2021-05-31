@@ -1,8 +1,8 @@
-from unittest.mock import MagicMock, patch
-from scheduleServer import app
 import unittest
+from unittest.mock import MagicMock, patch
 
 from helperFunctions.helperFunctions import AuthenticatedUser
+from scheduleServer import app
 
 
 class TestSchedule_runScheduler(unittest.TestCase):
@@ -111,6 +111,15 @@ class TestSchedule_runScheduler(unittest.TestCase):
         self.mocked_appGlobals.UPLOAD_FOLDER = "./static"
         self.mocked_appGlobals.ALLOWED_EXTENSIONS = {"txt", "csv"}
 
+        # -- Create a patcher for the RabbitConnectionManager object --
+        self.patcher_rabbitConnectionManager = patch("schedule.schedule.RabbitConnectionManager", autospec=True)
+
+        # Start he patcher - mock returned
+        self.mocked_rabbitConnectionManager = self.patcher_rabbitConnectionManager.start()
+
+        # Configure the mocked RabbitConnectionManager as desired
+        self.mocked_rabbitConnectionManager.publishMsg = MagicMock()
+
         # -- Create a patchers for the logging --
         self.patcher_loggingDEBUG = patch("logging.debug", autospec=True)
         self.patcher_loggingINFO = patch("logging.info", autospec=True)
@@ -130,6 +139,7 @@ class TestSchedule_runScheduler(unittest.TestCase):
         self.patcher_getAuth.stop()
         self.patcher_appGlobals.stop()
         self.patcher_osEnviron.stop()
+        self.patcher_rabbitConnectionManager.stop()
 
         # Stop all of the logging patchers
         self.patcher_loggingDEBUG.stop()
@@ -191,61 +201,13 @@ class TestSchedule_runScheduler(unittest.TestCase):
         # -- Assert --
         pass
 
-    def test_withAuthorizedUser_withValidParams_callsScheduler4_0Algorithm(self):
+    def test_withAuthorizedUser_withValidParams_addsMsgToQueue(self):
         # -- Arrange --
         # -- Act --
         # -- Assert --
         pass
 
-    def test_withAuthorizedUser_withFailedScheduler_returnsFailedResult(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
-
-    def test_withAuthorizedUser_queriesDBForEligibleRAs(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
-
-    def test_withAuthorizedUser_queriesDBForPreviousXDuties(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
-
-    def test_withAuthorizedUser_queriesDBForBreakDuties(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
-
-    def test_withAuthorizedUser_withFailedScheduleCycle_decreasesLDATAndReruns(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
-
-    def test_withAuthorizedUser_withSuccessfulScheduling_insertsScheduleIntoDB(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
-
-    def test_withAuthorizedUser_whenInsertingDutiesInDB_encountersIntegrityError_returnsFailedResult(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
-
-    def test_withAuthorizedUser_doesNotCallAddRAPointModifier(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
-
-    def test_withAuthorizedUser_withValidParams_withSuccessfulScheduling_returnsSuccessfulResult(self):
+    def test_withAuthorizedUser_withBrokenQueueConnection_returnsRetryMessage(self):
         # -- Arrange --
         # -- Act --
         # -- Assert --
