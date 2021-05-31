@@ -29,6 +29,7 @@ lazy==1.3
 MarkupSafe==1.1.1
 oauth2client==4.1.2
 oauthlib==2.1.0
+pika==1.2.0
 protobuf==3.13.0
 psycopg2==2.7.5
 pyasn1==0.4.2
