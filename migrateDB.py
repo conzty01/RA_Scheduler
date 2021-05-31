@@ -8,25 +8,36 @@ import os
 def migrate(conn):
     cur = conn.cursor()
 
-    # ------------------------------------
-    # --  Remove staff_membership rows  --
-    # ------------------------------------
+    # -----------------------------------
+    # --  Create scheduer_queue table  --
+    # -----------------------------------
 
-    logging.info("  Deleting staff_membership records")
+    # Check to see if the table already exists
+    cur.execute(
+        "SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'scheduler_queue' AND schemaname = 'public');"
+    )
 
-    # Remove all entries from the staff_membership table
-    #  where the res_hall_id = 0
-    cur.execute("DELETE FROM staff_membership WHERE res_hall_id = 0")
+    # If the table does not already exist...
+    if not cur.fetchone()[0]:
 
-    # --------------------------------------------
-    # --  Remove "NOT ASSIGNED" res_hall Entry  --
-    # --------------------------------------------
+        logging.info("  Creating scheduler_queue table")
 
-    logging.info("  Deleting res_hall record")
+        # Create the scheduler_queue table
+        cur.execute("""
+            CREATE TABLE scheduler_queue(
+                id              serial UNIQUE,
+                status          int NOT NULL DEFAULT 0,
+                reason          varchar(255) NOT NULL DEFAULT '',
+                res_hall_id     int NOT NULL,
+                created_ra_id   int NOT NULL,
+                created_date    timestamp WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                
+                PRIMARY KEY (id),
+                FOREIGN KEY (res_hall_id) REFERENCES res_hall(id),
+                FOREIGN KEY (created_ra_id) REFERENCES ra(id)
+            );""")
 
-    # Remove the "NOT ASSIGNED" Res Hall Entry from
-    #  the res_hall table.
-    cur.execute("DELETE FROM res_hall WHERE id = 0 AND name = 'NOT ASSIGNED';")
+        logging.info("  Finished creating scheduler_queue table")
 
 
 if __name__ == "__main__":

@@ -223,6 +223,21 @@ def createStaffMembershipDB(conn):
             FOREIGN KEY (res_hall_id) REFERENCES res_hall(id)
         );""")
 
+def createSchedulerQueueDB(conn):
+    conn.execute("DROP TABLE IF EXISTS scheduler_queue CASCADE;")
+    conn.execute("""
+        CREATE TABLE scheduler_queue(
+            id              serial UNIQUE,
+            status          int NOT NULL DEFAULT 0,
+            reason          varchar(255) NOT NULL DEFAULT '',
+            res_hall_id     int NOT NULL,
+            created_ra_id   int NOT NULL,
+            created_date    timestamp NOT NULL WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            
+            PRIMARY KEY (id),
+            FOREIGN KEY (res_hall_id) REFERENCES res_hall(id),
+            FOREIGN KEY (created_ra_id) REFERENCES ra(id)
+        );""")
 
 def main():
     conn = psycopg2.connect(os.environ["DATABASE_URL"])
@@ -240,6 +255,7 @@ def main():
     createPointModifierDB(conn.cursor())
     createHallSettingsDB(conn.cursor())
     createStaffMembershipDB(conn.cursor())
+    createSchedulerQueueDB((conn.cursor()))
 
     conn.commit()
 
