@@ -147,11 +147,12 @@ def getRABreakStats(hallId=None, startDateStr=None, endDateStr=None):
             SELECT ra_id as rid, COUNT(break_duties.id)
             FROM break_duties JOIN day ON (day.id = break_duties.day_id)
             WHERE day.date BETWEEN TO_DATE(%s, 'YYYY-MM-DD') AND TO_DATE(%s, 'YYYY-MM-DD')
+            AND hall_id = %s
             GROUP BY ra_id
         ) AS numQuery ON (ra.id = numQuery.rid)
         JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
         WHERE sm.res_hall_id = %s
-    """, (startDateStr, endDateStr, hallId))
+    """, (startDateStr, endDateStr, hallId, hallId))
 
     # Load the results from the DB
     raList = cur.fetchall()
