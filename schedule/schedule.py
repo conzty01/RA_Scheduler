@@ -1,21 +1,14 @@
 from flask import render_template, request, jsonify, Blueprint, abort
+from schedule.rabbitConnectionManager import RabbitConnectionManager
 from flask_login import login_required
-from psycopg2 import IntegrityError
-from schedule import scheduler4_1
-from schedule.ra_sched import RA
-from json import dumps
-import copy as cp
-import calendar
 import logging
-import pika
-from pika.exceptions import ConnectionWrongStateError, ChannelClosed, StreamLostError
 import os
 
 # Import the appGlobals for this blueprint to use
 import appGlobals as ag
 
 # Import the needed functions from other parts of the application
-from helperFunctions.helperFunctions import getAuth, stdRet, getCurSchoolYear, getSchoolYear, RabbitConnectionManager
+from helperFunctions.helperFunctions import getAuth, stdRet, getCurSchoolYear, getSchoolYear
 from staff.staff import getRAStats, addRAPointModifier
 
 schedule_bp = Blueprint("schedule_bp", __name__,
