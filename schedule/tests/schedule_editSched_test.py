@@ -264,7 +264,11 @@ class TestSchedule_editSched(unittest.TestCase):
 
         # Create some of the objects used in this test
         expectedDutyFlagLabel = "Test Label"
-        expectedCustomSettingsDict = {"dutyFlagLabel": expectedDutyFlagLabel}
+        expectedGCalIntegration = False
+        expectedCustomSettingsDict = {
+            "dutyFlagLabel": expectedDutyFlagLabel,
+            "gCalConnected": expectedGCalIntegration
+        }
 
         # Configure the expectedCustomSettingsDict so that it is as it would
         #  appear to the renderer
@@ -297,7 +301,8 @@ class TestSchedule_editSched(unittest.TestCase):
         # Configure the appGlobals.conn.cursor.execute mock to return different values
         #  after subsequent calls.
         self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
-            (expectedDutyFlagLabel, )   # First query is for the call to hall_settings
+            (expectedDutyFlagLabel, ),   # First query is for the call to hall_settings
+            (expectedGCalIntegration, )  # Second query is for the Google Calendar Integration
         ]
 
         # Configure the appGlobals.conn.cursor.execute mock to return different values
