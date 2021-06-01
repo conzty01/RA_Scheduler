@@ -60,18 +60,6 @@ class TestHallBP_getAuth(unittest.TestCase):
         self.username = "Test User"
         self.mocked_currentUser.username = self.username
 
-        # -- Create a patcher for the flask.url_for function --
-        self.patcher_flaskURLFor = patch("helperFunctions.helperFunctions.url_for", autospec=True)
-
-        # Start the patcher - mock returned
-        self.mocked_urlFor = self.patcher_flaskURLFor.start()
-
-        # -- Create a patcher for the flask.redirect function --
-        self.patcher_flaskRedirect = patch("helperFunctions.helperFunctions.redirect", autospec=True)
-
-        # Start the patcher - mock returned
-        self.mocked_redirect = self.patcher_flaskRedirect.start()
-
         # -- Create a patchers for the logging --
         self.patcher_loggingDEBUG = patch("logging.debug", autospec=True)
         self.patcher_loggingINFO = patch("logging.info", autospec=True)
@@ -89,8 +77,6 @@ class TestHallBP_getAuth(unittest.TestCase):
     def tearDown(self):
         # Stop all of the patchers
         self.patcher_flaskLoginCurrentUser.stop()
-        self.patcher_flaskRedirect.stop()
-        self.patcher_flaskURLFor.stop()
         self.patcher_appGlobals.stop()
         self.patcher_osEnviron.stop()
 
@@ -167,8 +153,6 @@ class TestHallBP_getAuth(unittest.TestCase):
 
         # Reset all of the mocked objects that will be used in this test
         self.mocked_currentUser.reset_mock()
-        self.mocked_urlFor.reset_mock()
-        self.mocked_redirect.reset_mock()
         self.mocked_appGlobals.conn.reset_mock()
 
         # Configure the appGlobals.conn.cursor.execute mock to return different values
