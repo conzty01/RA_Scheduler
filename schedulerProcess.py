@@ -1,88 +1,62 @@
-import pika
-import psycopg2
-from schedule import scheduler4_1
-import copy as cp
-import logging
-import calendar
-from schedule.ra_sched import RA
-import os
-from logging.config import dictConfig
+from schedule.rabbitConnectionManager import RabbitConnectionManager
 from json import loads, dumps, JSONDecodeError
+from schedule import scheduler4_1
+from schedule.ra_sched import RA
 from scheduleServer import app
+import copy as cp
+import calendar
+import psycopg2
+import logging
 import atexit
-
+import pika
+import os
 
 # import the needed functions from other parts of the application
 from helperFunctions.helperFunctions import getSchoolYear
 from staff.staff import getRAStats, addRAPointModifier
 
 
-# Connect to RabbitMQ and PostgreSQL
+# Connect to RabbitMQ for both the consumer and the error queue.
+rabbitConsumerManager = RabbitConnectionManager(
+    os.environ.get('CLOUDAMQP_URL', 'amqp://guest:guest@localhost:5672/%2f'),
+    os.environ.get('RABBITMQ_SCHEDULER_QUEUE', 'genSched')
+)
+rabbitErrorQueueManager = RabbitConnectionManager(
+    os.environ.get('CLOUDAMQP_URL', 'amqp://guest:guest@localhost:5672/%2f'),
+    os.environ.get('RABBITMQ_SCHEDULER_FAILURE_QUEUE', 'genSchedErrs'),
+    durable=True
+)
 
-# Load configuration variables from the environment with fallback values
-rabbitSchedulerQueue = os.environ.get('RABBITMQ_SCHEDULER_QUEUE', 'genSched')
-rabbitSchedulerErrorQueue = os.environ.get('RABBITMQ_SCHEDULER_FAILURE_QUEUE', 'genSchedErrs')
-rabbitSchedulerQueueLimit = int(os.environ.get('RABBITMQ_SCHEDULER_QUEUE_LIMIT', '1'))
-psqlConnectionStr = os.environ.get('DATABASE_URL', 'postgres:///ra_sched')
-rabbitConnectionStr = os.environ.get('CLOUDAMQP_URL', 'amqp://guest:guest@localhost:5672/%2f')
+logging.info("Connected to '{}' message queue channel.".format(rabbitConsumerManager.rabbitQueueName))
+logging.info("Connected to '{}' message queue channel.".format(rabbitErrorQueueManager.rabbitQueueName))
 
 # Establish DB connection
+psqlConnectionStr = os.environ.get('DATABASE_URL', 'postgres:///ra_sched')
 dbConn = psycopg2.connect(psqlConnectionStr)
-
-# Parse the URL parameters from the connection url
-params = pika.URLParameters(rabbitConnectionStr)
-
-# Create a blocking connection with the parsed parameters
-rabbitConn = pika.BlockingConnection(params)
-
-# Configure the app so that we can use parts of it from this worker process.
-
-# Disable the login_required decorator
-app.config["LOGIN_DISABLED"] = True
-# Reinitialize the Login Manager to accept the new configuration
-app.login_manager.init_app(app)
 
 
 def startup():
     # Start up the worker process and begin consuming RabbitMQ messages.
 
-    logging.info("Connecting to '{}' message queue channel.".format(rabbitSchedulerQueue))
+    # Configure the server app so that we can use parts of it in this worker process
 
-    # Start a channel
-    channel = rabbitConn.channel()
+    # Disable the login_required decorator for this instance
+    app.config["LOGIN_DISABLED"] = True
 
-    # Connect to the genSched queue
-    channel.queue_declare(queue=rabbitSchedulerQueue)
+    # Reinitialize the Login Manager to accept the new configuration
+    app.login_manager.init_app(app)
 
-    # Connect to the durable genSchedFailures queue
-    channel.queue_declare(
-        queue=rabbitSchedulerErrorQueue,
-        durable=True
-    )
+    logging.info("Begin consuming messages from '{}'".format(rabbitConsumerManager.rabbitQueueName))
 
-    # Set the runScheduler as the callback function to consume messages
-    channel.basic_consume(
-        rabbitSchedulerQueue,
-        parseMessage
-    )
-
-    # Configure the channel so that RabbitMQ does not send a given worker process
-    #  more than 'rabbitSchedulerQueueLimit' number of messages at a time.
-    #  https://www.rabbitmq.com/tutorials/tutorial-two-python.html
-    channel.basic_qos(
-        prefetch_count=rabbitSchedulerQueueLimit
-    )
-
-    logging.info("Begin consuming messages from '{}'".format(rabbitSchedulerQueue))
-
-    # Start consuming
-    channel.start_consuming()
+    # Begin consuming messages from the message queue!
+    rabbitConsumerManager.consumeMessages(parseMessage, rabbitQueueLimit=1)
 
 
 def teardown():
     # Close the necessary connections and clean up after ourselves
     dbConn.close()
-    rabbitConn.close()
+    rabbitConsumerManager.closeConnection()
+    rabbitErrorQueueManager.closeConnection()
 
 
 def parseMessage(ch, method, properties, body):
@@ -137,14 +111,15 @@ def parseMessage(ch, method, properties, body):
         #  expected "sqid" header.
 
         # Log the occurrence
-        logging.exception("Received message from '{}' with no 'sqid' header.".format(rabbitSchedulerQueue))
+        logging.exception(
+            "Received message from '{}' with no 'sqid' header.".format(rabbitConsumerManager.rabbitQueueName)
+        )
 
         # Since the SQID is the only way for us to know what record in the DB
         #  is associated with this message, and we were unable to get the SQID,
         #  then send this message to the error queue with a sqid of -1.
         forwardMsgToErrorQueue(
-            ch,
-            "Received message from '{}' with no 'sqid' header.".format(rabbitSchedulerQueue),
+            "Received message from '{}' with no 'sqid' header.".format(rabbitConsumerManager.rabbitQueueName),
             strBody,
             -1
         )
@@ -165,8 +140,8 @@ def parseMessage(ch, method, properties, body):
 
         # Forward the message to the Error Queue where it can be looked into in further detail.
         forwardMsgToErrorQueue(
-            ch,
-            "Unable to decode message body into JSON for SQID: {}".format(rabbitSchedulerQueue),
+            "Unable to decode message body into JSON for SQID: {}"
+                .format(rabbitConsumerManager.rabbitQueueName),
             strBody,
             msgSQID
         )
@@ -189,14 +164,13 @@ def parseMessage(ch, method, properties, body):
         dbConn.commit()
         cur.close()
 
-
     # Acknowledge that we have received and handled the message.
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
     logging.info("Message Processing Complete.")
 
 
-def forwardMsgToErrorQueue(ch, reason, forwardedMsg, sqid):
+def forwardMsgToErrorQueue(reason, forwardedMsg, sqid):
     # Forward the provided message to the error queue for future review.
 
     # Create the message body
@@ -205,20 +179,10 @@ def forwardMsgToErrorQueue(ch, reason, forwardedMsg, sqid):
         "forwarded_message_body": forwardedMsg
     }
 
-    # Queue up the Error message.
-    ch.basic_publish(
-        exchange="",
-        routing_key=rabbitSchedulerErrorQueue,
-        # Convert the msgBody to a JSON string and encode it in a byte array for pika
-        body=bytes(dumps(msgBody), "utf-8"),
-        properties=pika.BasicProperties(
-            headers={"sqid": sqid},
-            # Make the message persistent
-            delivery_mode=2
-        )
-    )
+    # Publish a persistent message to the error queue.
+    rabbitErrorQueueManager.publishMsg(msgBody, {"sqid": sqid}, deliveryMode=2)
 
-    logging.info("Forwarded message to '{}' failure queue.".format(rabbitSchedulerErrorQueue))
+    logging.info("Forwarded message to '{}' failure queue.".format(rabbitErrorQueueManager.rabbitQueueName))
 
 
 def runScheduler(resHallID, monthNum, year, noDutyList, eligibleRAList):
