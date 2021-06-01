@@ -3,5 +3,7 @@ python:
   - "3.6"
 script:
   - python -m unittest discover -p "*_test.py" -v
+services:
+  - rabbitmq
 notifications:
     slack: ra-scheduler:z6I7Y1LLLdzzVggMuJnw4Jiq
