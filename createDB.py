@@ -2,15 +2,32 @@ from psycopg2.extras import Json
 import psycopg2
 import os
 
+
+def createSchoolDB(conn):
+    conn.execute("DROP TABLE IF EXISTS school CASCADE;")
+    conn.execute("""
+        CREATE TABLE school(
+            id              serial UNIQUE,
+            name            varchar(255) NOT NULL,
+            city            varchar(255) NOT NULL,
+            state           varchar(2) NOT NULL,
+
+            PRIMARY KEY (name, city, state)
+        );""")
+
+
 def createHallDB(conn):
     conn.execute("DROP TABLE IF EXISTS res_hall CASCADE;")
     conn.execute("""
         CREATE TABLE res_hall(
             id				 serial UNIQUE,
             name			 varchar(50),
+            school_id        int NOT NULL,
             
-        PRIMARY KEY (name)
+        PRIMARY KEY (name, school_id),
+        FOREIGN KEY (school_id) REFERENCES school(id)
         );""")
+
 
 def createScheduleDB(conn):
     conn.execute("DROP TABLE IF EXISTS schedule CASCADE;")
@@ -26,6 +43,7 @@ def createScheduleDB(conn):
         FOREIGN KEY (month_id) REFERENCES month(id)
         );""")
 
+
 def createRaDB(conn):
     conn.execute("DROP TABLE IF EXISTS ra CASCADE;")
     conn.execute("""
@@ -39,6 +57,7 @@ def createRaDB(conn):
             PRIMARY KEY (id)
         );""")
 
+
 def createConflictDB(conn):
     conn.execute("DROP TABLE IF EXISTS conflicts CASCADE;")
     conn.execute("""
@@ -51,6 +70,7 @@ def createConflictDB(conn):
             FOREIGN KEY (ra_id) REFERENCES ra(id),
             FOREIGN KEY (day_id) REFERENCES day(id)
         );""")
+
 
 def createDutyDB(conn):
     conn.execute("DROP TABLE IF EXISTS duties CASCADE;")
@@ -72,6 +92,7 @@ def createDutyDB(conn):
             FOREIGN KEY (sched_id) REFERENCES schedule(id)
         );""")
 
+
 def createDayDB(conn):
     conn.execute("DROP TABLE IF EXISTS day CASCADE;")
 
@@ -84,6 +105,7 @@ def createDayDB(conn):
             PRIMARY KEY (month_id,date),
             FOREIGN KEY (month_id) REFERENCES month(id)
         );""")
+
 
 def createMonthDB(conn):
     conn.execute("DROP TABLE IF EXISTS month CASCADE;")
@@ -98,6 +120,7 @@ def createMonthDB(conn):
             PRIMARY KEY (name,year)
         );""")
 
+
 def createUserDB(conn):
     conn.execute('DROP TABLE IF EXISTS "user" CASCADE;')
 
@@ -110,6 +133,7 @@ def createUserDB(conn):
             PRIMARY KEY (id),
             FOREIGN KEY (ra_id) REFERENCES ra(id)
         );""")
+
 
 def createOAuthDB(conn):
     conn.execute('DROP TABLE IF EXISTS flask_dance_oauth CASCADE;')
@@ -125,6 +149,7 @@ def createOAuthDB(conn):
 
             PRIMARY KEY (id)
         );""")
+
 
 def createBreakDutiesTable(conn):
     conn.execute('DROP TABLE IF EXISTS break_duties CASCADE;')
@@ -175,6 +200,7 @@ def createPointModifierDB(conn):
             FOREIGN KEY (res_hall_id) REFERENCES res_hall(id)
         );""")
 
+
 def createHallSettingsDB(conn):
     conn.execute("DROP TABLE IF EXISTS hall_settings CASCADE;")
 
@@ -207,6 +233,7 @@ def createHallSettingsDB(conn):
             FOREIGN KEY (res_hall_id) REFERENCES res_hall(id)
         );""", (Json(defaultJSON),))
 
+
 def createStaffMembershipDB(conn):
     conn.execute("DROP TABLE IF EXISTS staff_membership CASCADE;")
     conn.execute("""
@@ -222,6 +249,7 @@ def createStaffMembershipDB(conn):
             FOREIGN KEY (ra_id) REFERENCES ra(id),
             FOREIGN KEY (res_hall_id) REFERENCES res_hall(id)
         );""")
+
 
 def createSchedulerQueueDB(conn):
     conn.execute("DROP TABLE IF EXISTS scheduler_queue CASCADE;")
@@ -239,8 +267,10 @@ def createSchedulerQueueDB(conn):
             FOREIGN KEY (created_ra_id) REFERENCES ra(id)
         );""")
 
+
 def main():
     conn = psycopg2.connect(os.environ["DATABASE_URL"])
+    createSchoolDB(conn.cursor())
     createHallDB(conn.cursor())
     createRaDB(conn.cursor())
     createMonthDB(conn.cursor())
@@ -255,7 +285,7 @@ def main():
     createPointModifierDB(conn.cursor())
     createHallSettingsDB(conn.cursor())
     createStaffMembershipDB(conn.cursor())
-    createSchedulerQueueDB((conn.cursor()))
+    createSchedulerQueueDB(conn.cursor())
 
     conn.commit()
 
