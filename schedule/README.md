@@ -63,9 +63,10 @@ This method returns an object with the following specifications:
 ```
 
 ### [/runScheduler](https://localhost:5000/schedule/api/runScheduler)
-API Method that runs the duty scheduler for the given
-Res Hall and month. Any users associated with the staff
-that have an auth_level of HD will not be scheduled.
+API Method that runs that queues a request for the duty 
+scheduler to be run for the given Res Hall and month. 
+Any users associated with the staff that have an 
+auth_level of HD or above will not be scheduled.
 
 Required Auth Level (Role): _**≥ AHD**_ <br />
 Accepted Method(s): _**POST**_
@@ -84,9 +85,36 @@ If called from a client, the following parameters are required:
 This method returns a standard return object whose status is one of the
 following:
 
- 1 : the duty scheduling was successful <br />
- 0 : the duty scheduling was unsuccessful <br />
--1 : an error occurred while scheduling
+ 1 : the duty scheduling request was successfully queued <br />
+-1 : an error occurred while queuing the scheduling request
+
+If the scheduling request was successfully queued, then the message of the standard
+return will be the SQID that the user can use to check the status of the scheduling
+request.
+
+### [/checkSchedulerStatus](https://localhost:5000/schedule/api/checkSchedulerStatus)
+API Method to check the status of the schedule generation
+for a given scheduler queue ID.
+
+Required Auth Level (Role): _**≥ AHD**_ <br />
+Accepted Method(s): _**GET**_
+
+If called from the server, this function accepts the following parameters:
+
+| Name | Type     | Description  |
+|------|----------|--------------|
+| sqid | `<int>`  | An integer representing the scheduler queue ID for the schedule being generated.|
+
+If called from a client, the following parameters are required:
+
+| Name | Type     | Description  |
+|------|----------|--------------|
+| sqid | `<int>`  | An integer representing the scheduler queue ID for the schedule being generated.|
+
+This method returns a standard return object whose status and message are
+the status and reason associated with the scheduler queue record. If no
+record can be found, then return a status of -1 and reason of "Record
+Not Found".
 
 ### [/changeRAonDuty](https://localhost:5000/schedule/api/changeRAonDuty)
 API Method will change the RA assigned for a given duty
