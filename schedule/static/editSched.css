@@ -94,3 +94,17 @@
 .fa-container {
     text-align: center;
 }
+
+.input-group-addon {
+    margin: auto;
+    margin-left: 1%;
+    max-width: 10%;
+}
+
+.fa-calendar {
+    color: var(--blue);
+}
+
+.datepicker {
+    max-width: 90%;
+}
