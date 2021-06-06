@@ -336,7 +336,7 @@ def queueScheduler():
         #  noDuty parameter
         if request.json["noDuty"] != "":
             # If noDuty is not "", then attempt to parse out the values
-            noDutyList = [int(d) for d in request.json["noDuty"].split(",")]
+            noDutyList = [int(d) for d in request.json["noDuty"].split(", ")]
 
         else:
             # Otherwise if there are no values passed in noDuty, set
