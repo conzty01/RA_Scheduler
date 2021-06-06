@@ -28,6 +28,7 @@ algorithm. For this application, you will need:
 * PostgreSQL 10.17
 * Python 3.6
 * VirtualEnv 15.1
+* RabbitMQ 3.8.14
 
 
 ### Installing
@@ -72,16 +73,47 @@ into the virtual env:
 pip install -r requirements.txt
 ```
 
+RADSA uses on a number of environment variables to pass
+information into the runtime of the application. These 
+can be configured in the `activateEnv` file. Once 
+configured, the setting can be exported into the env
+by running the following command:
+```
+. activateEnv
+```
+This step will need to be performed each time a new terminal
+is opened.
+
 With all of the above prerequisites installed, you should 
-be able to run the following:
+be able to run the following to initialize the database:
 ```
 $ python createDB.py
 $ python populateDB.py
-$ python scheduleServer.py
 ```
-Doing so will create the Database, populate it with some 
-starting data, and start the Flask server. You can then 
-open the browser of your choice and navigate to 
+Doing so will create the Database and populate it with some 
+starting data. 
+
+#### Installing RabbitMQ
+
+For instructions installing [RabbitMQ visit their website](https://www.rabbitmq.com/install-debian.html).
+
+
+### Running the Application Locally
+
+Follow the below steps in order to run this 
+application locally.
+
+1. Open two terminals and active the virtual env for 
+   this applications in each.
+2. In each terminal, navigate to the application
+   directory and run `. activateEnv`.
+3. In one terminal run `python scheduleServer.py` to
+   start the web server.
+4. In the other terminal run `python schedulerProcess.py` to
+   start the scheduler process.
+
+After the above steps are completed, the application can be 
+reached by opening a web browser and navigating to 
 `localhost:5000/`.
 
 
