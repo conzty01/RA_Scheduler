@@ -256,6 +256,8 @@ async function passModalSave(modalId, msg, extraWork=() => {}) {
             calendar.currentData.calendarApi.refetchEvents();
             // Get the updated points
             getPoints();
+            // Get the updated scheduler requests
+            getSchedRequests();
             // Complete any additional work
             extraWork();
             // Hide the modal
@@ -363,7 +365,8 @@ function runScheduler() {
 
     // Indicate to user that scheduler is running
     document.getElementById("runButton").disabled = true;
-    $("body").css("cursor", "wait");
+    document.getElementById("runModalProgressBar").style.display = "inherit";
+    //$("body").css("cursor", "wait");
 
     let data = {
         monthNum: monthNum + 1,
@@ -459,9 +462,13 @@ function checkPendingSchedule(retMsg) {
     ).then((res) => {
         passModalSave("#runModal", res, () => {
             document.getElementById("runButton").disabled = false;
-            $("body").css("cursor", "auto");
+            document.getElementById("runModalProgressBar").style.display = "none";
+            //$("body").css("cursor", "auto");
         });
     });
+
+    // Add the resulting scheduler queue request information to the queue list
+    addSchedReqItem(retMsg);
 }
 
 function showAddDutyModal(info=null) {
@@ -692,3 +699,192 @@ function showExportModal() {
     $('#exportModal').modal('show');
 }
 
+function getSchedulerQueueEntry(QueueID) {
+    // Get additional information from the server for the given Queue ID
+
+    // Call the appropriate API
+    appConfig.base.callAPI("getSchedulerQueueItemInfo",
+        {sqid:QueueID},
+        function(data) {showSchedQueueModal(data)},
+        "GET",
+        console.err
+    );
+}
+
+function showSchedQueueModal(info) {
+    // set the schedQueueModal inputs to display the given values.
+
+    // Set the Requested Date
+    document.getElementById("schedQueueDate").value = info.requestDatetime;
+
+    // Set the Status
+    let badgeStatusColor = "badge-";
+    let badgeStatusText = "";
+
+    switch (info.status) {
+        case 0:
+            // Status is still in progress
+            badgeStatusColor += "secondary";
+            badgeStatusText = "In Progress";
+            break;
+
+        case 1:
+            // Status is successful
+            badgeStatusColor += "success";
+            badgeStatusText = "Success";
+            break;
+
+        case -1:
+            // Status is failed
+            badgeStatusColor += "danger";
+            badgeStatusText = "Failed";
+            break;
+
+        case -99:
+            // Status indicates record not found
+            badgeStatusColor += "dark";
+            badgeStatusText = "Not Found"
+            break;
+
+        default:
+            // Default to a warning badge
+            badgeStatusColor += "warning";
+            badgeStatusText = "Unknown";
+            break;
+    }
+    document.getElementById("schedQueueStatus").innerHTML = badgeStatusText;
+    document.getElementById("schedQueueStatus").className = "badge " + badgeStatusColor;
+
+    // Set the Requesting User
+    document.getElementById("schedQueueRequestingUser").value = info.requestingRA;
+
+    // Set the Additional Information/Reason
+    document.getElementById("schedQueueReason").value = info.reason;
+
+    // Set the modal title to include the SQID
+    document.getElementById("schedReqID").innerHTML = info.sqid;
+
+    $('#schedQueueModal').modal('show');
+}
+
+function addSchedReqItem(schedReqDict) {
+    // Add the provided scheduler queue request to the list
+
+    // Get the appropriate UL element
+    let listUL = document.getElementById("queueListUL");
+
+    // Create a new row
+    let newLI = document.createElement("li");
+    newLI.onclick = () => {getSchedulerQueueEntry(schedReqDict.sqid)};
+    newLI.classList.add("clickable", "hoverItem");
+
+    // Create a new Request div
+    let newReqDiv = document.createElement("div");
+    newReqDiv.id = "list_request_" + schedReqDict.sqid.toString();
+    newReqDiv.classList.add("tName");
+    newReqDiv.innerHTML = schedReqDict.created_date;
+
+    // Create a new Status div
+    let newStatusDiv = document.createElement("div");
+    newStatusDiv.id = "list_status_" + schedReqDict.sqid.toString();
+    newStatusDiv.classList.add("tPoints");
+    let newStatusSpan = document.createElement("span");
+    newStatusSpan.classList.add("badge", "badge-secondary");
+    let statusText;
+    switch (schedReqDict.status) {
+        case -1:
+            statusText = "Failed";
+            break;
+        case 0:
+            statusText = "In Progress";
+            break;
+        case 1:
+            statusText = "Success";
+            break;
+        default:
+            statusText = "Unknown";
+    }
+    newStatusSpan.innerHTML = statusText;
+    newStatusSpan.id = "list_status_span_" + schedReqDict.sqid.toString();
+    newStatusDiv.appendChild(newStatusSpan);
+
+    // Zip everything together
+    newLI.appendChild(newReqDiv);
+    newLI.appendChild(newStatusDiv);
+    listUL.insertBefore(newLI, listUL.childNodes[2])
+
+    // If there are more than 11 elements in the list,
+    //  then remove the last node
+    if (listUL.childNodes.length > 11) {
+        listUL.removeChild(listUL.lastElementChild);
+    }
+}
+
+function getSchedRequests() {
+    appConfig.base.callAPI("getRecentSchedulerRequests", {}, updateSchedReqList, "GET");
+
+}
+
+function updateSchedReqList(schedReqDict) {
+    // PointDict is expected to be as follows:
+    // { sqid: {status: x, created_date: x}, ... }
+    console.log(schedReqDict);
+
+    let reqListDiv = document.getElementById("queueList");
+
+    for (let idKey in schedReqDict) {
+        // Get the Div containing the points for the respective RA
+        let statusDiv = document.getElementById("list_status_" + idKey);
+
+        let statusText;
+        let statusClass;
+        switch (schedReqDict[idKey].status) {
+            case -1:
+                statusText = "Failed";
+                statusClass = "badge-danger";
+                break;
+            case 0:
+                statusText = "In Progress";
+                statusClass = "badge-secondary";
+                break;
+            case 1:
+                statusText = "Success";
+                statusClass = "badge-success";
+                break;
+            default:
+            statusText = "Unknown";
+            statusClass = "badge-warning";
+        }
+
+        let newStatusSpan = document.createElement("span");
+        newStatusSpan.classList.add("badge", statusClass);
+        newStatusSpan.innerHTML = statusText;
+
+        if (statusDiv == null) {
+            // If the RA is not currently in the raList
+            //  then create a new entry for them.
+
+            let newLi = document.createElement("li");
+            newLi.id = "schedReqList_" + idKey;
+
+            let newDateDiv = document.createElement("div");
+            newDateDiv.id = "list_request_" + idKey;
+            newDateDiv.classList.add("tName");
+            newDateDiv.innerHTML = schedReqDict[idKey].created_date;
+
+            let newStatusDiv = document.createElement("div");
+            newStatusDiv.id = "list_status_" + idKey;
+            newStatusDiv.classList.add("tPoints");
+            newStatusDiv.appendChild(newStatusSpan);
+
+            newLi.appendChild(newNameDiv);
+            newLi.appendChild(newStatusDiv);
+            let ulElement = reqListDiv.getElementsByTagName("ul")[0];
+            ulElement.insertBefore(newLi, ulElement.ChildNodes[2]);
+
+        } else {
+            // Else update the point value
+            statusDiv.replaceChild(newStatusSpan, statusDiv.lastElementChild);
+        }
+    }
+}

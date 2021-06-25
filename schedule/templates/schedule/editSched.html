@@ -150,6 +150,9 @@
           <div class="modalUserInfo"></div>
       </div>
       <div class="modal-footer">
+        <div id="runModalProgressBar" class="progress">
+          <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+        </div>
         <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
         <button id="runButton" type="button" class="btn btn-primary" onclick="runScheduler()">Run Scheduler</button>
       </div>
@@ -192,6 +195,46 @@
   </div>
 </div>
 
+<!-- Scheduler Queue Modal -->
+<div class="modal fade" id="schedQueueModal" tabindex="-1" role="dialog" aria-labelledby="addDutyModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Scheduler Request <span id="schedReqID"></span></h3>
+      </div>
+      <div class="modal-body">
+          <div class="form-group form-row">
+              <div class="col-md-8">
+                  <label for="schedQueueDate">Request Date:</label>
+                  <input class="form-control" type="datetime-local" id="schedQueueDate" disabled >
+              </div>
+              <div class="col-md-4">
+                  <label for="schedQueueStatus">Status:</label>
+                  <div id="statusContainer">
+                      <span id="schedQueueStatus" class="badge badge-warning">Unknown</span>
+                  </div>
+              </div>
+          </div>
+          <div class="form-group form-row">
+              <div class="col">
+                  <label for="schedQueueRequestingUser">Requested By:</label>
+                  <input class="form-control" type="text" id="schedQueueRequestingUser" disabled >
+              </div>
+          </div>
+          <div class="form-group form-row">
+              <div class="col">
+                  <label for="schedQueueReason">Additional Information</label>
+                  <input class="form-control" type="text" id="schedQueueReason" disabled >
+              </div>
+          </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="calContainer" class="col-lg-9">
     <div id="calendar">
 
@@ -200,14 +243,38 @@
 <div id="raListContainer" class="col-lg-3">
     <div id="raList" class="raList">
         <ul>
-            <li id="list_header">
+            <li class="list_header">
                 <div id="list_name_header" class="tName">Name</div>
                 <div id="list_points_header" class="tPoints"># Points</div>
             </li>
             {% for idKey, idVal in ptDict: %}
-            <li id="list_{{ idKey }}">
+            <li id="list_{{ idKey }}" class="hoverItem">
                 <div id="list_name_{{ idKey }}" class="tName">{{ idVal["name"] }}</div>
                 <div id="list_points_{{ idKey }}" class="tPoints">{{ idVal["pts"]["dutyPts"] }}</div>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    <div id="queueList" class="raList">
+        <ul id="queueListUL">
+            <li class="list_header">
+                <div id="list_request_header" class="tName">Schedule Requests</div>
+                <div id="list_status_header" class="tPoints">Status</div>
+            </li>
+            {% for rowID, rowStatus, rowDate in schedQueueList: %}
+            <li id="schedReqList_{{ rowID }}" onclick="getSchedulerQueueEntry({{ rowID }})" class="clickable hoverItem">
+                <div id="list_request_{{ rowID }}" class="tName">{{ rowDate.strftime("%m/%d/%y") }}</div>
+                <div id="list_status_{{ rowID }}" class="tPoints">
+                    {% if rowStatus == 1: %}
+                    <span id="list_status_span_{{ rowID }}" class="badge badge-success">Success</span>
+                    {% elif rowStatus == 0: %}
+                    <span id="list_status_span_{{ rowID }}" class="badge badge-secondary">In Progress</span>
+                    {% elif rowStatus == -1: %}
+                    <span id="list_status_span_{{ rowID }}" class="badge badge-danger">Failed</span>
+                    {% else %}
+                    <span id="list_status_span_{{ rowID }}" class="badge badge-warning">Unknown</span>
+                    {% endif %}
+                </div>
             </li>
             {% endfor %}
         </ul>
