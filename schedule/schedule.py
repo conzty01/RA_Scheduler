@@ -93,12 +93,27 @@ def editSched():
         WHERE sm.res_hall_id = %s 
         ORDER BY ra.first_name ASC;""", (authedUser.hall_id(),))
 
+    # Load the RA query results
+    raList = cur.fetchall()
+
     # Sort alphabetically by last name of RA
     ptDictSorted = sorted(ptDict.items(), key=lambda kv: kv[1]["name"].split(" ")[1])
 
-    return render_template("schedule/editSched.html", raList=cur.fetchall(), auth_level=authedUser.auth_level(),
+    # Query the DB for the latest scheduler requests for the hall being viewed.
+    cur.execute("""
+        SELECT id, status, created_date
+        FROM scheduler_queue
+        WHERE res_hall_id = %s
+        ORDER BY created_date DESC
+        LIMIT (10);""", (authedUser.hall_id(),))
+
+    # Load the query results
+    schedulerQueueList = cur.fetchall()
+    logging.debug(schedulerQueueList)
+
+    return render_template("schedule/editSched.html", raList=raList, auth_level=authedUser.auth_level(),
                            ptDict=ptDictSorted, curView=3, opts=custSettings, hall_name=authedUser.hall_name(),
-                           linkedHalls=authedUser.getAllAssociatedResHalls())
+                           linkedHalls=authedUser.getAllAssociatedResHalls(), schedQueueList=schedulerQueueList)
 
 
 # ---------------------
@@ -386,7 +401,7 @@ def queueScheduler():
 
     # Add a record in the scheduler_queue table for this request
     cur.execute(
-        "INSERT INTO scheduler_queue (res_hall_id, created_ra_id) VALUES (%s, %s) RETURNING id;",
+        "INSERT INTO scheduler_queue (res_hall_id, created_ra_id) VALUES (%s, %s) RETURNING id, created_date, status;",
         (hallId, authedUser.ra_id())
     )
 
@@ -394,7 +409,7 @@ def queueScheduler():
     ag.conn.commit()
 
     # Fetch the new record's ID
-    sqid = cur.fetchone()[0]
+    sqid, created_date, status = cur.fetchone()
 
     # Close the DB cursor
     cur.close()
@@ -424,7 +439,7 @@ def queueScheduler():
     logging.info("Successfully queued scheduler request {} for Res Hall: {}".format(sqid, hallId))
 
     # Notify the user of the successful schedule generation!
-    return jsonify({"status": 1, "msg": "successful", "sqid": sqid})
+    return jsonify({"status": status, "created_date": created_date.strftime("%m/%d/%y"), "sqid": sqid})
 
 
 @schedule_bp.route("/api/checkSchedulerStatus", methods=["GET"])
@@ -512,6 +527,215 @@ def checkSchedulerStatus(sqid=None):
     else:
         # Otherwise return a JSON version of the result
         return jsonify({"status": status, "msg": reason, "sqid": sqid})
+
+
+@schedule_bp.route("/api/getSchedulerQueueItemInfo", methods=["GET"])
+@login_required
+def getScheduleQueueItemInfo(sqid=None, resHallID=None):
+    # API method to return information regarding the schedule generation
+    #  for a given scheduler queue ID.
+    #
+    #  Required Auth Level: >= AHD
+    #
+    #  If called from the server, this function accepts the following parameters:
+    #
+    #     sqid        <int>  -  an integer representing the scheduler queue ID for the
+    #                            schedule being generated.
+    #     resHallID   <int>  -  an integer representing the Res Hall ID for the
+    #                            schedule queue item being requested.
+    #
+    #  If called from a client, the following parameters are required:
+    #
+    #     sqid  <int>  -  an integer representing the scheduler queue ID for the
+    #                      schedule being generated.
+    #
+    #  This method returns an object with the following specifications:
+    #
+    #     {
+    #        "status": <scheduler_queue.status>,
+    #        "reason": <scheduler_queue.reason>,
+    #        "requestDatetime": <scheduler_queue.created_date>,
+    #        "requestingRA": <ra.first_name> <ra.last_name>,
+    #        "sqid": <scheduler_queue.id>
+    #     }
+
+    # Assume this API was called from the server and verify that this is true.
+    fromServer = True
+    if sqid is None and resHallID is None:
+        # If the SQID is None, then this method was called from a remote client.
+
+        # Get the user's information from the database
+        authedUser = getAuth()
+
+        # Check to see if the user is authorized to query schedule statuses
+        # If the user is not at least an AHD
+        if authedUser.auth_level() < 2:
+            # Then they are not permitted to see this view.
+
+            # Log the occurrence.
+            logging.warning(
+                "User Not Authorized - RA: {} attempted to view schedule queue details."
+                .format(authedUser.ra_id())
+            )
+
+            # Notify the user that they are not authorized.
+            return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+
+        # Get the SQID from the request
+        sqid = request.args.get("sqid")
+
+        # Get the user's res hall ID
+        resHallID = authedUser.hall_id()
+
+        # Mark that this method was not called from the server
+        fromServer = False
+
+    logging.debug("Get Scheduler Info - SQID: {}, Hall: {}".format(sqid, resHallID))
+
+    # Create a cursor object
+    cur = ag.conn.cursor()
+
+    # Fetch the desired information of the provided scheduler queue record.
+    cur.execute("""
+        SELECT sq.status, sq.reason, sq.created_date, CONCAT(ra.first_name,' ',ra.last_name), sq.id
+        FROM scheduler_queue AS sq JOIN ra ON (ra.id = sq.created_ra_id)
+        WHERE sq.id = %s
+        AND sq.res_hall_id = %s
+        ORDER BY sq.created_date DESC
+    """, (sqid, resHallID))
+
+    # Load the results to memory
+    res = cur.fetchone()
+
+    logging.debug("Get Scheduler Info DB result: {}".format(res))
+
+    # Check to see if we received a result
+    if res is not None:
+        # If there is a result, then pack the result
+        ret = {
+            "status": res[0],
+            "reason": res[1],
+            "requestDatetime": res[2],
+            "requestingRA": res[3],
+            "sqid": res[4]
+        }
+
+    else:
+        # Otherwise set the status and reason appropriately
+        ret = {
+            "status": -99,
+            "reason": "Record Not Found - {}".format(sqid),
+            "requestDatetime": None,
+            "requestingRA": None,
+            "sqid": 0
+        }
+
+    # Close the cursor
+    cur.close()
+
+    # If this API method was called from the server
+    if fromServer:
+        # Then return the result as-is
+        return ret
+
+    else:
+        # Otherwise return a JSON version of the result
+        return jsonify(ret)
+
+
+@schedule_bp.route("/api/getRecentSchedulerRequests", methods=["GET"])
+@login_required
+def getRecentSchedulerRequests(resHallID=None):
+    # API method to return the 10 latest scheduler requests for the given
+    #  residence hall.
+    #
+    #  Required Auth Level: >= AHD
+    #
+    #  If called from the server, this function accepts the following parameters:
+    #
+    #     resHallID   <int>  -  an integer representing the Res Hall ID for the
+    #                            schedule queue item being requested.
+    #
+    #  If called from a client, the method does not require any additional
+    #  parameters.
+    #
+    #  This method returns an object with the following specifications:
+    #
+    #     {
+    #        <scheduler_queue.id 1> : {
+    #           "created_date": <scheduler_queue.created_date>,
+    #           "status": <scheduler_queue.status>
+    #        },
+    #        <scheduler_queue.id 2> : {
+    #           "created_date": <scheduler_queue.created_date>,
+    #           "status": <scheduler_queue.status>
+    #        },
+    #        ...
+    #     }
+
+    # Assume this API was called from the server and verify that this is true.
+    fromServer = True
+    if resHallID is None:
+        # If the SQID is None, then this method was called from a remote client.
+
+        # Get the user's information from the database
+        authedUser = getAuth()
+
+        # Check to see if the user is authorized to query schedule statuses
+        # If the user is not at least an AHD
+        if authedUser.auth_level() < 2:
+            # Then they are not permitted to see this view.
+
+            # Log the occurrence.
+            logging.warning(
+                "User Not Authorized - RA: {} attempted to view latest schedule queue requests."
+                    .format(authedUser.ra_id())
+            )
+
+            # Notify the user that they are not authorized.
+            return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+
+        # Get the user's res hall ID
+        resHallID = authedUser.hall_id()
+
+        # Mark that this method was not called from the server
+        fromServer = False
+
+    logging.debug("Get Scheduler Requests - Hall: {}".format(resHallID))
+
+    # Create a cursor object
+    cur = ag.conn.cursor()
+
+    # Query the DB for the latest scheduler requests for the hall being viewed.
+    cur.execute("""
+            SELECT id, status, created_date
+            FROM scheduler_queue
+            WHERE res_hall_id = %s
+            ORDER BY created_date DESC
+            LIMIT (10);""", (resHallID,))
+
+    # Load the query results
+    schedulerQueueList = cur.fetchall()
+
+    # Format the results into the expected format
+    res = {}
+    for sqid, status, created_date in schedulerQueueList:
+        res[sqid] = {
+            "created_date": created_date.strftime("%m/%d/%y"),
+            "status": status
+        }
+
+    # Close the cursor
+    cur.close()
+
+    # If this API method was called from the server
+    if fromServer:
+        # Then return the result as-is
+        return res
+
+    else:
+        # Otherwise return a JSON version of the result
+        return jsonify(res)
 
 
 @schedule_bp.route("/api/alterDuty", methods=["POST"])
