@@ -240,7 +240,7 @@ def getRAConflicts(startDateStr=None, endDateStr=None, raID=-1, hallID=None):
             # If there was an issue, then return an error notification
 
             # Log the occurrence
-            logging.info("Unable to parse RA ID from getRAConflicts API request")
+            logging.warning("Unable to parse RA ID from getRAConflicts API request")
 
             # Notify the user of the error
             return jsonify(stdRet(-1, "Invalid RA ID"))
