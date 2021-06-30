@@ -581,8 +581,18 @@ def getScheduleQueueItemInfo(sqid=None, resHallID=None):
             # Notify the user that they are not authorized.
             return jsonify(stdRet(-1, "NOT AUTHORIZED"))
 
-        # Get the SQID from the request
-        sqid = request.args.get("sqid")
+        try:
+            # Get the SQID from the request
+            sqid = request.args.get("sqid")
+
+        except ValueError:
+            # If there was an issue, then return an error notification
+
+            # Log the occurrence
+            logging.warning("Unable to parse SQID from getScheduleQueueItemInfo API request")
+
+            # Notify the user that there was an error
+            return jsonify(stdRet(-1, "Invalid SQID"))
 
         # Get the user's res hall ID
         resHallID = authedUser.hall_id()
