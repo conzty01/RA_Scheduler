@@ -583,7 +583,7 @@ def getScheduleQueueItemInfo(sqid=None, resHallID=None):
 
         try:
             # Get the SQID from the request
-            sqid = request.args.get("sqid")
+            sqid = int(request.args.get("sqid"))
 
         except ValueError:
             # If there was an issue, then return an error notification
