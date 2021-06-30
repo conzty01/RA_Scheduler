@@ -231,8 +231,7 @@ class TestSchedule_editSched(unittest.TestCase):
         # Assert that the last call to the DB was queried as expected.
         #  In this instance, we are unable to use the assert_called_once_with
         #  method as this function calls out to
-        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
-            """
+        self.mocked_appGlobals.conn.cursor().execute.assert_any_call("""
         SELECT ra.id, ra.first_name, ra.last_name, ra.color 
         FROM ra JOIN staff_membership AS sm ON (ra.id = sm.ra_id)
         WHERE sm.res_hall_id = %s 
@@ -244,6 +243,14 @@ class TestSchedule_editSched(unittest.TestCase):
             "SELECT duty_flag_label FROM hall_settings WHERE res_hall_id = %s",
             (self.user_hall_id,)
         )
+
+        # Assert that at least one call to the DB was queried as expected
+        self.mocked_appGlobals.conn.cursor().execute.assert_any_call("""
+        SELECT id, status, created_date
+        FROM scheduler_queue
+        WHERE res_hall_id = %s
+        ORDER BY created_date DESC
+        LIMIT (10);""", (self.user_hall_id,))
 
     @patch("schedule.schedule.getRAStats", autospec=True)
     @patch("schedule.schedule.render_template", autospec=True)
@@ -298,6 +305,9 @@ class TestSchedule_editSched(unittest.TestCase):
             key=lambda kv: kv[1]["name"].split(" ")[1]
         )
 
+        # Create the scheduler queue list
+        expectedSchedQueueList = [i for i in range(10)]
+
         # Configure the appGlobals.conn.cursor.execute mock to return different values
         #  after subsequent calls.
         self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
@@ -308,7 +318,8 @@ class TestSchedule_editSched(unittest.TestCase):
         # Configure the appGlobals.conn.cursor.execute mock to return different values
         #  after subsequent calls.
         self.mocked_appGlobals.conn.cursor().fetchall.side_effect = [
-            expectedRAList  # First query is for the list of all RAs
+            expectedRAList,  # First query is for the list of all RAs
+            expectedSchedQueueList  # Second query is for
         ]
 
         # Configure the mocked render_template function to return a valid response object
@@ -331,7 +342,7 @@ class TestSchedule_editSched(unittest.TestCase):
         # Assert that the last call to the DB was queried as expected.
         #  In this instance, we are unable to use the assert_called_once_with
         #  method as this function calls out to
-        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
+        self.mocked_appGlobals.conn.cursor().execute.assert_any_call(
             """
         SELECT ra.id, ra.first_name, ra.last_name, ra.color 
         FROM ra JOIN staff_membership AS sm ON (ra.id = sm.ra_id)
@@ -345,6 +356,14 @@ class TestSchedule_editSched(unittest.TestCase):
             (self.user_hall_id,)
         )
 
+        # Assert that at least one call to the DB was queried as expected
+        self.mocked_appGlobals.conn.cursor().execute.assert_any_call("""
+        SELECT id, status, created_date
+        FROM scheduler_queue
+        WHERE res_hall_id = %s
+        ORDER BY created_date DESC
+        LIMIT (10);""", (self.user_hall_id,))
+
         # Assert that the appropriate information was passed to the render_template function
         mocked_renderTemplate.assert_called_once_with(
             "schedule/editSched.html",
@@ -354,5 +373,6 @@ class TestSchedule_editSched(unittest.TestCase):
             curView=3,
             opts=expectedCustomSettingsDict,
             hall_name=self.helper_getAuth.hall_name(),
-            linkedHalls=self.helper_getAuth.getAllAssociatedResHalls()
+            linkedHalls=self.helper_getAuth.getAllAssociatedResHalls(),
+            schedQueueList=expectedSchedQueueList
         )
