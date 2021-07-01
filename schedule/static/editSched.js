@@ -9,15 +9,15 @@
 var schedButtons = {
     customPrevButton: {
         text: '<',
-        click: movePrev
+        click: editSchedMovePrev
     },
     customNextButton: {
         text: '>',
-        click: moveNext
+        click: editSchedMoveNext
     },
     customTodayButton: {
         text: 'Today',
-        click: moveToday
+        click: editSchedMoveToday
     },
     runSchedulerButton: {
         text: 'Schedule',
@@ -33,6 +33,37 @@ var calToolbar = {
     center: 'title',
     right: 'addEventButton runSchedulerButton'
 }
+
+/*   Override Calendar Navigation Functions   */
+function editSchedMoveCalendar(direction) {
+    // Call the appropriate base function to actually change the calendar.
+    switch (direction) {
+        case -1:
+            movePrev();
+            break;
+        case  0:
+            moveToday();
+            break;
+        case  1:
+            moveNext();
+            break;
+    }
+
+    // Adjust the datepicker in the run scheduler modal to look at the next month.
+    $('#runNoDutyDates').datepicker('setEndDate', new Date(appConfig.calDate.getFullYear(), appConfig.calDate.getMonth()+1, 0));
+    $('#runNoDutyDates').datepicker('setStartDate', new Date(appConfig.calDate.getFullYear(), appConfig.calDate.getMonth(), 1));
+
+    // Set the selection to the 15th of the month to update the view when the
+    //  the date picker is loaded. This will ensure that the proper month is
+    //  shown to the user on focus.
+    //$('#runNoDutyDates').datepicker('setDate', new Date(appConfig.calDate.getFullYear(), appConfig.calDate.getMonth(), 1);)
+    //$('#runNoDutyDates').datepicker('clearDates');
+
+}
+function editSchedMovePrev()  { editSchedMoveCalendar(-1) }
+function editSchedMoveToday() { editSchedMoveCalendar( 0) }
+function editSchedMoveNext()  { editSchedMoveCalendar( 1) }
+
 
 function initEditSchedCal() {
     initCal({

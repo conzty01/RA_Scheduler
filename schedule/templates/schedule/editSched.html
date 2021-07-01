@@ -311,7 +311,6 @@ var bpAPIPrefix = '/schedule';
 
     $(function() {
         $('#datepicker').datepicker({
-            //startDate: new Date(),
             multidate: true,
             format: "d",
             datesDisabled: [],
@@ -321,7 +320,7 @@ var bpAPIPrefix = '/schedule';
             clearBtn: true,
             disableTouchKeyboard: false,
             startDate: '1',     // First day of the month
-            endDate: new Date(appConfig.curDate.getFullYear(), appConfig.curDate.getMonth()+1, 0), // Last day of the month
+            endDate: new Date(appConfig.calDate.getFullYear(), appConfig.calDate.getMonth()+1, 0), // Last day of the month
         }).on('changeDate', function(e) {
             // `e` here contains the extra attributes
             $(this).find('.input-group-addon .count').text(' ' + e.dates.length);
