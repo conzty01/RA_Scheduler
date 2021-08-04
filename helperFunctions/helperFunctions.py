@@ -42,10 +42,12 @@ def getAuth():
     # Query the DB for the user
     cur.execute("""
             SELECT ra.id, ra.first_name, ra.last_name, 
-                   sm.res_hall_id, sm.auth_level, res_hall.name
+                   sm.res_hall_id, sm.auth_level, res_hall.name,
+                   school.id, school.name
             FROM "user" JOIN ra ON ("user".ra_id = ra.id)
                         JOIN staff_membership AS sm ON (ra.id = sm.ra_id)
                         JOIN res_hall ON (sm.res_hall_id = res_hall.id)
+                        JOIN school ON (school.id = res_hall.school_id)
             WHERE username = %s
             ORDER BY sm.selected DESC""", (uEmail,))
 
@@ -78,7 +80,9 @@ def getAuth():
         res_halls.append({
             "id": row[3],
             "auth_level": row[4],
-            "name": row[5]
+            "name": row[5],
+            "school_id": row[6],
+            "school_name": row[7]
         })
 
     # Close the DB cursor
@@ -264,6 +268,8 @@ class AuthenticatedUser:
                |- name         <str>  - the name of the res_hall record
                |- id           <int>  - the id of the res_hall record
                |- auth_level   <int>  - the numeric value corresponding with the user's auth_level for this hall
+               |- school_id    <int>  - the id of the school record associated with the res_hall record
+               |- school_name  <str>  - the name of the school associated with the res_hall record
 
         NOTE: The first hall in the res_halls list will be used as user's currently selected Res Hall.
 
@@ -316,5 +322,3 @@ class AuthenticatedUser:
         # Mark the Res Hall at the provided index as being the user's currently selected
         #  Res Hall.
         self.__selectedHall = self.__resHalls[index]
-
-
