@@ -74,11 +74,14 @@ class TestBreakBP_editBreaks(unittest.TestCase):
         # Set the ra_id and hall_id to values that can be used throughout
         self.user_ra_id = 1
         self.user_hall_id = 1
+        self.user_school_id = 1
         self.associatedResHalls = [
             {
                 "id": self.user_hall_id,
                 "auth_level": self.mocked_authLevel,
-                "name": "Test Hall"
+                "name": "Test Hall",
+                "school_id": self.user_school_id,
+                "school_name": "Test School"
             }
         ]
 

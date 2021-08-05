@@ -232,8 +232,18 @@ def getRAConflicts(startDateStr=None, endDateStr=None, raID=-1, hallID=None):
         # Set the value of hallId from the userDict
         hallID = authedUser.hall_id()
 
-        # Get the raID from the request arguments
-        raID = request.args.get("raID")
+        try:
+            # Attempt to get the raID from the request arguments
+            raID = int(request.args.get("raID"))
+
+        except ValueError:
+            # If there was an issue, then return an error notification
+
+            # Log the occurrence
+            logging.warning("Unable to parse RA ID from getRAConflicts API request")
+
+            # Notify the user of the error
+            return jsonify(stdRet(-1, "Invalid RA ID"))
 
         # Get the start and end string values from the request arguments.
         #  Since we utilize the fullCal.js library, we know that the request

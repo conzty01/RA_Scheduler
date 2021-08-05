@@ -60,18 +60,6 @@ class TestHallBP_getAuth(unittest.TestCase):
         self.username = "Test User"
         self.mocked_currentUser.username = self.username
 
-        # -- Create a patcher for the flask.url_for function --
-        self.patcher_flaskURLFor = patch("helperFunctions.helperFunctions.url_for", autospec=True)
-
-        # Start the patcher - mock returned
-        self.mocked_urlFor = self.patcher_flaskURLFor.start()
-
-        # -- Create a patcher for the flask.redirect function --
-        self.patcher_flaskRedirect = patch("helperFunctions.helperFunctions.redirect", autospec=True)
-
-        # Start the patcher - mock returned
-        self.mocked_redirect = self.patcher_flaskRedirect.start()
-
         # -- Create a patchers for the logging --
         self.patcher_loggingDEBUG = patch("logging.debug", autospec=True)
         self.patcher_loggingINFO = patch("logging.info", autospec=True)
@@ -89,8 +77,6 @@ class TestHallBP_getAuth(unittest.TestCase):
     def tearDown(self):
         # Stop all of the patchers
         self.patcher_flaskLoginCurrentUser.stop()
-        self.patcher_flaskRedirect.stop()
-        self.patcher_flaskURLFor.stop()
         self.patcher_appGlobals.stop()
         self.patcher_osEnviron.stop()
 
@@ -117,6 +103,8 @@ class TestHallBP_getAuth(unittest.TestCase):
         expectedHallID = 42
         expectedAuthLevel = 68
         expectedResHallName = "Test Hall"
+        expectedSchoolID = 46
+        expectedSchoolName = "Test School"
 
         # Configure the appGlobals.conn.cursor.execute mock to return different values
         #  after subsequent calls.
@@ -124,7 +112,8 @@ class TestHallBP_getAuth(unittest.TestCase):
         self.mocked_appGlobals.conn.cursor().fetchall.side_effect = [
             # First call returns the desired information which has one row
             ((expectedRAID, expectedFirstName, expectedLastName,
-             expectedHallID, expectedAuthLevel, expectedResHallName),)
+             expectedHallID, expectedAuthLevel, expectedResHallName,
+             expectedSchoolID, expectedSchoolName),)
         ]
 
         # -- Act --
@@ -140,10 +129,12 @@ class TestHallBP_getAuth(unittest.TestCase):
         self.mocked_appGlobals.conn.cursor().execute.assert_called_once_with(
             """
             SELECT ra.id, ra.first_name, ra.last_name, 
-                   sm.res_hall_id, sm.auth_level, res_hall.name
+                   sm.res_hall_id, sm.auth_level, res_hall.name,
+                   school.id, school.name
             FROM "user" JOIN ra ON ("user".ra_id = ra.id)
                         JOIN staff_membership AS sm ON (ra.id = sm.ra_id)
                         JOIN res_hall ON (sm.res_hall_id = res_hall.id)
+                        JOIN school ON (school.id = res_hall.school_id)
             WHERE username = %s
             ORDER BY sm.selected DESC""", (self.username,)
         )
@@ -167,8 +158,6 @@ class TestHallBP_getAuth(unittest.TestCase):
 
         # Reset all of the mocked objects that will be used in this test
         self.mocked_currentUser.reset_mock()
-        self.mocked_urlFor.reset_mock()
-        self.mocked_redirect.reset_mock()
         self.mocked_appGlobals.conn.reset_mock()
 
         # Configure the appGlobals.conn.cursor.execute mock to return different values
@@ -191,10 +180,12 @@ class TestHallBP_getAuth(unittest.TestCase):
         self.mocked_appGlobals.conn.cursor().execute.assert_called_once_with(
             """
             SELECT ra.id, ra.first_name, ra.last_name, 
-                   sm.res_hall_id, sm.auth_level, res_hall.name
+                   sm.res_hall_id, sm.auth_level, res_hall.name,
+                   school.id, school.name
             FROM "user" JOIN ra ON ("user".ra_id = ra.id)
                         JOIN staff_membership AS sm ON (ra.id = sm.ra_id)
                         JOIN res_hall ON (sm.res_hall_id = res_hall.id)
+                        JOIN school ON (school.id = res_hall.school_id)
             WHERE username = %s
             ORDER BY sm.selected DESC""", (self.username,)
         )
@@ -222,6 +213,8 @@ class TestHallBP_getAuth(unittest.TestCase):
         expectedRAID = 1
         expectedFirstName = "Trumpets"
         expectedLastName = "Are Cool"
+        expectedSchoolID = 99
+        expectedSchoolName = "Test School"
         expectedHallID1 = 42
         expectedAuthLevel1 = 68
         expectedResHallName1 = "Test Hall 1"
@@ -229,16 +222,21 @@ class TestHallBP_getAuth(unittest.TestCase):
         expectedAuthLevel2 = 1
         expectedResHallName2 = "Test Hall 2"
 
+
         expectedResHallList = [
             {
                 "id": expectedHallID1,
                 "auth_level": expectedAuthLevel1,
-                "name": expectedResHallName1
+                "name": expectedResHallName1,
+                "school_id": expectedSchoolID,
+                "school_name": expectedSchoolName
             },
             {
                 "id": expectedHallID2,
                 "auth_level": expectedAuthLevel2,
-                "name": expectedResHallName2
+                "name": expectedResHallName2,
+                "school_id": expectedSchoolID,
+                "school_name": expectedSchoolName
             },
         ]
 
@@ -248,9 +246,9 @@ class TestHallBP_getAuth(unittest.TestCase):
         self.mocked_appGlobals.conn.cursor().fetchall.side_effect = [
             # First call returns the desired information which will have two rows
             ((expectedRAID, expectedFirstName, expectedLastName, expectedHallID1,
-              expectedAuthLevel1, expectedResHallName1),
+              expectedAuthLevel1, expectedResHallName1, expectedSchoolID, expectedSchoolName),
              (expectedRAID, expectedFirstName, expectedLastName, expectedHallID2,
-              expectedAuthLevel2, expectedResHallName2)
+              expectedAuthLevel2, expectedResHallName2, expectedSchoolID, expectedSchoolName)
              )
         ]
 
@@ -267,10 +265,12 @@ class TestHallBP_getAuth(unittest.TestCase):
         self.mocked_appGlobals.conn.cursor().execute.assert_called_once_with(
             """
             SELECT ra.id, ra.first_name, ra.last_name, 
-                   sm.res_hall_id, sm.auth_level, res_hall.name
+                   sm.res_hall_id, sm.auth_level, res_hall.name,
+                   school.id, school.name
             FROM "user" JOIN ra ON ("user".ra_id = ra.id)
                         JOIN staff_membership AS sm ON (ra.id = sm.ra_id)
                         JOIN res_hall ON (sm.res_hall_id = res_hall.id)
+                        JOIN school ON (school.id = res_hall.school_id)
             WHERE username = %s
             ORDER BY sm.selected DESC""", (self.username,)
         )
