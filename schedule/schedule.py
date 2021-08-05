@@ -1,11 +1,8 @@
 from flask import render_template, request, jsonify, Blueprint, abort
+from schedule.rabbitConnectionManager import RabbitConnectionManager
 from flask_login import login_required
-from psycopg2 import IntegrityError
-from schedule import scheduler4_1
-from schedule.ra_sched import RA
-import copy as cp
-import calendar
 import logging
+import os
 
 # Import the appGlobals for this blueprint to use
 import appGlobals as ag
@@ -17,6 +14,13 @@ from staff.staff import getRAStats, addRAPointModifier
 schedule_bp = Blueprint("schedule_bp", __name__,
                         template_folder="templates",
                         static_folder="static")
+
+# Connect to the RabbitMQ instance
+schedulerQueueConn = RabbitConnectionManager(
+    os.environ.get('CLOUDAMQP_URL', 'amqp://guest:guest@localhost:5672/%2f'),
+    os.environ.get('RABBITMQ_SCHEDULER_QUEUE', 'genSched')
+)
+
 
 # ---------------------
 # --      Views      --
@@ -59,9 +63,21 @@ def editSched():
     # Load the necessary hall settings from the DB
     cur.execute("SELECT duty_flag_label FROM hall_settings WHERE res_hall_id = %s", (authedUser.hall_id(),))
 
+    # Load the query result
+    dfl = cur.fetchone()[0]
+
+    # Check to see if the google calendar integration is set up
+    cur.execute(
+        "SELECT EXISTS (SELECT token FROM google_calendar_info WHERE res_hall_id = %s)",
+        (authedUser.hall_id(),)
+    )
+    # Load the query result
+    gCalConn = cur.fetchone()[0]
+
     # Create a custom settings dictionary
     custSettings = {
-        "dutyFlagLabel": cur.fetchone()[0]
+        "dutyFlagLabel": dfl,
+        "gCalConnected": gCalConn
     }
 
     # Merge the base options into the custom settings dictionary to simplify passing
@@ -77,12 +93,27 @@ def editSched():
         WHERE sm.res_hall_id = %s 
         ORDER BY ra.first_name ASC;""", (authedUser.hall_id(),))
 
+    # Load the RA query results
+    raList = cur.fetchall()
+
     # Sort alphabetically by last name of RA
     ptDictSorted = sorted(ptDict.items(), key=lambda kv: kv[1]["name"].split(" ")[1])
 
-    return render_template("schedule/editSched.html", raList=cur.fetchall(), auth_level=authedUser.auth_level(),
+    # Query the DB for the latest scheduler requests for the hall being viewed.
+    cur.execute("""
+        SELECT id, status, created_date
+        FROM scheduler_queue
+        WHERE res_hall_id = %s
+        ORDER BY created_date DESC
+        LIMIT (10);""", (authedUser.hall_id(),))
+
+    # Load the query results
+    schedulerQueueList = cur.fetchall()
+    logging.debug(schedulerQueueList)
+
+    return render_template("schedule/editSched.html", raList=raList, auth_level=authedUser.auth_level(),
                            ptDict=ptDictSorted, curView=3, opts=custSettings, hall_name=authedUser.hall_name(),
-                           linkedHalls=authedUser.getAllAssociatedResHalls())
+                           linkedHalls=authedUser.getAllAssociatedResHalls(), schedQueueList=schedulerQueueList)
 
 
 # ---------------------
@@ -257,10 +288,10 @@ def getSchedule2(start=None, end=None, hallId=None, showAllColors=None):
 
 
 @schedule_bp.route("/api/runScheduler", methods=["POST"])
-def runScheduler():
-    # API Method that runs the duty scheduler for the given
-    #  Res Hall and month. Any users associated with the staff
-    #  that have an auth_level of HD will not be scheduled.
+def queueScheduler():
+    # API Method that queues a request to run the duty scheduler
+    #  for the given Res Hall and month. Any users associated with
+    #  the staff that have an auth_level of HD will not be scheduled.
     #
     #  Required Auth Level: >= AHD
     #
@@ -285,9 +316,12 @@ def runScheduler():
     #  This method returns a standard return object whose status is one of the
     #  following:
     #
-    #      1 : the duty scheduling was successful
-    #      0 : the duty scheduling was unsuccessful
-    #     -1 : an error occurred while scheduling
+    #      1 : the duty scheduling request was successfully queued
+    #     -1 : an error occurred while queuing the scheduling request
+    #
+    #  If the scheduling request was successfully queued, then the message of the standard
+    #  return will be the SQID that the user can use to check the status of the scheduling
+    #  request.
 
     # Get the user's information from the database
     authedUser = getAuth()
@@ -317,7 +351,7 @@ def runScheduler():
         #  noDuty parameter
         if request.json["noDuty"] != "":
             # If noDuty is not "", then attempt to parse out the values
-            noDutyList = [int(d) for d in request.json["noDuty"].split(",")]
+            noDutyList = [int(d) for d in request.json["noDuty"].split(", ")]
 
         else:
             # Otherwise if there are no values passed in noDuty, set
@@ -330,14 +364,10 @@ def runScheduler():
             # If eligibleRAs is not "", then attempt to parse out the values
             eligibleRAs = [int(i) for i in request.json["eligibleRAs"]]
 
-            # Also create a formatted psql string to add to the query that loads
-            #  the necessary information from the DB
-            eligibleRAStr = "AND ra.id IN ({});".format(str(eligibleRAs)[1:-1])
-
         else:
             # Otherwise if there are no values passed in eligibleRAs, then
-            # set eligibleRAStr to ";" to end the query string
-            eligibleRAStr = ";"
+            # set eligibleRAs to an empty list
+            eligibleRAs = []
 
     except ValueError as ve:
         # If a ValueError occurs, then there was an issue parsing out the
@@ -348,7 +378,9 @@ def runScheduler():
                         .format(ve))
 
         # Notify the user of the error
-        return jsonify(stdRet(-1, "Error Parsing Scheduler Parameters"))
+        return jsonify(
+            stdRet(-1, "Error Parsing Scheduler Request Parameters. Please refresh and try again.")
+        )
 
     except KeyError as ke:
         # If a KeyError occurs, then there was an expected value in the
@@ -359,7 +391,7 @@ def runScheduler():
                         .format(ke))
 
         # Notify the user of the error
-        return jsonify(stdRet(-1, "Missing Scheduler Parameters"))
+        return jsonify(stdRet(-1, "Missing Scheduler Parameters. Please refresh and try again."))
 
     # Set the value of the hallId from the userDict
     hallId = authedUser.hall_id()
@@ -367,414 +399,353 @@ def runScheduler():
     # Create a DB cursor
     cur = ag.conn.cursor()
 
-    # Query the DB for the given month
-    cur.execute("SELECT id, year FROM month WHERE num = %s AND EXTRACT(YEAR FROM year) = %s",
-                (monthNum, year))
-
-    # Load the results from the DB
-    monthRes = cur.fetchone()
-
-    # Check to see if the query returned a result
-    if monthRes is None:
-        # If not, then log the occurrence
-        logging.warning("Unable to find month {}/{} in DB".format(monthNum, year))
-
-        # And notify the user
-        return jsonify(stdRet(-1, "Unable to find month {}/{} in DB".format(monthNum, year)))
-
-    else:
-        # Otherwise, unpack the monthRes into monthId and year
-        monthId, date = monthRes
-
-    logging.debug("MonthId: {}".format(monthId))
-
-    # -- Get all eligible RAs and their conflicts --
-
-    # Query the DB for all of the eligible RAs for a given hall, and their
-    #  conflicts for the given month excluding any ra table records with
-    #  an auth_level of 3 or higher.
-    cur.execute("""
-        SELECT ra.first_name, ra.last_name, ra.id, sm.res_hall_id, sm.start_date,
-               COALESCE(cons.array_agg, ARRAY[]::date[])
-        FROM ra LEFT OUTER JOIN (
-            SELECT ra_id, ARRAY_AGG(days.date)
-            FROM conflicts JOIN (
-                SELECT id, date
-                FROM day
-                WHERE month_id = %s
-                ) AS days
-            ON (conflicts.day_id = days.id)
-            GROUP BY ra_id
-            ) AS cons
-        ON (ra.id = cons.ra_id)
-        JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
-        WHERE sm.res_hall_id = %s
-        AND sm.auth_level < 3 {}
-    """.format(eligibleRAStr), (monthId, hallId))
-
-    # Load the result from the DB
-    partialRAList = cur.fetchall()
-
-    # Get the start date for the school year. This will be used
-    #  to calculate how many points each RA has up to the month
-    #  being scheduled.
-    start, _ = getSchoolYear(date.month, date.year)
-
-    # Get the end from the DB. The end date will be the first day
-    #  of the month being scheduled. This will prevent the scheduler
-    #  from using the number of points an RA had during a previous
-    #  run of the scheduler for this month.
-    cur.execute("SELECT year FROM month WHERE id = %s", (monthId,))
-
-    # Load the value from the DB and convert it to a string in the expected format
-    end = cur.fetchone()[0].isoformat()
-
-    # Get the number of days in the given month
-    _, dateNum = calendar.monthrange(date.year, date.month)
-
-    # Calculate and format maxBreakDay which is the latest break duty that should be
-    #  included for the duty points calculation.
-    maxBreadDuty = "{:04d}-{:02d}-{:02d}".format(date.year, date.month, dateNum)
-
-    # Get the RA statistics for the given hall
-    ptsDict = getRAStats(hallId, start, end, maxBreakDay=maxBreadDuty)
-
-    logging.debug("ptsDict: {}".format(ptsDict))
-
-    # Assemble the RA list with RA objects that have the individual RAs' information
-    ra_list = []
-    for res in partialRAList:
-        # Add up the RA's duty points and any point modifier
-        pts = ptsDict[res[2]]["pts"]["dutyPts"] + ptsDict[res[2]]["pts"]["modPts"]
-
-        # Parse out the date information since we only use the day in this implementation
-        parsedConflictDays = [dateObject.day for dateObject in res[5]]
-
-        # Append the newly created RA to the ra_list
-        ra_list.append(
-            RA(
-                res[0],                 # First Name
-                res[1],                 # Last Name
-                res[2],                 # RA ID
-                res[3],                 # Hall ID
-                res[4],                 # Start Date
-                parsedConflictDays,     # Conflicts
-                pts                     # Points
-            )
-        )
-
-    # Set the Last Duty Assigned Tolerance based on floor dividing the number of
-    #  RAs by 2 then adding 1. For example, with a staff_manager of 15, the LDA Tolerance
-    #  would be 8 days.
-
-    # Calculate the last date assigned tolerance (LDAT) which is the number of days
-    #  before an RA is to be considered again for a duty. This should start as
-    #  one more than half of the number of RAs in the list. The scheduler algorithm
-    #  will adjust this as needed if the value passed in does not generate a schedule.
-    ldat = (len(ra_list) // 2) + 1
-
-    # Query the DB for the last 'x' number of duties from the previous month so that we
-    #  do not schedule RAs back-to-back between months.
-
-    # 'x' is currently defined to be the last day assigned tolerance
-
-    # Create a startMonthStr that can be used as the earliest boundary for the duties from the
-    #  last 'x' duties from the previous month.
-    # If the monthNum is 1 (If the desired month is January)
-    if monthNum == 1:
-        # Then the previous month is 12 (December) of the previous year
-        startMonthStr = '{}-12'.format(date.year - 1)
-
-    else:
-        # Otherwise the previous month is going to be from the same year
-        startMonthStr = '{}-{}'.format(date.year, "{0:02d}".format(monthNum - 1))
-
-    # Generate the endMonthStr which is simply a dateStr that represents the
-    #  first day of the month in which the scheduler should run.
-    endMonthStr = '{}-{}'.format(date.year, "{0:02d}".format(monthNum))
-
-    # Log this information for the debugger!
-    logging.debug("StartMonthStr: {}".format(startMonthStr))
-    logging.debug("EndMonthStr: {}".format(endMonthStr))
-    logging.debug("Hall Id: {}".format(hallId))
-    logging.debug("Year: {}".format(date.year))
-    logging.debug('MonthNum: {0:02d}'.format(monthNum))
-    logging.debug("LDAT: {}".format(ldat))
-
-    # Query the DB for the last 'x' number of duties from the previous month so that we
-    #  do not schedule RAs back-to-back between months.
-    cur.execute("""SELECT ra.first_name, ra.last_name, ra.id, sm.res_hall_id,
-                          sm.start_date, day.date - TO_DATE(%s, 'YYYY-MM-DD'),
-                          duties.flagged
-                  FROM duties JOIN day ON (day.id=duties.day_id)
-                              JOIN ra ON (ra.id=duties.ra_id)
-                              JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
-                  WHERE duties.hall_id = %s
-                  AND duties.sched_id IN (
-                        SELECT DISTINCT ON (schedule.month_id) schedule.id
-                        FROM schedule
-                        WHERE schedule.hall_id = %s
-                        AND schedule.month_id IN (
-                            SELECT month.id
-                            FROM month
-                            WHERE month.year >= TO_DATE(%s, 'YYYY-MM')
-                            AND month.year <= TO_DATE(%s, 'YYYY-MM')
-                        )
-                        ORDER BY schedule.month_id, schedule.created DESC, schedule.id DESC
-                  )
-                  
-                  AND day.date >= TO_DATE(%s,'YYYY-MM-DD') - %s
-                  AND day.date <= TO_DATE(%s,'YYYY-MM-DD') - 1
-                  ORDER BY day.date ASC;
-    """, (endMonthStr + "-01", hallId, hallId, startMonthStr, endMonthStr,
-          endMonthStr + "-01", ldat, endMonthStr + "-01"))
-
-    # Load the query results from the DB
-    prevDuties = cur.fetchall()
-
-    # Create shell RA objects that will hash to the same value as their respective RA objects.
-    #  This hash is how we map the equivalent RA objects together. These shell RAs will be put
-    #  in a tuple containing the RA, the number of days from the duty date to the beginning of
-    #  the next month, and a boolean whether or not that duty was flagged.
-    #     Ex: (RA Shell, No. days since last duty, Whether the duty is flagged)
-    prevRADuties = [(RA(d[0], d[1], d[2], d[3], d[4]), d[5], d[6]) for d in prevDuties]
-
-    logging.debug("PREVIOUS DUTIES: {}".format(prevRADuties))
-
-    # Query the DB for a list of break duties for the given month.
-    #  In version 4.0 of the scheduler, break duties essentially are treated
-    #  like noDutyDates and are skipped in the scheduling process. As a result,
-    #  only the date is needed.
-    cur.execute("""
-        SELECT TO_CHAR(day.date, 'DD')
-        FROM break_duties JOIN day ON (break_duties.day_id = day.id)
-        WHERE break_duties.month_id = {}
-        AND break_duties.hall_id = {}
-    """.format(monthId, hallId))
-
-    # Load the results from the DB and convert the value to an int.
-    breakDuties = [int(row[0]) for row in cur.fetchall()]
-    logging.debug("Break Duties: {}".format(breakDuties))
-
-    # Attempt to run the scheduler using deep copies of the raList and noDutyList.
-    #  This is so that if the scheduler does not resolve on the first run, we
-    #  can modify the parameters and try again with a fresh copy of the raList
-    #  and noDutyList.
-    copy_raList = cp.deepcopy(ra_list)
-    copy_noDutyList = cp.copy(noDutyList)
-
-    # Load the Res Hall's settings for the scheduler
-    cur.execute("""SELECT duty_config, auto_adj_excl_ra_pts, flag_multi_duty 
-                   FROM hall_settings
-                   WHERE res_hall_id = %s""", (hallId,))
-    dutyConfig, autoExcAdj, flagMultiDuty = cur.fetchone()
-
-    # AutoExcAdj is a currently unused feature that allows the scheduler to
-    #  automatically create point_modifiers for RAs that have been excluded from
-    #  being scheduled for the given month. This feature is unreleased because
-    #  if the user sets this to true and then runs the scheduler more than once
-    #  for the same month, there is no way for the application to know if it
-    #  created any point_modifiers for the excluded RAs of the previous run so
-    #  that it can remove them from the system/algorithm. As a result, any
-    #  point_modifiers created in this manner will just grow and grow until
-    #  an HD goes in and manually alters the point_modifier.modifier value.
-    # TODO: Figure out how to address the above comment. Possibly implement a
-    #        draft system so that AHD+ users can view a scheduler run before
-    #        publishing it to the rest of staff?
-
-    regNumAssigned = dutyConfig["reg_duty_num_assigned"]
-    mulNumAssigned = dutyConfig["multi_duty_num_assigned"]
-    regDutyPts = dutyConfig["reg_duty_pts"]
-    mulDutyPts = dutyConfig["multi_duty_pts"]
-    mulDutyDays = dutyConfig["multi_duty_days"]
-
-    # Set completed to False and successful to False by default. These values
-    #  will be manipulated in the while loop below as necessary.
-    completed = False
-    successful = False
-    while not completed:
-        # While we are not finished scheduling, create a candidate schedule
-        sched = scheduler4_1.schedule(copy_raList, year, monthNum, doubleDateNum=mulNumAssigned,
-                                      doubleDatePts=mulDutyPts, noDutyDates=copy_noDutyList,
-                                      doubleDays=mulDutyDays, doublePts=mulDutyPts,
-                                      ldaTolerance=ldat, doubleNum=mulNumAssigned,
-                                      prevDuties=prevRADuties, breakDuties=breakDuties,
-                                      setDDFlag=flagMultiDuty, regDutyPts=regDutyPts,
-                                      regNumAssigned=regNumAssigned)
-
-        # If we were unable to schedule with the previous parameters,
-        if len(sched) == 0:
-            # Then we should attempt to modify the previous parameters
-            #  and try again.
-
-            if ldat > 1:
-                # If the LDATolerance is greater than 1
-                #  then decrement the LDATolerance by 1 and try again
-
-                logging.info("DECREASE LDAT: {}".format(ldat))
-                ldat -= 1
-
-                # Create new deep copies of the ra_list and noDutyList
-                copy_raList = cp.deepcopy(ra_list)
-                copy_noDutyList = cp.copy(noDutyList)
-
-            else:
-                # Otherwise the LDATolerance is not greater than 1. In this
-                #  case, we were unable to successfully generate a schedule
-                #  with the given parameters.
-                completed = True
-
-        else:
-            # Otherwise, we were able to successfully create a schedule!
-            #  Mark that we have completed so we may exit the while loop
-            #  and mark that we were successful.
-            completed = True
-            successful = True
-
-    logging.debug("Schedule: {}".format(sched))
-
-    # If we were not successful in generating a duty schedule.
-    if not successful:
-        # Log the occurrence
-        logging.info("Unable to Generate Schedule for Hall: {} MonthNum: {} Year: {}"
-                     .format(hallId, monthNum, year))
-
-        # Notify the user of this result
-        return jsonify(stdRet(0, "Unable to Generate Schedule"))
-
-    # Add a record to the schedule table in the DB get its ID
-    cur.execute("INSERT INTO schedule (hall_id, month_id, created) VALUES (%s, %s, NOW()) RETURNING id;",
-                (hallId, monthId))
-
-    # Load the query result
-    schedId = cur.fetchone()[0]
+    # Add a record in the scheduler_queue table for this request
+    cur.execute(
+        "INSERT INTO scheduler_queue (res_hall_id, created_ra_id) VALUES (%s, %s) RETURNING id, created_date, status;",
+        (hallId, authedUser.ra_id())
+    )
 
     # Commit the changes to the DB
     ag.conn.commit()
 
-    logging.debug("Schedule ID: {}".format(schedId))
-
-    # Map the day.id to the numeric date value used for the scheduling algorithm
-
-    # Create the mapping object
-    days = {}
-
-    # Query the day table for all of the days within the given month.
-    cur.execute("SELECT EXTRACT(DAY FROM date), id FROM day WHERE month_id = %s;", (monthId,))
-
-    # Iterate through the results
-    for res in cur.fetchall():
-        # Map the date to the day.id
-        days[res[0]] = res[1]
-
-    # Create a dictionary to add up all of the averages
-    avgPtDict = {}
-
-    # Iterate through the schedule and generate parts of an insert query that will ultimately
-    #  add the duties to the DB
-    dutyDayStr = ""
-    noDutyDayStr = ""
-    for d in sched:
-        # Check to see if there is at least one RA assigned for duty
-        #  on this day.
-        if d.numberOnDuty() > 0:
-            # If there is at least one RA assigned for duty on this day,
-            #  then iterate over all of the RAs assigned for duty on this
-            #  day and add them to the dutyDayStr
-            for s in d.iterDutySlots():
-                # Retrieve the RA object that is assigned to this duty slot
-                r = s.getAssignment()
-
-                # Add the necessary information to the dutyDayStr
-                dutyDayStr += "({},{},{},{},{},{}),".format(hallId, r.getId(), days[d.getDate()],
-                                                         schedId, d.getPoints(), s.getFlag())
-
-                # Check to see if the RA has already been added to the dictionary
-                if r in avgPtDict.keys():
-                    # If so, add the points to the dict
-                    avgPtDict[r.getId()] += d.getPoints()
-                else:
-                    # Otherwise, initialize the RA's entry with this day's points.
-                    avgPtDict[r.getId()] = d.getPoints()
-
-        else:
-            # Otherwise, if there are no RAs assigned for duty on this day,
-            #  then add the day to the noDutyDayStr
-            noDutyDayStr += "({},{},{},{}),".format(hallId, days[d.getDate()], schedId, d.getPoints())
-
-    # Attempt to save the schedule to the DBgit s
-    try:
-        # If there were days added to the dutyDayStr
-        if dutyDayStr != "":
-            # Then insert all of the duties that were scheduled for the month into the DB
-            cur.execute("""
-            INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val, flagged) 
-            VALUES {};
-            """.format(dutyDayStr[:-1]))
-
-        # If there were days added to the noDutyDayStr
-        if noDutyDayStr != "":
-            # Then insert all of the blank duty values for days that were not scheduled
-            cur.execute("""
-                    INSERT INTO duties (hall_id, day_id, sched_id, point_val) VALUES {};
-                    """.format(noDutyDayStr[:-1]))
-
-    except IntegrityError:
-        # If we encounter an IntegrityError, then that means we attempted to insert a value
-        #  into the DB that was already in there.
-
-        # Log the occurrence
-        logging.warning(
-            "IntegrityError encountered when attempting to save duties for Schedule: {}. Rolling back changes."
-            .format(schedId))
-
-        # Rollback the changes to the DB
-        ag.conn.rollback()
-
-        # Notify the user of this issue.
-        return jsonify(stdRet(-1, "Unable to Generate Schedule"))
-
-    # If autoExcAdj is set, then create adjust the excluded RAs' points
-    if autoExcAdj and len(eligibleRAStr) > 1:
-        logging.info("Adjusting Excluded RA Point Modifiers")
-
-        # Select all RAs in the given hall whose auth_level is below 3 (HD)
-        #  that were not included in the eligibleRAs list
-        cur.execute("""
-            SELECT ra_id 
-            FROM staff_membership 
-            WHERE ra_id NOT IN %s 
-            AND res_hall_id = %s""", (tuple(eligibleRAs), hallId))
-
-        raAdjList = cur.fetchall()
-
-        # Calculate the average number of points earned for the month.
-        sum = 0
-        for ra in avgPtDict.keys():
-            sum += avgPtDict[ra]
-
-        # Calculate the average using floor division
-        avgPointGain = sum // len(avgPtDict.keys())
-
-        logging.info("Average Point Gain: {} for Schedule: {}".format(avgPointGain, schedId))
-        logging.debug("Number of excluded RAs: {}".format(len(raAdjList)))
-        # logging.debug(str(avgPtDict))
-
-        # Iterate through the excluded RAs and add point modifiers
-        #  to them.
-        for ra in raAdjList:
-            addRAPointModifier(ra[0], hallId, avgPointGain)
-
-    # Commit changes to the DB
-    ag.conn.commit()
+    # Fetch the new record's ID
+    sqid, created_date, status = cur.fetchone()
 
     # Close the DB cursor
     cur.close()
 
-    logging.info("Successfully Generated Schedule: {}".format(schedId))
+    # Create the body of the rabbitMQ message with the below attributes:
+    #      |- resHallID         <int>
+    #      |- monthNum          <int>
+    #      |- year              <int>
+    #      |- eligibleRAList    <lst<int>>
+    #      |- noDutyList        <lst<int>>
+
+    msgBody = {
+        "resHallID": hallId,
+        "monthNum": monthNum,
+        "year": year,
+        "eligibleRAList": eligibleRAs,
+        "noDutyList": noDutyList
+    }
+
+    # Queue up the scheduler request message.
+    if not schedulerQueueConn.publishMsg(msgBody, {"sqid": sqid}):
+        # If the channel gave us an error, then re-establish the RabbitMQ connection.
+
+        # Notify the user to try again
+        return jsonify(stdRet(-1, "Connection to message broker interrupted. Please try again."))
+
+    logging.info("Successfully queued scheduler request {} for Res Hall: {}".format(sqid, hallId))
 
     # Notify the user of the successful schedule generation!
-    return jsonify(stdRet(1, "successful"))
+    return jsonify({"status": status, "created_date": created_date.strftime("%m/%d/%y"), "sqid": sqid})
+
+
+@schedule_bp.route("/api/checkSchedulerStatus", methods=["GET"])
+@login_required
+def checkSchedulerStatus(sqid=None):
+    # API method to check the status of the schedule generation
+    #  for a given scheduler queue ID.
+    #
+    #  Required Auth Level: >= AHD
+    #
+    #  If called from the server, this function accepts the following parameters:
+    #
+    #     sqid  <int>  -  an integer representing the scheduler queue ID for the
+    #                      schedule being generated.
+    #
+    #  If called from a client, the following parameters are required:
+    #
+    #     sqid  <int>  -  an integer representing the scheduler queue ID for the
+    #                      schedule being generated.
+    #
+    #  This method returns a standard return object whose status and message are
+    #  the status and reason associated with the scheduler queue record. If no
+    #  record can be found, then return a status of -1 and reason of "Record
+    #  Not Found".
+
+    # Assume this API was called from the server and verify that this is true.
+    fromServer = True
+    if sqid is None:
+        # If the SQID is None, then this method was called from a remote client.
+
+        # Get the user's information from the database
+        authedUser = getAuth()
+
+        # Check to see if the user is authorized to query schedule statuses
+        # If the user is not at least an AHD
+        if authedUser.auth_level() < 2:
+            # Then they are not permitted to see this view.
+
+            # Log the occurrence.
+            logging.warning(
+                "User Not Authorized - RA: {} attempted to view schedule status."
+                .format(authedUser.ra_id())
+            )
+
+            # Notify the user that they are not authorized.
+            return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+
+        # Get the SQID from the request
+        sqid = request.args.get("sqid")
+
+        # Mark that this method was not called from the server
+        fromServer = False
+
+    logging.debug("Check Scheduler Status - SQID: {}".format(sqid))
+
+    # Create a cursor object
+    cur = ag.conn.cursor()
+
+    # Fetch the status and reason of the provided scheduler queue record.
+    cur.execute("SELECT status, reason FROM scheduler_queue WHERE id = %s", (sqid,))
+
+    # Load the results to memory
+    res = cur.fetchone()
+
+    logging.debug("Check status DB result: {}".format(res))
+
+    # Check to see if we received a result
+    if res is not None:
+        # If there is a result, then unpack the result
+        status, reason = res
+
+    else:
+        # Otherwise set the status and reason appropriately
+        status = -1
+        reason = "Record Not Found - {}".format(sqid)
+
+    # Close the cursor
+    cur.close()
+
+    # If this API method was called from the server
+    if fromServer:
+        # Then return the result as-is
+        return {"status": status, "msg": reason, "sqid": sqid}
+
+    else:
+        # Otherwise return a JSON version of the result
+        return jsonify({"status": status, "msg": reason, "sqid": sqid})
+
+
+@schedule_bp.route("/api/getSchedulerQueueItemInfo", methods=["GET"])
+@login_required
+def getScheduleQueueItemInfo(sqid=None, resHallID=None):
+    # API method to return information regarding the schedule generation
+    #  for a given scheduler queue ID.
+    #
+    #  Required Auth Level: >= AHD
+    #
+    #  If called from the server, this function accepts the following parameters:
+    #
+    #     sqid        <int>  -  an integer representing the scheduler queue ID for the
+    #                            schedule being generated.
+    #     resHallID   <int>  -  an integer representing the Res Hall ID for the
+    #                            schedule queue item being requested.
+    #
+    #  If called from a client, the following parameters are required:
+    #
+    #     sqid  <int>  -  an integer representing the scheduler queue ID for the
+    #                      schedule being generated.
+    #
+    #  This method returns an object with the following specifications:
+    #
+    #     {
+    #        "status": <scheduler_queue.status>,
+    #        "reason": <scheduler_queue.reason>,
+    #        "requestDatetime": <scheduler_queue.created_date>,
+    #        "requestingRA": <ra.first_name> <ra.last_name>,
+    #        "sqid": <scheduler_queue.id>
+    #     }
+
+    # Assume this API was called from the server and verify that this is true.
+    fromServer = True
+    if sqid is None and resHallID is None:
+        # If the SQID is None, then this method was called from a remote client.
+
+        # Get the user's information from the database
+        authedUser = getAuth()
+
+        # Check to see if the user is authorized to query schedule statuses
+        # If the user is not at least an AHD
+        if authedUser.auth_level() < 2:
+            # Then they are not permitted to see this view.
+
+            # Log the occurrence.
+            logging.warning(
+                "User Not Authorized - RA: {} attempted to view schedule queue details."
+                .format(authedUser.ra_id())
+            )
+
+            # Notify the user that they are not authorized.
+            return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+
+        try:
+            # Get the SQID from the request
+            sqid = int(request.args.get("sqid"))
+
+        except ValueError:
+            # If there was an issue, then return an error notification
+
+            # Log the occurrence
+            logging.warning("Unable to parse SQID from getScheduleQueueItemInfo API request")
+
+            # Notify the user that there was an error
+            return jsonify(stdRet(-1, "Invalid SQID"))
+
+        # Get the user's res hall ID
+        resHallID = authedUser.hall_id()
+
+        # Mark that this method was not called from the server
+        fromServer = False
+
+    logging.debug("Get Scheduler Info - SQID: {}, Hall: {}".format(sqid, resHallID))
+
+    # Create a cursor object
+    cur = ag.conn.cursor()
+
+    # Fetch the desired information of the provided scheduler queue record.
+    cur.execute("""
+        SELECT sq.status, sq.reason, sq.created_date, CONCAT(ra.first_name,' ',ra.last_name), sq.id
+        FROM scheduler_queue AS sq JOIN ra ON (ra.id = sq.created_ra_id)
+        WHERE sq.id = %s
+        AND sq.res_hall_id = %s
+        ORDER BY sq.created_date DESC
+    """, (sqid, resHallID))
+
+    # Load the results to memory
+    res = cur.fetchone()
+
+    logging.debug("Get Scheduler Info DB result: {}".format(res))
+
+    # Check to see if we received a result
+    if res is not None:
+        # If there is a result, then pack the result
+        ret = {
+            "status": res[0],
+            "reason": res[1],
+            "requestDatetime": res[2],
+            "requestingRA": res[3],
+            "sqid": res[4]
+        }
+
+    else:
+        # Otherwise set the status and reason appropriately
+        ret = {
+            "status": -99,
+            "reason": "Record Not Found - {}".format(sqid),
+            "requestDatetime": None,
+            "requestingRA": None,
+            "sqid": 0
+        }
+
+    # Close the cursor
+    cur.close()
+
+    # If this API method was called from the server
+    if fromServer:
+        # Then return the result as-is
+        return ret
+
+    else:
+        # Otherwise return a JSON version of the result
+        return jsonify(ret)
+
+
+@schedule_bp.route("/api/getRecentSchedulerRequests", methods=["GET"])
+@login_required
+def getRecentSchedulerRequests(resHallID=None):
+    # API method to return the 10 latest scheduler requests for the given
+    #  residence hall.
+    #
+    #  Required Auth Level: >= AHD
+    #
+    #  If called from the server, this function accepts the following parameters:
+    #
+    #     resHallID   <int>  -  an integer representing the Res Hall ID for the
+    #                            schedule queue item being requested.
+    #
+    #  If called from a client, the method does not require any additional
+    #  parameters.
+    #
+    #  This method returns an object with the following specifications:
+    #
+    #     {
+    #        <scheduler_queue.id 1> : {
+    #           "created_date": <scheduler_queue.created_date>,
+    #           "status": <scheduler_queue.status>
+    #        },
+    #        <scheduler_queue.id 2> : {
+    #           "created_date": <scheduler_queue.created_date>,
+    #           "status": <scheduler_queue.status>
+    #        },
+    #        ...
+    #     }
+
+    # Assume this API was called from the server and verify that this is true.
+    fromServer = True
+    if resHallID is None:
+        # If the SQID is None, then this method was called from a remote client.
+
+        # Get the user's information from the database
+        authedUser = getAuth()
+
+        # Check to see if the user is authorized to query schedule statuses
+        # If the user is not at least an AHD
+        if authedUser.auth_level() < 2:
+            # Then they are not permitted to see this view.
+
+            # Log the occurrence.
+            logging.warning(
+                "User Not Authorized - RA: {} attempted to view latest schedule queue requests."
+                    .format(authedUser.ra_id())
+            )
+
+            # Notify the user that they are not authorized.
+            return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+
+        # Get the user's res hall ID
+        resHallID = authedUser.hall_id()
+
+        # Mark that this method was not called from the server
+        fromServer = False
+
+    logging.debug("Get Scheduler Requests - Hall: {}".format(resHallID))
+
+    # Create a cursor object
+    cur = ag.conn.cursor()
+
+    # Query the DB for the latest scheduler requests for the hall being viewed.
+    cur.execute("""
+            SELECT id, status, created_date
+            FROM scheduler_queue
+            WHERE res_hall_id = %s
+            ORDER BY created_date DESC
+            LIMIT (10);""", (resHallID,))
+
+    # Load the query results
+    schedulerQueueList = cur.fetchall()
+
+    # Format the results into the expected format
+    res = {}
+    for sqid, status, created_date in schedulerQueueList:
+        res[sqid] = {
+            "created_date": created_date.strftime("%m/%d/%y"),
+            "status": status
+        }
+
+    # Close the cursor
+    cur.close()
+
+    # If this API method was called from the server
+    if fromServer:
+        # Then return the result as-is
+        return res
+
+    else:
+        # Otherwise return a JSON version of the result
+        return jsonify(res)
 
 
 @schedule_bp.route("/api/alterDuty", methods=["POST"])

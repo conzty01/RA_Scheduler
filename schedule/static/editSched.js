@@ -4,44 +4,76 @@
 /* Functions for the editSched.html page */
 ///////////////////////////////////////////
 
+// Calendar button configurations to be passed
+//  into the initialization function.
+var schedButtons = {
+    customPrevButton: {
+        text: '<',
+        click: editSchedMovePrev
+    },
+    customNextButton: {
+        text: '>',
+        click: editSchedMoveNext
+    },
+    customTodayButton: {
+        text: 'Today',
+        click: editSchedMoveToday
+    },
+    runSchedulerButton: {
+        text: 'Schedule',
+        click: showRunModal
+    },
+    addEventButton: {
+        text: 'Add Duty',
+        click: showAddDutyModal
+    }
+}
+var calToolbar = {
+    left: 'customPrevButton,customNextButton customTodayButton',
+    center: 'title',
+    right: 'addEventButton runSchedulerButton'
+}
+
+/*   Override Calendar Navigation Functions   */
+function editSchedMoveCalendar(direction) {
+    // Call the appropriate base function to actually change the calendar.
+    switch (direction) {
+        case -1:
+            movePrev();
+            break;
+        case  0:
+            moveToday();
+            break;
+        case  1:
+            moveNext();
+            break;
+    }
+
+    // Adjust the datepicker in the run scheduler modal to look at the next month.
+    $('#runNoDutyDates').datepicker('setEndDate', new Date(appConfig.calDate.getFullYear(), appConfig.calDate.getMonth()+1, 0));
+    $('#runNoDutyDates').datepicker('setStartDate', new Date(appConfig.calDate.getFullYear(), appConfig.calDate.getMonth(), 1));
+
+    // Set the selection to the 15th of the month to update the view when the
+    //  the date picker is loaded. This will ensure that the proper month is
+    //  shown to the user on focus.
+    //$('#runNoDutyDates').datepicker('setDate', new Date(appConfig.calDate.getFullYear(), appConfig.calDate.getMonth(), 1);)
+    //$('#runNoDutyDates').datepicker('clearDates');
+
+}
+function editSchedMovePrev()  { editSchedMoveCalendar(-1) }
+function editSchedMoveToday() { editSchedMoveCalendar( 0) }
+function editSchedMoveNext()  { editSchedMoveCalendar( 1) }
+
+
 function initEditSchedCal() {
     initCal({
         height: "75%",
         initialView: 'dayGridMonth',
         dayMaxEventRows: true,
         moreLinkClick: "popover",
-        customButtons: {
-            customPrevButton: {
-                text: '<',
-                click: movePrev
-            },
-            customNextButton: {
-                text: '>',
-                click: moveNext
-            },
-            customTodayButton: {
-                text: 'Today',
-                click: moveToday
-            },
-            runSchedulerButton: {
-                text: 'Schedule',
-                click: showRunModal
-            },
-            addEventButton: {
-                text: 'Add Duty',
-                click: showAddDutyModal
-            },
-            exportScheduleButton: {
-                text: 'Export',
-                click: showExportModal
-            }
-        },
+        customButtons: schedButtons,
         dateClick: showAddDutyModal,
-        headerToolbar: {
-            left: 'customPrevButton,customNextButton customTodayButton',
-            center: 'title',
-            right: 'exportScheduleButton addEventButton runSchedulerButton'
-        },
+        headerToolbar: calToolbar,
         eventSources: [
             {
                 url: '/schedule/api/getSchedule',
@@ -237,11 +269,14 @@ function saveModal() {
     }
 }
 
-function passModalSave(modalId, msg, extraWork=() => {}) {
+async function passModalSave(modalId, msg, extraWork=() => {}) {
 
     //console.log(msg);
 
     let modal = document.getElementById(modalId.slice(1));
+
+    // Wait for the msg to arrive (if needed)
+    await msg;
 
     // If the status is '1', then the save was successful
     switch (msg.status) {
@@ -252,6 +287,8 @@ function passModalSave(modalId, msg, extraWork=() => {}) {
             calendar.currentData.calendarApi.refetchEvents();
             // Get the updated points
             getPoints();
+            // Get the updated scheduler requests
+            getSchedRequests();
             // Complete any additional work
             extraWork();
             // Hide the modal
@@ -281,6 +318,10 @@ function passModalSave(modalId, msg, extraWork=() => {}) {
 
             // Update the errorDiv with the message
             errDiv.getElementsByClassName("msg")[0].innerHTML = msg.msg;
+
+            // Hide the user info div
+            hideModalUserInfoDiv(modalId.slice(1));
+
             // Display the errorDiv
             errDiv.style.display = "block";
 
@@ -293,28 +334,51 @@ function passModalSave(modalId, msg, extraWork=() => {}) {
 }
 
 function showRunModal() {
+    // Show the runModal to the user.
+
+    // Grab the modal from the DOM.
     let title = document.getElementById("runModalLongTitle");
 
+    // Grab the date from the calendar view.
     title.textContent = appConfig.calDate.toLocaleString('default', { month: 'long', year: 'numeric' });
 
     // Hide any errors from previous scheduler runs
-    let modal = document.getElementById("runModal");
-    let errDiv = modal.getElementsByClassName("modalError")[0];
-    errDiv.style.display = "none";
+    hideModalErrorDiv("runModal");
 
+    // Hide any user info messages from previous scheduler runs
+    hideModalUserInfoDiv("runModal");
+
+    // Show the modal to the user.
     $('#runModal').modal('show');
+}
+
+function hideModalErrorDiv(modalName) {
+    // Hide the error div in the provided modal.
+
+    // Grab the modal
+    let modal = document.getElementById(modalName);
+    //Get the errorDiv within the modal
+    let errDiv = modal.getElementsByClassName("modalError")[0];
+    // Hide it from sight
+    errDiv.style.display = "none";
+}
+
+function hideModalUserInfoDiv(modalName) {
+    // Hide the user info div in the provided modal.
+
+    // Grab the modal
+    let modal = document.getElementById(modalName);
+    //Get the errorDiv within the modal
+    let infoDiv = modal.getElementsByClassName("modalUserInfo")[0];
+    // Hide it from sight
+    infoDiv.style.display = "none";
 }
 
 function runScheduler() {
     let noDutyDays = document.getElementById("runNoDutyDates").value;
-    //    let eligibleRAs = [];
-    //
-    //    // Assemble list of RA ids that are eligible for the scheduler
-    //    for (let li of document.getElementById("runRAList").getElementsByTagName("input")) {
-    //        if (li.checked) {
-    //            eligibleRAs.push(li.id);
-    //        }
-    //    }
+
+    // Hide any error message within the DIV
+    hideModalErrorDiv("runModal");
 
     // Get the list of selected eligibleRAs
     let eligibleRAs = $('#runRAList').val()
@@ -332,7 +396,8 @@ function runScheduler() {
 
     // Indicate to user that scheduler is running
     document.getElementById("runButton").disabled = true;
-    $("body").css("cursor", "wait");
+    document.getElementById("runModalProgressBar").style.display = "inherit";
+    //$("body").css("cursor", "wait");
 
     let data = {
         monthNum: monthNum + 1,
@@ -343,14 +408,98 @@ function runScheduler() {
     }
 
     //document.getElementById("loading").style.display = "block";
-    appConfig.base.callAPI("runScheduler",
-            data,
-            function(msg) {
-                passModalSave("#runModal", msg, () => {
-                    document.getElementById("runButton").disabled = false;
-                    $("body").css("cursor", "auto");
-                });
-            }, "POST", function(msg) {passModalSave("#runModal", {status:-1,msg:msg})});
+    appConfig.base.callAPI(
+        "runScheduler",
+        data,
+        function(msg) {checkPendingSchedule(msg)},
+        "POST",
+        function(msg) {passModalSave("#runModal", {status:-1,msg:msg})}
+    );
+}
+
+function schedulerMaxRetriesReached() {
+    // The scheduler was not able to create a schedule in the allotted
+    //  amount of time.
+
+    return {
+        status: 0,
+        msg: "Due to a high amount traffic, we are unable to create your duty schedule at this time. " +
+             "We have your request on record, and will get to it as soon as we are able. Please check again later."
+    };
+}
+
+function schedulerEvalStatus(res) {
+    // Evaluate whether or not the scheduler has completed. If it has
+    //  (either successfully or unsuccessfully) finished, return true,
+    //  otherwise return false.
+
+    // The provided res is expected to have the following three attributes:
+    //  status, msg, and sqid
+    return res.status !== 0;
+}
+
+function schedulerUpdateDisplayStatus(res, retriesLeft, backoff) {
+    // Determine whether or not to update the status message displayed
+    //  to the user while they wait for the scheduler.
+
+    // Determine what retry number we are currently on.
+    let retryNumber = 7 - retriesLeft;
+
+    // If we have retried a number of times already, then let's entertain the user while they wait.
+    let msg = "";
+    switch (retryNumber) {
+        case 1:
+            msg = "Queueing schedule request...";
+            break;
+
+        case 3:
+            msg = "Creating duty schedule...";
+            break;
+
+        case 5:
+            msg = "We are still working on your request-- thank you for your patience!";
+            break;
+
+    }
+
+    // Only update the message the user sees if it has changed.
+    if (msg !== "") {
+        // Grab the modal
+        let modal = document.getElementById("runModal");
+        // Grab the user info div
+        let infoDiv = modal.getElementsByClassName("modalUserInfo")[0];
+        // Update the user info div with the message
+        infoDiv.innerHTML = msg;
+        // Display the errorDiv
+        infoDiv.style.display = "block";
+    }
+}
+
+
+function checkPendingSchedule(retMsg) {
+    // Retrieve the status of the pending scheduler task with the provided SQID.
+    // retMsg should have three attributes: status, msg, and sqid
+
+    // Begin a fetch-retry loop that will reach out to checkSchedulerStatus API
+    //  with an exponential backoff and a max of 10 retries.
+    appConfig.base.fetchRetry(
+        appConfig.base.assembleAPIURLString("checkSchedulerStatus") + "?" + new URLSearchParams({sqid: retMsg.sqid}),
+        schedulerEvalStatus,
+        schedulerMaxRetriesReached,
+        schedulerUpdateDisplayStatus,
+        {method:'GET'},
+        7,      // Max number of retries
+        1000    // Starting backoff in milliseconds
+    ).then((res) => {
+        passModalSave("#runModal", res, () => {
+            document.getElementById("runButton").disabled = false;
+            document.getElementById("runModalProgressBar").style.display = "none";
+            //$("body").css("cursor", "auto");
+        });
+    });
+
+    // Add the resulting scheduler queue request information to the queue list
+    addSchedReqItem(retMsg);
 }
 
 function showAddDutyModal(info=null) {
@@ -581,3 +730,192 @@ function showExportModal() {
     $('#exportModal').modal('show');
 }
 
+function getSchedulerQueueEntry(QueueID) {
+    // Get additional information from the server for the given Queue ID
+
+    // Call the appropriate API
+    appConfig.base.callAPI("getSchedulerQueueItemInfo",
+        {sqid:QueueID},
+        function(data) {showSchedQueueModal(data)},
+        "GET",
+        console.err
+    );
+}
+
+function showSchedQueueModal(info) {
+    // set the schedQueueModal inputs to display the given values.
+
+    // Set the Requested Date
+    document.getElementById("schedQueueDate").value = info.requestDatetime;
+
+    // Set the Status
+    let badgeStatusColor = "badge-";
+    let badgeStatusText = "";
+
+    switch (info.status) {
+        case 0:
+            // Status is still in progress
+            badgeStatusColor += "secondary";
+            badgeStatusText = "In Progress";
+            break;
+
+        case 1:
+            // Status is successful
+            badgeStatusColor += "success";
+            badgeStatusText = "Success";
+            break;
+
+        case -1:
+            // Status is failed
+            badgeStatusColor += "danger";
+            badgeStatusText = "Failed";
+            break;
+
+        case -99:
+            // Status indicates record not found
+            badgeStatusColor += "dark";
+            badgeStatusText = "Not Found"
+            break;
+
+        default:
+            // Default to a warning badge
+            badgeStatusColor += "warning";
+            badgeStatusText = "Unknown";
+            break;
+    }
+    document.getElementById("schedQueueStatus").innerHTML = badgeStatusText;
+    document.getElementById("schedQueueStatus").className = "badge " + badgeStatusColor;
+
+    // Set the Requesting User
+    document.getElementById("schedQueueRequestingUser").value = info.requestingRA;
+
+    // Set the Additional Information/Reason
+    document.getElementById("schedQueueReason").value = info.reason;
+
+    // Set the modal title to include the SQID
+    document.getElementById("schedReqID").innerHTML = info.sqid;
+
+    $('#schedQueueModal').modal('show');
+}
+
+function addSchedReqItem(schedReqDict) {
+    // Add the provided scheduler queue request to the list
+
+    // Get the appropriate UL element
+    let listUL = document.getElementById("queueListUL");
+
+    // Create a new row
+    let newLI = document.createElement("li");
+    newLI.onclick = () => {getSchedulerQueueEntry(schedReqDict.sqid)};
+    newLI.classList.add("clickable", "hoverItem");
+
+    // Create a new Request div
+    let newReqDiv = document.createElement("div");
+    newReqDiv.id = "list_request_" + schedReqDict.sqid.toString();
+    newReqDiv.classList.add("tName");
+    newReqDiv.innerHTML = schedReqDict.created_date;
+
+    // Create a new Status div
+    let newStatusDiv = document.createElement("div");
+    newStatusDiv.id = "list_status_" + schedReqDict.sqid.toString();
+    newStatusDiv.classList.add("tPoints");
+    let newStatusSpan = document.createElement("span");
+    newStatusSpan.classList.add("badge", "badge-secondary");
+    let statusText;
+    switch (schedReqDict.status) {
+        case -1:
+            statusText = "Failed";
+            break;
+        case 0:
+            statusText = "In Progress";
+            break;
+        case 1:
+            statusText = "Success";
+            break;
+        default:
+            statusText = "Unknown";
+    }
+    newStatusSpan.innerHTML = statusText;
+    newStatusSpan.id = "list_status_span_" + schedReqDict.sqid.toString();
+    newStatusDiv.appendChild(newStatusSpan);
+
+    // Zip everything together
+    newLI.appendChild(newReqDiv);
+    newLI.appendChild(newStatusDiv);
+    listUL.insertBefore(newLI, listUL.childNodes[2])
+
+    // If there are more than 11 elements in the list,
+    //  then remove the last node
+    if (listUL.childNodes.length > 11) {
+        listUL.removeChild(listUL.lastElementChild);
+    }
+}
+
+function getSchedRequests() {
+    appConfig.base.callAPI("getRecentSchedulerRequests", {}, updateSchedReqList, "GET");
+
+}
+
+function updateSchedReqList(schedReqDict) {
+    // PointDict is expected to be as follows:
+    // { sqid: {status: x, created_date: x}, ... }
+    console.log(schedReqDict);
+
+    let reqListDiv = document.getElementById("queueList");
+
+    for (let idKey in schedReqDict) {
+        // Get the Div containing the points for the respective RA
+        let statusDiv = document.getElementById("list_status_" + idKey);
+
+        let statusText;
+        let statusClass;
+        switch (schedReqDict[idKey].status) {
+            case -1:
+                statusText = "Failed";
+                statusClass = "badge-danger";
+                break;
+            case 0:
+                statusText = "In Progress";
+                statusClass = "badge-secondary";
+                break;
+            case 1:
+                statusText = "Success";
+                statusClass = "badge-success";
+                break;
+            default:
+            statusText = "Unknown";
+            statusClass = "badge-warning";
+        }
+
+        let newStatusSpan = document.createElement("span");
+        newStatusSpan.classList.add("badge", statusClass);
+        newStatusSpan.innerHTML = statusText;
+
+        if (statusDiv == null) {
+            // If the RA is not currently in the raList
+            //  then create a new entry for them.
+
+            let newLi = document.createElement("li");
+            newLi.id = "schedReqList_" + idKey;
+
+            let newDateDiv = document.createElement("div");
+            newDateDiv.id = "list_request_" + idKey;
+            newDateDiv.classList.add("tName");
+            newDateDiv.innerHTML = schedReqDict[idKey].created_date;
+
+            let newStatusDiv = document.createElement("div");
+            newStatusDiv.id = "list_status_" + idKey;
+            newStatusDiv.classList.add("tPoints");
+            newStatusDiv.appendChild(newStatusSpan);
+
+            newLi.appendChild(newNameDiv);
+            newLi.appendChild(newStatusDiv);
+            let ulElement = reqListDiv.getElementsByTagName("ul")[0];
+            ulElement.insertBefore(newLi, ulElement.ChildNodes[2]);
+
+        } else {
+            // Else update the point value
+            statusDiv.replaceChild(newStatusSpan, statusDiv.lastElementChild);
+        }
+    }
+}

@@ -315,6 +315,42 @@ class TestConflictBP_getRAConflicts(unittest.TestCase):
         # Assert that we received our expected result
         self.assertListEqual(expectedConflictsResult, resp.json)
 
+    def test_whenCalledFromClient_whenPassedInvalidRAID_returnsInvalidID(self):
+        # Test to ensure that when an invalid RAID is provided, an error response
+        #  is returned that indicates that the RAID is invalid.
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 2
+
+        # Invalid RA ID
+        invalidRAID = "Lil Bobby Tables"
+
+        # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/conflicts/api/getRAConflicts",
+                               query_string=dict(raID=invalidRAID),
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that we received a json response
+        self.assertTrue(resp.is_json)
+
+        # Assert that the json is formatted as expected
+        self.assertEqual(resp.json, stdRet(-1, "Invalid RA ID"))
+
+        # Assert that we received a 200 status code
+        self.assertEqual(resp.status_code, 200)
+
+        # Assert that no additional call to the DB was made
+        self.mocked_appGlobals.conn.cursor().execute.assert_not_called()
+
     def test_whenCalledFromClient_withUnauthorizedUser_returnsNotAuthorizedResponse(self):
         # Test to ensure that when a user that is NOT authorized to reach this
         #  endpoint, they receive a JSON response that indicates that they are

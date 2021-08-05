@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="{{url_for('schedule_bp.static', filename='editSched.css')}}">
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.13.1/css/bootstrap-select.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.8.0/css/bootstrap-datepicker.min.css" />
 
 {% endblock %}
 
@@ -123,11 +124,16 @@
         <h3 class="modal-title">Run Scheduler: <span id="runModalLongTitle" style="font-weight:bold;"></span></h3>
       </div>
       <div class="modal-body">
-          <div class="form-group">
-              <label for="runNoDutyDates">
-                  Enter the days where no duties should be assigned separated by commas.
-              </label>
-              <input class="form-control" id="runNoDutyDates" type="text" placeholder="Example: 14,15,30" />
+          <label for="runNoDutyDates">
+              Select the days that where no duties should be assigned.
+          </label>
+          <div class="input-group date form-group" id="datepicker" data-provider="datepicker">
+              <input type="text" class="form-control datepicker" id="runNoDutyDates" name="runNoDutyDates"
+                     placeholder="Select no duty days..." required />
+              <span class="input-group-addon">
+                  <i class="fa fa-lg fa-calendar"></i>
+                  <span class="count"></span>
+              </span>
           </div>
           <div class="form-group">
               <label for="runRAList">
@@ -140,15 +146,13 @@
                   {% endfor %}
               </select>
           </div>
-          <!--<div class="row">
-              <label for="runLDA">
-                  Number of days between duties.
-              </label>
-              <input id="runNoDutyDates" type="text" placeholder="Example: 14,15,30" />
-          </div>-->
-          <div class="modalError">Failed to Schedule Duties: <span class="msg"></span></div>
+          <div class="modalError">Unable to Schedule Duties: <span class="msg"></span></div>
+          <div class="modalUserInfo"></div>
       </div>
       <div class="modal-footer">
+        <div id="runModalProgressBar" class="progress">
+          <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+        </div>
         <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
         <button id="runButton" type="button" class="btn btn-primary" onclick="runScheduler()">Run Scheduler</button>
       </div>
@@ -191,6 +195,46 @@
   </div>
 </div>
 
+<!-- Scheduler Queue Modal -->
+<div class="modal fade" id="schedQueueModal" tabindex="-1" role="dialog" aria-labelledby="addDutyModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Scheduler Request <span id="schedReqID"></span></h3>
+      </div>
+      <div class="modal-body">
+          <div class="form-group form-row">
+              <div class="col-md-8">
+                  <label for="schedQueueDate">Request Date:</label>
+                  <input class="form-control" type="datetime-local" id="schedQueueDate" disabled >
+              </div>
+              <div class="col-md-4">
+                  <label for="schedQueueStatus">Status:</label>
+                  <div id="statusContainer">
+                      <span id="schedQueueStatus" class="badge badge-warning">Unknown</span>
+                  </div>
+              </div>
+          </div>
+          <div class="form-group form-row">
+              <div class="col">
+                  <label for="schedQueueRequestingUser">Requested By:</label>
+                  <input class="form-control" type="text" id="schedQueueRequestingUser" disabled >
+              </div>
+          </div>
+          <div class="form-group form-row">
+              <div class="col">
+                  <label for="schedQueueReason">Additional Information</label>
+                  <input class="form-control" type="text" id="schedQueueReason" disabled >
+              </div>
+          </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="calContainer" class="col-lg-9">
     <div id="calendar">
 
@@ -199,14 +243,38 @@
 <div id="raListContainer" class="col-lg-3">
     <div id="raList" class="raList">
         <ul>
-            <li id="list_header">
+            <li class="list_header">
                 <div id="list_name_header" class="tName">Name</div>
                 <div id="list_points_header" class="tPoints"># Points</div>
             </li>
             {% for idKey, idVal in ptDict: %}
-            <li id="list_{{ idKey }}">
+            <li id="list_{{ idKey }}" class="hoverItem">
                 <div id="list_name_{{ idKey }}" class="tName">{{ idVal["name"] }}</div>
                 <div id="list_points_{{ idKey }}" class="tPoints">{{ idVal["pts"]["dutyPts"] }}</div>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    <div id="queueList" class="raList">
+        <ul id="queueListUL">
+            <li class="list_header">
+                <div id="list_request_header" class="tName">Schedule Requests</div>
+                <div id="list_status_header" class="tPoints">Status</div>
+            </li>
+            {% for rowID, rowStatus, rowDate in schedQueueList: %}
+            <li id="schedReqList_{{ rowID }}" onclick="getSchedulerQueueEntry({{ rowID }})" class="clickable hoverItem">
+                <div id="list_request_{{ rowID }}" class="tName">{{ rowDate.strftime("%m/%d/%y") }}</div>
+                <div id="list_status_{{ rowID }}" class="tPoints">
+                    {% if rowStatus == 1: %}
+                    <span id="list_status_span_{{ rowID }}" class="badge badge-success">Success</span>
+                    {% elif rowStatus == 0: %}
+                    <span id="list_status_span_{{ rowID }}" class="badge badge-secondary">In Progress</span>
+                    {% elif rowStatus == -1: %}
+                    <span id="list_status_span_{{ rowID }}" class="badge badge-danger">Failed</span>
+                    {% else %}
+                    <span id="list_status_span_{{ rowID }}" class="badge badge-warning">Unknown</span>
+                    {% endif %}
+                </div>
             </li>
             {% endfor %}
         </ul>
@@ -225,11 +293,39 @@ var bpAPIPrefix = '/schedule';
 <script src="{{url_for('static', filename='fullCal.js')}}"></script>
 <script src="{{url_for('schedule_bp.static', filename='editSched.js')}}"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap-select@1.13.14/dist/js/bootstrap-select.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.8.0/js/bootstrap-datepicker.min.js"></script>
 <script>
+    {% if opts["gCalConnected"] %}
+    schedButtons.exportScheduleButton = {
+        text: 'Export',
+        click: showExportModal
+    }
+    calToolbar.right = "exportScheduleButton " + calToolbar.right
+    {% endif %}
+
     initEditSchedCal();
     $(function () {
         $('#runRAList').selectpicker();
     });
     $('#runRAList').selectpicker('selectAll');
+
+    $(function() {
+        $('#datepicker').datepicker({
+            multidate: true,
+            format: "d",
+            datesDisabled: [],
+            language: 'en',
+            multidateSeparator: ", ",
+            assumeNearbyYear: true,
+            clearBtn: true,
+            disableTouchKeyboard: false,
+            startDate: '1',     // First day of the month
+            endDate: new Date(appConfig.calDate.getFullYear(), appConfig.calDate.getMonth()+1, 0), // Last day of the month
+        }).on('changeDate', function(e) {
+            // `e` here contains the extra attributes
+            $(this).find('.input-group-addon .count').text(' ' + e.dates.length);
+    });
+});
+
 </script>
 {% endblock %}

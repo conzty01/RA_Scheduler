@@ -2,10 +2,10 @@ from unittest.mock import MagicMock, patch
 from scheduleServer import app
 import unittest
 
-from helperFunctions.helperFunctions import AuthenticatedUser
+from helperFunctions.helperFunctions import stdRet, AuthenticatedUser
 
 
-class TestSchedule_runScheduler(unittest.TestCase):
+class TestSchedule_addNewDuty(unittest.TestCase):
     def setUp(self):
         # Set up a number of items that will be used for these tests.
 
@@ -143,109 +143,43 @@ class TestSchedule_runScheduler(unittest.TestCase):
         #  to the default value which is 1.
         self.mocked_authLevel.return_value = 1
 
-    def test_withoutAuthorizedUser_returnsNotAuthorizedResponse(self):
+    # ------------------------------
+    # -- Called from Client Tests --
+    # ------------------------------
+    def test_whenCalledFromClient_withoutAuthorizedUser_returnsNotAuthorizedResponse(self):
         # -- Arrange --
         # -- Act --
         # -- Assert --
         pass
 
-    def test_withAuthorizedUser_withoutNoDutyDates_createsEmptyNoDutyList(self):
+    def test_whenCalledFromClient_withAuthorizedUser_withInvalidSQID_returnsRecordNotFound(self):
         # -- Arrange --
         # -- Act --
         # -- Assert --
         pass
 
-    def test_withAuthorizedUser_withNoDutyDates_parsesNoDutyListFromParameter(self):
+    def test_whenCalledFromClient_withAuthorizedUser_withValidSQID_returnsRecordStatusAndReason(self):
         # -- Arrange --
         # -- Act --
         # -- Assert --
         pass
 
-    def test_withAuthorizedUser_withEligibleRAs_parsesEligibleRAsFromParameter(self):
+    # ------------------------------
+    # -- Called from Server Tests --
+    # ------------------------------
+    def test_whenCalledFromServer_withoutAuthorizedUser_returnsNotAuthorizedResponse(self):
         # -- Arrange --
         # -- Act --
         # -- Assert --
         pass
 
-    def test_withAuthorizedUser_whenParsingNoDutyDates_encountersValueError_returnsParsingErrorResult(self):
+    def test_whenCalledFromServer_withAuthorizedUser_withInvalidSQID_returnsRecordNotFound(self):
         # -- Arrange --
         # -- Act --
         # -- Assert --
         pass
 
-    def test_withAuthorizedUser_whenParsingEligibleRAs_encountersValueError_returnsParsingErrorResult(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
-
-    def test_withAuthorizedUser_whenParsingInputParams_encountersKeyError_returnsMissingParamsResult(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
-
-    def test_withAuthorizedUser_withInvalidMonth_returnsInvalidSelectionResult(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
-
-    def test_withAuthorizedUser_withValidParams_callsScheduler4_0Algorithm(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
-
-    def test_withAuthorizedUser_withFailedScheduler_returnsFailedResult(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
-
-    def test_withAuthorizedUser_queriesDBForEligibleRAs(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
-
-    def test_withAuthorizedUser_queriesDBForPreviousXDuties(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
-
-    def test_withAuthorizedUser_queriesDBForBreakDuties(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
-
-    def test_withAuthorizedUser_withFailedScheduleCycle_decreasesLDATAndReruns(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
-
-    def test_withAuthorizedUser_withSuccessfulScheduling_insertsScheduleIntoDB(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
-
-    def test_withAuthorizedUser_whenInsertingDutiesInDB_encountersIntegrityError_returnsFailedResult(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
-
-    def test_withAuthorizedUser_doesNotCallAddRAPointModifier(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
-
-    def test_withAuthorizedUser_withValidParams_withSuccessfulScheduling_returnsSuccessfulResult(self):
+    def test_whenCalledFromServer_withAuthorizedUser_withValidSQID_returnsRecordStatusAndReason(self):
         # -- Arrange --
         # -- Act --
         # -- Assert --

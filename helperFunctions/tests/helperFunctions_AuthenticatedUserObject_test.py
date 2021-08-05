@@ -368,12 +368,16 @@ class TestAuthenticatedUserObject(unittest.TestCase):
             {
                 "name": "Test Hall",
                 "id": 1,
-                "auth_level": 4
+                "auth_level": 4,
+                "school_id": 2,
+                "school_name": "Test School"
             },
             {
                 "name": "Test Hall2",
                 "id": 2,
-                "auth_level": 1
+                "auth_level": 1,
+                "school_id": 2,
+                "school_name": "Test School"
             }
         ]
         testAuthenticatedUserObject = AuthenticatedUser(
@@ -409,12 +413,16 @@ class TestAuthenticatedUserObject(unittest.TestCase):
             {
                 "name": "Test Hall",
                 "id": 1,
-                "auth_level": 4
+                "auth_level": 4,
+                "school_id": 2,
+                "school_name": "Test School"
             },
             {
                 "name": "Test Hall2",
                 "id": 2,
-                "auth_level": 1
+                "auth_level": 1,
+                "school_id": 2,
+                "school_name": "Test School"
             }
         ]
         testAuthenticatedUserObject = AuthenticatedUser(

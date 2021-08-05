@@ -217,11 +217,12 @@ class TestBreakBP_getRABreakStats(unittest.TestCase):
             SELECT ra_id as rid, COUNT(break_duties.id)
             FROM break_duties JOIN day ON (day.id = break_duties.day_id)
             WHERE day.date BETWEEN TO_DATE(%s, 'YYYY-MM-DD') AND TO_DATE(%s, 'YYYY-MM-DD')
+            AND hall_id = %s
             GROUP BY ra_id
         ) AS numQuery ON (ra.id = numQuery.rid)
         JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
         WHERE sm.res_hall_id = %s
-    """, (desiredStartStr, desiredEndStr, self.user_hall_id)
+    """, (desiredStartStr, desiredEndStr, self.user_hall_id, self.user_hall_id)
         )
 
         # Assert that appGlobals.conn.commit was never called
@@ -307,11 +308,12 @@ class TestBreakBP_getRABreakStats(unittest.TestCase):
             SELECT ra_id as rid, COUNT(break_duties.id)
             FROM break_duties JOIN day ON (day.id = break_duties.day_id)
             WHERE day.date BETWEEN TO_DATE(%s, 'YYYY-MM-DD') AND TO_DATE(%s, 'YYYY-MM-DD')
+            AND hall_id = %s
             GROUP BY ra_id
         ) AS numQuery ON (ra.id = numQuery.rid)
         JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
         WHERE sm.res_hall_id = %s
-    """, (desiredStartStr, desiredEndStr, self.user_hall_id)
+    """, (desiredStartStr, desiredEndStr, self.user_hall_id, self.user_hall_id)
         )
 
         # Assert that appGlobals.conn.commit was never called

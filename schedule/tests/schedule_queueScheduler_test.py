@@ -1,12 +1,11 @@
-from unittest.mock import MagicMock, patch
-from scheduleServer import app
-from flask import Response
 import unittest
+from unittest.mock import MagicMock, patch
 
 from helperFunctions.helperFunctions import AuthenticatedUser
+from scheduleServer import app
 
 
-class TestConflictBP_conflicts(unittest.TestCase):
+class TestSchedule_runScheduler(unittest.TestCase):
     def setUp(self):
         # Set up a number of items that will be used for these tests.
 
@@ -74,14 +73,11 @@ class TestConflictBP_conflicts(unittest.TestCase):
         # Set the ra_id and hall_id to values that can be used throughout
         self.user_ra_id = 1
         self.user_hall_id = 1
-        self.user_school_id = 1
         self.associatedResHalls = [
             {
                 "id": self.user_hall_id,
                 "auth_level": self.mocked_authLevel,
-                "name": "Test Hall",
-                "school_id": self.user_school_id,
-                "school_name": "Test School"
+                "name": "Test Hall"
             }
         ]
 
@@ -95,7 +91,7 @@ class TestConflictBP_conflicts(unittest.TestCase):
         )
 
         # Create the patcher for the getAuth() method
-        self.patcher_getAuth = patch("conflicts.conflicts.getAuth", autospec=True)
+        self.patcher_getAuth = patch("schedule.schedule.getAuth", autospec=True)
 
         # Start the patcher - mock returned
         self.mocked_getAuth = self.patcher_getAuth.start()
@@ -104,7 +100,7 @@ class TestConflictBP_conflicts(unittest.TestCase):
         self.mocked_getAuth.return_value = self.helper_getAuth
 
         # -- Create a patcher for the appGlobals file --
-        self.patcher_appGlobals = patch("conflicts.conflicts.ag", autospec=True)
+        self.patcher_appGlobals = patch("schedule.schedule.ag", autospec=True)
 
         # Start the patcher - mock returned
         self.mocked_appGlobals = self.patcher_appGlobals.start()
@@ -114,6 +110,15 @@ class TestConflictBP_conflicts(unittest.TestCase):
         self.mocked_appGlobals.conn = MagicMock()
         self.mocked_appGlobals.UPLOAD_FOLDER = "./static"
         self.mocked_appGlobals.ALLOWED_EXTENSIONS = {"txt", "csv"}
+
+        # -- Create a patcher for the RabbitConnectionManager object --
+        self.patcher_rabbitConnectionManager = patch("schedule.schedule.RabbitConnectionManager", autospec=True)
+
+        # Start he patcher - mock returned
+        self.mocked_rabbitConnectionManager = self.patcher_rabbitConnectionManager.start()
+
+        # Configure the mocked RabbitConnectionManager as desired
+        self.mocked_rabbitConnectionManager.publishMsg = MagicMock()
 
         # -- Create a patchers for the logging --
         self.patcher_loggingDEBUG = patch("logging.debug", autospec=True)
@@ -134,7 +139,9 @@ class TestConflictBP_conflicts(unittest.TestCase):
         self.patcher_getAuth.stop()
         self.patcher_appGlobals.stop()
         self.patcher_osEnviron.stop()
+        self.patcher_rabbitConnectionManager.stop()
 
+        # Stop all of the logging patchers
         self.patcher_loggingDEBUG.stop()
         self.patcher_loggingINFO.stop()
         self.patcher_loggingWARNING.stop()
@@ -146,74 +153,62 @@ class TestConflictBP_conflicts(unittest.TestCase):
         #  to the default value which is 1.
         self.mocked_authLevel.return_value = 1
 
-    def test_withLoggedInUser_RendersAppropriateTemplate(self):
-        # Test to ensure that when a user that is logged in
-        #  navigates to the page, they are able to see a rendered
-        #  template of the conflicts. Users that are not logged in
-        #  are handled by the helperFunction getAuth() which is not
-        #  not being tested in this test Class.
-
+    def test_withoutAuthorizedUser_returnsNotAuthorizedResponse(self):
         # -- Arrange --
-
-        # Reset all of the mocked objects that will be used in this test
-        self.mocked_authLevel.reset_mock()
-        self.mocked_appGlobals.conn.reset_mock()
-
-        # Reset the auth_level
-        self.resetAuthLevel()
-
         # -- Act --
-
-        # Request the desired page.
-        resp = self.server.get("/conflicts/",
-                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
-
         # -- Assert --
+        pass
 
-        # Assert that we received a 200 status code
-        self.assertEqual(resp.status_code, 200)
-
-        # Assert that the response is not JSON
-        self.assertFalse(resp.is_json)
-
-    @patch("conflicts.conflicts.render_template", autospec=True)
-    def test_withLoggedInUser_PassesExpectedDataToRenderer(self, mocked_renderTemplate):
-        # Test to ensure that when a user that is logged in navigates
-        #  to the page, the expected information is being passed to
-        #  the render_template function.
-
+    def test_withAuthorizedUser_withoutNoDutyDates_createsEmptyNoDutyList(self):
         # -- Arrange --
-
-        # Reset all of the mocked objects that will be used in this test
-        self.mocked_authLevel.reset_mock()
-        self.mocked_appGlobals.conn.reset_mock()
-
-        # Reset the auth_level
-        self.resetAuthLevel()
-
-        # Configure the mocked render_template function to return a valid response object
-        mocked_renderTemplate.return_value = Response(status=200)
-
         # -- Act --
-
-        # Request the desired page.
-        resp = self.server.get("/conflicts/",
-                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
-
         # -- Assert --
+        pass
 
-        # Assert that we received a 200 status code
-        self.assertEqual(resp.status_code, 200)
+    def test_withAuthorizedUser_withNoDutyDates_parsesNoDutyListFromParameter(self):
+        # -- Arrange --
+        # -- Act --
+        # -- Assert --
+        pass
 
-        # Assert that the response is not JSON
-        self.assertFalse(resp.is_json)
+    def test_withAuthorizedUser_withEligibleRAs_parsesEligibleRAsFromParameter(self):
+        # -- Arrange --
+        # -- Act --
+        # -- Assert --
+        pass
 
-        # Assert that render_template was called with the expected data
-        mocked_renderTemplate.assert_called_once_with(
-            "conflicts/conflicts.html",
-            auth_level=self.mocked_authLevel,
-            curView=2,
-            opts=self.mocked_appGlobals.baseOpts,
-            hall_name=self.helper_getAuth.hall_name(),
-            linkedHalls=self.helper_getAuth.getAllAssociatedResHalls()
-        )
+    def test_withAuthorizedUser_whenParsingNoDutyDates_encountersValueError_returnsParsingErrorResult(self):
+        # -- Arrange --
+        # -- Act --
+        # -- Assert --
+        pass
+
+    def test_withAuthorizedUser_whenParsingEligibleRAs_encountersValueError_returnsParsingErrorResult(self):
+        # -- Arrange --
+        # -- Act --
+        # -- Assert --
+        pass
+
+    def test_withAuthorizedUser_whenParsingInputParams_encountersKeyError_returnsMissingParamsResult(self):
+        # -- Arrange --
+        # -- Act --
+        # -- Assert --
+        pass
+
+    def test_withAuthorizedUser_withInvalidMonth_returnsInvalidSelectionResult(self):
+        # -- Arrange --
+        # -- Act --
+        # -- Assert --
+        pass
+
+    def test_withAuthorizedUser_withValidParams_addsMsgToQueue(self):
+        # -- Arrange --
+        # -- Act --
+        # -- Assert --
+        pass
+
+    def test_withAuthorizedUser_withBrokenQueueConnection_returnsRetryMessage(self):
+        # -- Arrange --
+        # -- Act --
+        # -- Assert --
+        pass
