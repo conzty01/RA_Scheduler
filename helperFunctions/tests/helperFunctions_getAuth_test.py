@@ -58,7 +58,9 @@ class TestHallBP_getAuth(unittest.TestCase):
 
         # Configure the mocked current_user as desired
         self.username = "Test User"
+        self.id = 42
         self.mocked_currentUser.username = self.username
+        self.mocked_currentUser.id = self.id
 
         # -- Create a patchers for the logging --
         self.patcher_loggingDEBUG = patch("logging.debug", autospec=True)
