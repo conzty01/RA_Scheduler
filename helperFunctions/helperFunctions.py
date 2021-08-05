@@ -60,7 +60,7 @@ def getAuth():
     # Check to see if we found any records for the user
     if len(res) == 0:
         # If the user does not exist, go to error url
-        logging.warning("Unable to locate RA associated to User: {}".format(uEmail))
+        logging.warning("Unable to locate RA associated to User: {}".format(uID))
 
         # Close the DB cursor
         cur.close()
