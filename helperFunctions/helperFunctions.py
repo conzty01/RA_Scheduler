@@ -33,6 +33,7 @@ def getAuth():
 
     # The email returned from Google
     uEmail = current_user.username
+    uID = current_user.id
 
     #logging.debug(uEmail)
 
@@ -59,7 +60,7 @@ def getAuth():
     # Check to see if we found any records for the user
     if len(res) == 0:
         # If the user does not exist, go to error url
-        logging.warning("No user found with email: {}".format(uEmail))
+        logging.warning("Unable to locate RA associated to User: {}".format(uEmail))
 
         # Close the DB cursor
         cur.close()
