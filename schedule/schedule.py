@@ -73,17 +73,6 @@ def editSched():
     # Load the query result
     gCalConn = cur.fetchone()[0]
 
-    # Load the query result
-    dfl = cur.fetchone()[0]
-
-    # Check to see if the google calendar integration is set up
-    cur.execute(
-        "SELECT EXISTS (SELECT token FROM google_calendar_info WHERE res_hall_id = %s)",
-        (authedUser.hall_id(),)
-    )
-    # Load the query result
-    gCalConn = cur.fetchone()[0]
-
     # Create a custom settings dictionary
     custSettings = {
         "dutyFlagLabel": dfl,
