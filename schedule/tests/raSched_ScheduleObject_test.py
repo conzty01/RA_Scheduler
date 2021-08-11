@@ -1,7 +1,8 @@
-from schedule.ra_sched import Schedule, RA
+from schedule.ra_sched import Schedule, RA, Day
 from unittest.mock import patch
 from datetime import date
 import unittest
+import calendar
 
 
 class TestScheduleObject(unittest.TestCase):
@@ -37,28 +38,130 @@ class TestScheduleObject(unittest.TestCase):
         self.patcher_loggingERROR.stop()
 
     def test_hasExpectedMethods(self):
+        # Test to ensure the Schedule Object has the following methods:
+        #  - sort
+        #  - numDays
+        #  - getDate
+        #  - addRA
+        #  - removeRA
+        #  - setReview
+        #  - addReviewDay
+        #  - shouldReview
+
         # -- Arrange --
         # -- Act --
         # -- Assert --
-        pass
+
+        self.assertTrue(hasattr(Schedule, "sort"))
+        self.assertTrue(hasattr(Schedule, "numDays"))
+        self.assertTrue(hasattr(Schedule, "getDate"))
+        self.assertTrue(hasattr(Schedule, "addRA"))
+        self.assertTrue(hasattr(Schedule, "removeRA"))
+        self.assertTrue(hasattr(Schedule, "setReview"))
+        self.assertTrue(hasattr(Schedule, "addReviewDay"))
+        self.assertTrue(hasattr(Schedule, "shouldReview"))
 
     def test_hasExpectedProperties(self):
+        # Test to ensure that the Schedule Object has the following properties:
+        #  - review
+        #  - reviewDays
+        #  - noDutyDates
+        #  - doubleDays
+        #  - doubleDates
+        #  - schedule
+
         # -- Arrange --
+
+        # Create the objects used in this test
+        testSchedule = Schedule(2021, 8)
+
         # -- Act --
         # -- Assert --
-        pass
+
+        # Assert that the above properties exist and are as we expect
+        self.assertIsInstance(testSchedule.review, bool)
+        self.assertIsInstance(testSchedule.reviewDays, set)
+        self.assertIsInstance(testSchedule.noDutyDates, list)
+        self.assertIsInstance(testSchedule.doubleDays, tuple)
+        self.assertIsInstance(testSchedule.doubleDates, list)
+        self.assertIsInstance(testSchedule.schedule, list)
 
     def test_hasExpectedDefaultValues(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
+        # Test to ensure that when omitting non-required parameters
+        #  when constructing a Schedule object, the default values are
+        #  as we would expect. This test will not deal with the schedule
+        #  property.
 
-    def test_withNoProvidedSchedule_generatesScheduleUsingDoubleDaysAndDates(self):
         # -- Arrange --
+
+        # Create the objects used in this test
+        expectedReview = False
+        expectedReviewDays = set()
+        expectedNoDutyDates = []
+        expectedDoubleDays = (4, 5)
+
         # -- Act --
+
+        # Create the Schedule object being tested
+        testScheduleObject = Schedule(2021, 8)
+
         # -- Assert --
-        pass
+
+        # Assert that the values that weren't provided are set to the
+        #  expected default.
+        self.assertEqual(expectedReview, testScheduleObject.review)
+        self.assertEqual(expectedReviewDays, testScheduleObject.reviewDays)
+        self.assertEqual(expectedNoDutyDates, testScheduleObject.noDutyDates)
+        self.assertEqual(expectedDoubleDays, testScheduleObject.doubleDays)
+
+    def test_withProvidedSchedule_doesNotGenerateNewSchedule(self):
+        # Test to ensure that when providing a schedule parameter, the object
+        #  does not regenerate a new schedule.
+
+        # -- Arrange --
+
+        # Create a dummy schedule
+        desiredSchedule = [i for i in range(10)]
+
+        # -- Act --
+
+        # Create the Schedule object being tested
+        testScheduleObject = Schedule(2021, 8, sched=desiredSchedule)
+
+        # -- Assert --
+
+        # Assert that the schedule is set to the one passed to the constructor
+        self.assertListEqual(desiredSchedule, testScheduleObject.schedule)
+
+    def test_withNoProvidedSchedule_generatesScheduleUsingDoubleDays(self):
+        # Test to ensure that when a schedule parameter is not provided, the object
+        #  generates its own schedule using the provided doubleDays and doubleDates
+
+        # -- Arrange --
+
+        # Create the objects to be used in this test
+        desiredYear = 2021
+        desiredMonth = 8
+        desiredDoubleDays = (1, 4, 5)
+        expectedSchedule = []
+
+        # Generate the expected schedule
+        for d, dow in calendar.Calendar().itermonthdays2(desiredYear, desiredMonth):
+            if d != 0:
+                expectedSchedule.append(
+                    Day(date(desiredYear, desiredMonth, d), dow)
+                )
+                
+
+        # -- Act --
+
+        # Create the Schedule Object
+        testScheduleObject = Schedule(desiredYear, desiredMonth, doubleDays=desiredDoubleDays)
+
+        # -- Assert --
+
+        # Assert that the generated schedule is as we expected
+        self.assertListEqual(expectedSchedule, testScheduleObject.schedule)
 
     def test_withNoProvidedSchedule_generatesScheduleExcludingNoDutyDates(self):
         # -- Arrange --
