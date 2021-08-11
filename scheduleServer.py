@@ -52,9 +52,10 @@ HOST_URL = os.environ["HOST_URL"]
 
 # Create the Flask application
 app = Flask(__name__)
-app.config['TEMPLATES_AUTO_RELOAD'] = True
+app.config['TEMPLATES_AUTO_RELOAD'] = os.environ["TEMPLATES_AUTO_RELOAD"]
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ["DATABASE_URL"]
 app.config["EXPLAIN_TEMPLATE_LOADING"] = os.environ["EXPLAIN_TEMPLATE_LOADING"]
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = os.environ["SQLALCHEMY_TRACK_MODIFICATIONS"]
 
 # Set up the Bootstrap application
 Bootstrap(app)
