@@ -180,7 +180,7 @@ def googleLoggedIn(blueprint, token):
 
     except NoResultFound:
         # If there are no result found...
-        logging.info("Unable to find user in DB - Creating new user")
+        logging.info("Unable to find existing OAuth user in DB - Creating new OAuth user")
 
         # Then create a new user record in our database
         oauth = OAuth(provider=blueprint.name,
@@ -197,7 +197,7 @@ def googleLoggedIn(blueprint, token):
     else:
         # Otherwise, we have a new user that needs to have an RA
         #  associated with them.
-        logging.info("Create New User - Searching for Appropriate RA")
+        logging.info("New User - Searching for Associated RA.")
 
         # Create a DB cursor
         cur = ag.conn.cursor()
@@ -211,18 +211,25 @@ def googleLoggedIn(blueprint, token):
         # Close the DB cursor
         cur.close()
 
-        # Create a new user in the database
-        user = User(username=username, ra_id=raId)
+        # If there is an RA with a matching email
+        if raId is not None:
+            logging.info("New User - Associated RA found.")
 
-        # Associate it with the OAuth token
-        oauth.user = user
-        db.session.add_all([user, oauth])
+            # Create a new user in the database
+            user = User(username=username, ra_id=raId)
 
-        # Commit hte changes to the DB
-        db.session.commit()
+            # Associate the new user with the OAuth token
+            oauth.user = user
+            db.session.add_all([user, oauth])
 
-        # Log the user in
-        login_user(user)
+            # Commit the changes to the DB
+            db.session.commit()
+
+            # Log the user in
+            login_user(user)
+
+        else:
+            logging.info("New User - No Associated RA found.")
 
     # Function should return False so that flask_dance won't try to store the token itself
     return False
