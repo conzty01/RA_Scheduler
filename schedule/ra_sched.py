@@ -502,7 +502,7 @@ class Day:
 
     def getLastDutySlotAssignment(self):
         # Return the RA that was assigned to the last Duty Slot
-        return self.ras[-1].getAssignment()
+        return self.ras[-1].getAssignment() if len(self.ras) > 0 else None
 
     # ------------------------
     # -- Supporting Classes --
