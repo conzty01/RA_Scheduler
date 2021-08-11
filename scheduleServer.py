@@ -27,7 +27,7 @@ from staff.staff import staff_bp
 # Configure the logger immediately per Flask recommendation
 
 # Get the logging level from the environment
-logLevel = os.environ["LOG_LEVEL"].upper()
+logLevel = os.getenv("LOG_LEVEL", "DEBUG").upper()
 
 # Create the logging configuration
 dictConfig({
@@ -48,23 +48,23 @@ dictConfig({
 })
 
 # Load the HOST_URL from the environment.
-HOST_URL = os.environ["HOST_URL"]
+HOST_URL = os.getenv("HOST_URL", "https://localhost:5000")
 
 # Create the Flask application
 app = Flask(__name__)
-app.config['TEMPLATES_AUTO_RELOAD'] = os.environ["TEMPLATES_AUTO_RELOAD"]
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ["DATABASE_URL"]
-app.config["EXPLAIN_TEMPLATE_LOADING"] = os.environ["EXPLAIN_TEMPLATE_LOADING"]
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = os.environ["SQLALCHEMY_TRACK_MODIFICATIONS"]
+app.config['TEMPLATES_AUTO_RELOAD'] = os.getenv("TEMPLATES_AUTO_RELOAD", False)
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL", "postgres:///ra_sched")
+app.config["EXPLAIN_TEMPLATE_LOADING"] = os.getenv("EXPLAIN_TEMPLATE_LOADING", False)
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = os.getenv("SQLALCHEMY_TRACK_MODIFICATIONS", False)
 
 # Set up the Bootstrap application
 Bootstrap(app)
 
 # Setup for flask_dance with oauth
-app.secret_key = os.environ["SECRET_KEY"]
+app.secret_key = os.getenv("SECRET_KEY", '')
 gBlueprint = make_google_blueprint(
-    client_id=os.environ["CLIENT_ID"],
-    client_secret=os.environ["CLIENT_SECRET"],
+    client_id=os.getenv("CLIENT_ID", ''),
+    client_secret=os.getenv("CLIENT_SECRET", ''),
     scope=["profile", "email"],
     redirect_to="index"
 )
@@ -79,7 +79,7 @@ app.register_blueprint(conflicts_bp,   url_prefix="/conflicts")
 app.register_blueprint(breaks_bp,      url_prefix="/breaks")
 
 # Set the upload folder for the application
-UPLOAD_FOLDER = "./static"
+UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "./static")
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Create he SQLAlchemy DB connection for the Flask app
@@ -428,12 +428,12 @@ def forwardToGitReports():
     logging.warning("Directing User to Bug Report Submission Form")
 
     # Return a redirect to the Bug Report page
-    return redirect(os.environ["BUG_URL"])
+    return redirect(os.getenv("BUG_URL", ''))
 
 
 if __name__ == "__main__":
     # Load the USE_ADHOC value from the environment
-    local = bool(os.environ["USE_ADHOC"])
+    local = bool(os.getenv("USE_ADHOC", True))
 
     # If we are running this application on a local machine
     if local:
