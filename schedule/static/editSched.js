@@ -824,12 +824,14 @@ function addSchedReqItem(schedReqDict) {
     newStatusSpan.classList.add("badge", "badge-secondary");
     let statusText;
     switch (schedReqDict.status) {
-        case -1:
+        case -3:
+        case -2:
             statusText = "Failed";
             break;
         case 0:
             statusText = "In Progress";
             break;
+        case -1:
         case 1:
             statusText = "Success";
             break;
