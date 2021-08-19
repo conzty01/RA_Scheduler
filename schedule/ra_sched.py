@@ -766,6 +766,10 @@ class Schedule:
         def __str__(self):
             return self.msg
 
+        def __eq__(self, other):
+            # Return True if the other Note object has the same message and status
+            return self.msg == other.msg and self.status == other.status
+
     def addNote(self, msg, status=DEFAULT):
         # Create a new Note object and add it to the schedule's
         #  schedNotes list.
