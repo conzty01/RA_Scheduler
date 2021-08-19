@@ -758,13 +758,15 @@ function showSchedQueueModal(info) {
             badgeStatusText = "In Progress";
             break;
 
+        case -1:
         case 1:
             // Status is successful
             badgeStatusColor += "success";
             badgeStatusText = "Success";
             break;
 
-        case -1:
+        case -3:
+        case -2:
             // Status is failed
             badgeStatusColor += "danger";
             badgeStatusText = "Failed";
@@ -869,6 +871,8 @@ function updateSchedReqList(schedReqDict) {
         let statusText;
         let statusClass;
         switch (schedReqDict[idKey].status) {
+            case -3:
+            case -2:
             case -1:
                 statusText = "Failed";
                 statusClass = "badge-danger";

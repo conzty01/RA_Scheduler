@@ -265,11 +265,11 @@
             <li id="schedReqList_{{ rowID }}" onclick="getSchedulerQueueEntry({{ rowID }})" class="clickable hoverItem">
                 <div id="list_request_{{ rowID }}" class="tName">{{ rowDate.strftime("%m/%d/%y") }}</div>
                 <div id="list_status_{{ rowID }}" class="tPoints">
-                    {% if rowStatus == 1: %}
+                    {% if rowStatus == 1 or rowStatus == -1: %}
                     <span id="list_status_span_{{ rowID }}" class="badge badge-success">Success</span>
                     {% elif rowStatus == 0: %}
                     <span id="list_status_span_{{ rowID }}" class="badge badge-secondary">In Progress</span>
-                    {% elif rowStatus == -1: %}
+                    {% elif rowStatus <= -2: %}
                     <span id="list_status_span_{{ rowID }}" class="badge badge-danger">Failed</span>
                     {% else %}
                     <span id="list_status_span_{{ rowID }}" class="badge badge-warning">Unknown</span>

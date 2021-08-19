@@ -1,15 +1,13 @@
 from schedule.rabbitConnectionManager import RabbitConnectionManager
-from json import loads, dumps, JSONDecodeError
-from schedule import scheduler4_1
-from schedule import scheduler5_0
-from schedule.ra_sched import RA
+from json import loads, JSONDecodeError
+from schedule import scheduler4_2
+from schedule.ra_sched import RA, Schedule
 from scheduleServer import app
 import copy as cp
 import calendar
 import psycopg2
 import logging
 import atexit
-import pika
 import os
 
 # import the needed functions from other parts of the application
@@ -19,12 +17,12 @@ from staff.staff import getRAStats, addRAPointModifier
 
 # Connect to RabbitMQ for both the consumer and the error queue.
 rabbitConsumerManager = RabbitConnectionManager(
-    os.environ.get('CLOUDAMQP_URL', 'amqp://guest:guest@localhost:5672/%2f'),
-    os.environ.get('RABBITMQ_SCHEDULER_QUEUE', 'genSched')
+    os.getenv('CLOUDAMQP_URL', 'amqp://guest:guest@localhost:5672/%2f'),
+    os.getenv('RABBITMQ_SCHEDULER_QUEUE', 'genSched')
 )
 rabbitErrorQueueManager = RabbitConnectionManager(
-    os.environ.get('CLOUDAMQP_URL', 'amqp://guest:guest@localhost:5672/%2f'),
-    os.environ.get('RABBITMQ_SCHEDULER_FAILURE_QUEUE', 'genSchedErrs'),
+    os.getenv('CLOUDAMQP_URL', 'amqp://guest:guest@localhost:5672/%2f'),
+    os.getenv('RABBITMQ_SCHEDULER_FAILURE_QUEUE', 'genSchedErrs'),
     durable=True
 )
 
@@ -32,7 +30,7 @@ logging.info("Connected to '{}' message queue channel.".format(rabbitConsumerMan
 logging.info("Connected to '{}' message queue channel.".format(rabbitErrorQueueManager.rabbitQueueName))
 
 # Establish DB connection
-psqlConnectionStr = os.environ.get('DATABASE_URL', 'postgres:///ra_sched')
+psqlConnectionStr = os.getenv('DATABASE_URL', 'postgres:///ra_sched')
 dbConn = psycopg2.connect(psqlConnectionStr)
 
 
@@ -438,15 +436,6 @@ def runScheduler(resHallID, monthNum, year, noDutyList, eligibleRAList):
                    WHERE res_hall_id = %s""", (resHallID,))
     dutyConfig, autoExcAdj, flagMultiDuty = cur.fetchone()
 
-    # Hall setting for overriding duty conflicts if needed
-    canOverrideConflicts = True
-
-    # Boolean for overriding duty conflicts on the next run
-    overrideConflictsThisPass = False
-
-    # Value of the LDAT that reached the furthest state
-    furthestStateLDAT = -1
-
     # AutoExcAdj is a currently unused feature that allows the scheduler to
     #  automatically create point_modifiers for RAs that have been excluded from
     #  being scheduled for the given month. This feature is unreleased because
@@ -466,96 +455,54 @@ def runScheduler(resHallID, monthNum, year, noDutyList, eligibleRAList):
     mulDutyPts = dutyConfig["multi_duty_pts"]
     mulDutyDays = dutyConfig["multi_duty_days"]
 
-    # Initialize the furthestState variable to None. This is used if we need to
-    #  attempt to generate a schedule by overriding an RA's duty conflicts.
-    furthestStateReached = None
-
     # Set completed to False and successful to False by default. These values
     #  will be manipulated in the while loop below as necessary.
     completed = False
     successful = False
     while not completed:
         # While we are not finished scheduling, create a candidate schedule
-        sched, furthestStateCandidate = scheduler5_0.schedule(
+        sched = scheduler4_2.schedule(
             copy_raList, year, monthNum, doubleDateNum=mulNumAssigned, doubleDatePts=mulDutyPts,
             noDutyDates=copy_noDutyList, doubleDays=mulDutyDays, doublePts=mulDutyPts,
             ldaTolerance=ldat, doubleNum=mulNumAssigned, prevDuties=prevRADuties,
             breakDuties=breakDuties, setDDFlag=flagMultiDuty, regDutyPts=regDutyPts,
-            regNumAssigned=regNumAssigned, assignConflicts=overrideConflictsThisPass,
-            curBlockingState=furthestStateReached
+            regNumAssigned=regNumAssigned
         )
 
+        # If the schedule's status encountered an error and cannot create a schedule
+        if sched.getStatus() == Schedule.ERROR:
+            # Stop the scheduling attempt and report the error back to the user
+            completed = True
+            continue
+
         # If we were unable to schedule with the previous parameters,
-        if len(sched) == 0:
+        if sched.getStatus() == Schedule.FAIL:
             # Then we should attempt to modify the previous parameters
             #  and try again.
 
-            if ldat > 1 and not overrideConflictsThisPass:
-                # If the LDATolerance is greater than 1 and we did not
-                #  attempt to override conflicts on the last run, then
-                #  decrement the LDATolerance by 1 and try again.
+            if ldat > 1:
+                # If the LDATolerance is greater than 1
+                #  then decrement the LDATolerance by 1 and try again
 
-                # First check to see if we reached a new furthest state
-                if furthestStateCandidate > furthestStateReached:
-                    logging.debug(
-                        "ResHall: {}, Month: {} - New Furthest State Reached - {}, {}".format(
-                            resHallID,
-                            monthId,
-                            furthestStateCandidate.curDay.getDate(),
-                            ldat
-                        )
-                    )
-
-                    # If so, set it as the new furthest state
-                    furthestStateReached = furthestStateCandidate
-
-                    # Also set the LDAT that got us to this state
-                    furthestStateLDAT = ldat
-
-                # Decrement the LDATolerance by 1
+                logging.info("DECREASE LDAT: {}".format(ldat))
                 ldat -= 1
-
-                logging.info(
-                    "ResHall: {}, Month: {} - DECREASING LDAT TO: {}"
-                        .format(resHallID, monthId, ldat)
-                )
 
                 # Create new deep copies of the ra_list and noDutyList
                 copy_raList = cp.deepcopy(ra_list)
                 copy_noDutyList = cp.copy(noDutyList)
 
-                # Go around the loop and try again
-
             else:
-                # Otherwise the LDATolerance is not greater than 1, then check to see
-                #  if we should attempt to override conflicts. We should attempt to
-                #  override conflicts if the Hall setting is set and we have not already
-                #  attempted to override conflicts.
-                if canOverrideConflicts and not overrideConflictsThisPass:
-                    # Go around one more time with the configuration that resulted
-                    #  in the furthest state and attempt to override conflicts
+                # Otherwise the LDATolerance is not greater than 1. In this
+                #  case, we were unable to successfully generate a schedule
+                #  with the given parameters.
+                completed = True
 
-                    # Set the LDAT for this next pass
-                    ldat = furthestStateLDAT
-
-                    # Set the flag for overriding duty conflicts in the next run
-                    overrideConflictsThisPass = True
-
-                    # Create new deep copies of the ra_list and noDutyList
-                    copy_raList = cp.deepcopy(ra_list)
-                    copy_noDutyList = cp.copy(noDutyList)
-
-                    logging.info(
-                        "ResHall: {}, Month: {} Last Attempt - overriding duty conflicts"
-                            .format(resHallID, monthId)
-                    )
-
-                else:
-                    # Otherwise, we were unable to generate a schedule.
-                    #  Mark that we have completed so we may exit the while loop
-                    #  and mark that we were not successful.
-                    completed = True
-                    successful = False
+        else:
+            # Otherwise, we were able to successfully create a schedule!
+            #  Mark that we have completed so we may exit the while loop
+            #  and mark that we were successful.
+            completed = True
+            successful = True
 
     logging.debug("Schedule: {}".format(sched))
 
@@ -565,8 +512,8 @@ def runScheduler(resHallID, monthNum, year, noDutyList, eligibleRAList):
         logging.info("Unable to Generate Schedule for Hall: {} MonthNum: {} Year: {}"
                      .format(resHallID, monthNum, year))
 
-        # Notify the user of this result
-        return -1, "Unable to Generate Schedule."
+        # Return the schedule object to the caller
+        return sched.getStatus(), "; ".join(str(note) for note in sched.getNotes())
 
     # Add a record to the schedule table in the DB get its ID
     cur.execute("INSERT INTO schedule (hall_id, month_id, created) VALUES (%s, %s, NOW()) RETURNING id;",
@@ -650,7 +597,7 @@ def runScheduler(resHallID, monthNum, year, noDutyList, eligibleRAList):
         #  into the DB that was already in there.
 
         # Log the occurrence
-        logging.warning(
+        logging.exception(
             "IntegrityError encountered when attempting to save duties for Schedule: {}. Rolling back changes."
                 .format(schedId)
         )
@@ -701,7 +648,7 @@ def runScheduler(resHallID, monthNum, year, noDutyList, eligibleRAList):
     logging.info("Successfully Generated Schedule: {}".format(schedId))
 
     # Notify the user of the successful schedule generation!
-    return 1, "successful"
+    return 1, "Schedule generated successfully."
 
 
 if __name__ == "__main__":

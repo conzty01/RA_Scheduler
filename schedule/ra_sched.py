@@ -576,9 +576,17 @@ class Schedule:
             doubleDates  (lst)    A list containing dates for the given month and year that should
                                    have two duty slots. These dates are separate from days of the
                                    week handled in the doubleDays tuple.
-
     """
-    def __init__(self, year, month, noDutyDates=[], sched=[], doubleDays=(4, 5), doubleDates=[]):
+
+    # Initialize the Schedule class's possible statuses
+    ERROR = -3      # An error was encountered and a schedule was unable to be generated
+    FAIL = -2       # A schedule was unable to be generated
+    WARNING = -1    # A schedule was generated, but the user should be made aware of something
+    DEFAULT = 0     # A blank schedule
+    SUCCESS = 1     # A schedule was generated successfully
+
+    def __init__(self, year, month, noDutyDates=list(), sched=None, doubleDays=(4, 5),
+                 doubleDates=list(), notes=list(), status=DEFAULT):
         # Whether the schedule should be set for manual review
         self.review = False
 
@@ -594,8 +602,14 @@ class Schedule:
         # A list containing dates which should have two duty slots
         self.doubleDates = list(doubleDates)
 
+        # A list of note objects
+        self.schedNotes = notes
+
+        # The status of the schedule object
+        self.status = status
+
         # If 'sched' is defined...
-        if sched:
+        if sched is not None:
             # then use this as the defined schedule.
             self.schedule = sched
 
@@ -723,6 +737,43 @@ class Schedule:
     def shouldReview(self):
         # Return whether this schedule should be manually reviewed.
         return self.review
+
+    def getStatus(self):
+        # Return the schedule's status
+        return self.status
+
+    # ------------------------
+    # -- Supporting Classes --
+    # ------------------------
+    class Note:
+        """ Object for holding user-relevant metadata about a Schedule object.
+
+            This class is intended to be used to attach metadata to a particular schedule.
+
+            Args:
+                msg     (str):    A string containing the user-relevant information.
+                status  (int):    An integer denoting the status of the message.
+        """
+
+        def __init__(self, msg, status):
+            # Set the associated parameters
+            self.msg = msg
+            self.status = status
+
+        def __repr__(self):
+            return "<Note status:{}, msg:{}>".format(self.status, self.msg)
+
+        def __str__(self):
+            return self.msg
+
+    def addNote(self, msg, status=DEFAULT):
+        # Create a new Note object and add it to the schedule's
+        #  schedNotes list.
+        self.schedNotes.append(self.Note(msg, status))
+
+    def getNotes(self):
+        # Return the list of notes associated with the schedule.
+        return self.schedNotes
 
 
 class State:
@@ -923,7 +974,7 @@ class State:
         self.curDay.addRA(candRA)
 
         # Update lastDateAssigned
-        self.lda[candRA].append(self.curDay.getDate())
+        self.lda[candRA] = self.curDay.getDate()
 
         # If doubleDay, then update numDoubleDays
         if self.isDoubleDay():
@@ -1006,8 +1057,8 @@ class State:
             # If an RA has been assigned a duty recently
             #  This is skipped when the LDA is 0, meaning the RA has not been
             #  assigned for duty yet this month.
-            if lastDateAssigned[ra][-1] != 0 and \
-               day.getDate() - lastDateAssigned[ra][-1] < ldaTolerance:
+            if lastDateAssigned[ra] != 0 and \
+               day.getDate() - lastDateAssigned[ra] < ldaTolerance:
                 # Then the RA is no longer a duty candidate
                 isCand = False
                 # print("      Removed: Recent Duty")
@@ -1082,7 +1133,7 @@ class State:
         # print("  Sorting")
         retList.sort(
             key=lambda ra: genCandScore(
-                ra, day, lastDateAssigned[ra][-1],
+                ra, day, lastDateAssigned[ra],
                 numDoubleDays[ra], isDoubleDay, datePts,
                 doubleDayAvg, ptsAvg, numFlagDuties[ra],
                 flagDutyAvg
@@ -1090,7 +1141,7 @@ class State:
         )
         conList.sort(
             key=lambda ra: genCandScore(
-                ra, day, lastDateAssigned[ra][-1],
+                ra, day, lastDateAssigned[ra],
                 numDoubleDays[ra], isDoubleDay, datePts,
                 doubleDayAvg, ptsAvg, numFlagDuties[ra],
                 flagDutyAvg
