@@ -33,6 +33,7 @@ def getAuth():
 
     # The email returned from Google
     uEmail = current_user.username
+    uID = current_user.id
 
     #logging.debug(uEmail)
 
@@ -49,20 +50,21 @@ def getAuth():
                         JOIN res_hall ON (sm.res_hall_id = res_hall.id)
                         JOIN school ON (school.id = res_hall.school_id)
             WHERE username = %s
+            AND res_hall.enabled = TRUE
             ORDER BY sm.selected DESC""", (uEmail,))
 
     # Get user info from the database
     res = cur.fetchall()
+
+    # Close the DB cursor
+    cur.close()
 
     logging.debug("DB Result: {}".format(res))
 
     # Check to see if we found any records for the user
     if len(res) == 0:
         # If the user does not exist, go to error url
-        logging.warning("No user found with email: {}".format(uEmail))
-
-        # Close the DB cursor
-        cur.close()
+        logging.warning("Unable to locate RA associated with user")
 
         # Raise an 401 Unauthorized HTTP Exception that will be handled by flask
         abort(401)
@@ -84,9 +86,6 @@ def getAuth():
             "school_id": row[6],
             "school_name": row[7]
         })
-
-    # Close the DB cursor
-    cur.close()
 
     logging.debug("getAuth Complete")
 

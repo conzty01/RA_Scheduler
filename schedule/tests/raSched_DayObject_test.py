@@ -1441,6 +1441,33 @@ class TestDayObject(unittest.TestCase):
         self.assertFalse(result2)
         self.assertFalse(result3)
 
+    def test_DayObject_getLastDutySlotAssignment_returnsLastDutySlotAssignment(self):
+        # Test to ensure that the getLastDutySlotAssignment method returns the
+        #  RA that was assigned to the last Duty Slot.
+
+        # -- Arrange --
+
+        # Create the objects that will be used in this test
+        testRAObject1 = RA("Test1", "User1", 1, 2019, date(2017, 1, 1))
+        testRAObject2 = RA("Test2", "User2", 2, 2019, date(2017, 1, 1))
+        testDayObject = Day(date(2021, 2, 1), 0, 2)
+
+        # -- Act --
+
+        # Call the appropriate method
+        result0 = testDayObject.getLastDutySlotAssignment()
+        testDayObject.addRA(testRAObject1)
+        result1 = testDayObject.getLastDutySlotAssignment()
+        testDayObject.addRA(testRAObject2)
+        result2 = testDayObject.getLastDutySlotAssignment()
+
+        # -- Assert --
+
+        # Assert that the the expected results were returned
+        self.assertEqual(None, result0)
+        self.assertEqual(testRAObject1, result1)
+        self.assertEqual(testRAObject2, result2)
+
     # -------------------------------
     # -- Tests for DutySlot Object --
     # -------------------------------

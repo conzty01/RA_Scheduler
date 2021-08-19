@@ -62,7 +62,6 @@ def editSched():
 
     # Load the necessary hall settings from the DB
     cur.execute("SELECT duty_flag_label FROM hall_settings WHERE res_hall_id = %s", (authedUser.hall_id(),))
-
     # Load the query result
     dfl = cur.fetchone()[0]
 
