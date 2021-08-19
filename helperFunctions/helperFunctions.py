@@ -50,6 +50,7 @@ def getAuth():
                         JOIN res_hall ON (sm.res_hall_id = res_hall.id)
                         JOIN school ON (school.id = res_hall.school_id)
             WHERE username = %s
+            AND res_hall.enabled = TRUE
             ORDER BY sm.selected DESC""", (uEmail,))
 
     # Get user info from the database

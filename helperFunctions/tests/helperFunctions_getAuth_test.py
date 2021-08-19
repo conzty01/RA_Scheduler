@@ -138,6 +138,7 @@ class TestHallBP_getAuth(unittest.TestCase):
                         JOIN res_hall ON (sm.res_hall_id = res_hall.id)
                         JOIN school ON (school.id = res_hall.school_id)
             WHERE username = %s
+            AND res_hall.enabled = TRUE
             ORDER BY sm.selected DESC""", (self.username,)
         )
 
@@ -189,6 +190,7 @@ class TestHallBP_getAuth(unittest.TestCase):
                         JOIN res_hall ON (sm.res_hall_id = res_hall.id)
                         JOIN school ON (school.id = res_hall.school_id)
             WHERE username = %s
+            AND res_hall.enabled = TRUE
             ORDER BY sm.selected DESC""", (self.username,)
         )
 
@@ -274,6 +276,7 @@ class TestHallBP_getAuth(unittest.TestCase):
                         JOIN res_hall ON (sm.res_hall_id = res_hall.id)
                         JOIN school ON (school.id = res_hall.school_id)
             WHERE username = %s
+            AND res_hall.enabled = TRUE
             ORDER BY sm.selected DESC""", (self.username,)
         )
 
