@@ -873,7 +873,6 @@ function updateSchedReqList(schedReqDict) {
         switch (schedReqDict[idKey].status) {
             case -3:
             case -2:
-            case -1:
                 statusText = "Failed";
                 statusClass = "badge-danger";
                 break;
@@ -881,6 +880,7 @@ function updateSchedReqList(schedReqDict) {
                 statusText = "In Progress";
                 statusClass = "badge-secondary";
                 break;
+            case -1:
             case 1:
                 statusText = "Success";
                 statusClass = "badge-success";
