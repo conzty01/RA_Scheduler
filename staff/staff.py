@@ -541,19 +541,19 @@ def addStaffer():
     cur.execute("SELECT id FROM ra WHERE email = %s;", (data["email"],))
 
     # Load the result from the DB
-    checkRes = cur.fetchone()
+    existingRAID = cur.fetchone()
 
     # If there is a user with the provided email already
-    if checkRes is not None:
-        # Then set the query string to update RA record to be associated with the new hall
-        cur.execute("""
-            UPDATE staff_membership
-            SET res_hall_id = %s 
-            WHERE ra_id = %s 
-            RETURNING ra_id;""", (authedUser.hall_id(), checkRes[0]))
+    if existingRAID is not None:
+        # Create an entry into the staff_membership table for this new member
+        cur.execute(
+            """INSERT INTO staff_membership (ra_id, res_hall_id, auth_level, selected)
+               VALUES (%s, %s, %s, %s);""",
+            (existingRAID[0], authedUser.hall_id(), data["authLevel"], False)
+        )
 
         # Fetch the returned ID of the RA record
-        raID = cur.fetchone()
+        raID = existingRAID[0]
 
     else:
         # Otherwise set the query string create a new RA record in the ra table with
