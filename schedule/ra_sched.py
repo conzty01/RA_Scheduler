@@ -635,7 +635,7 @@ class Schedule:
                 if d != 0:
 
                     # Check to see if this date should not have a duty scheduled on it
-                    if d in noDutyDates:
+                    if d in self.noDutyDates:
                         # If no duty should be scheduled, create a Day object with
                         #  no duty slots and append it to the schedule
                         self.schedule.append(
@@ -650,7 +650,7 @@ class Schedule:
 
                         # Check to see if the day should have two duty slots due
                         #  to the day of the week that the day falls on.
-                        if dow in doubleDays:
+                        if dow in self.doubleDays:
                             # If the day is considered a double-day, then add the
                             #  date to the doubleDates attribute.
                             self.doubleDates.append(date)
