@@ -757,7 +757,9 @@ class Schedule:
 
         def __init__(self, msg, status):
             # Set the associated parameters
-            self.msg = msg
+
+            # Ensure that the provided message has a newline character at the end of it.
+            self.msg = msg if msg[-1] == "\n" else msg + "\n"
             self.status = status
 
         def __repr__(self):
