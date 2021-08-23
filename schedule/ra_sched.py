@@ -23,7 +23,7 @@ class RA:
                                     earned through their assigned monthly duties.
     """
 
-    def __init__(self, firstName, lastName, raID, hallID, dateStarted, conflicts=[], points=0):
+    def __init__(self, firstName, lastName, raID, hallID, dateStarted, conflicts=None, points=0):
 
         # First name of the RA
         self.firstName = firstName
@@ -41,7 +41,7 @@ class RA:
         self.hallId = hallID
 
         # Conflicts of the RA
-        self.conflicts = list(conflicts)
+        self.conflicts = [] if conflicts is None else list(conflicts)
 
         # Date representing the date that the RA began employment
         self.dateStarted = dateStarted
@@ -186,7 +186,7 @@ class Day:
                                        duty slot. If set to True, the last duty slot will be flagged.
     """
 
-    def __init__(self, date, dow, numDutySlots=1, ras=[], customPointVal=0, dayID=0,
+    def __init__(self, date, dow, numDutySlots=1, ras=None, customPointVal=0, dayID=0,
                  isDoubleDay=False, flagDutySlot=False):
         # The date of the Day object
         self.date = date
@@ -207,7 +207,7 @@ class Day:
         self.flagDutySlot = flagDutySlot
 
         # If an RA list has been provided
-        if ras:
+        if ras is not None:
             # Set the RA list with assigned duty slots
             self.ras = [self.DutySlot(ra) for ra in ras]
 
@@ -585,8 +585,8 @@ class Schedule:
     DEFAULT = 0     # A blank schedule
     SUCCESS = 1     # A schedule was generated successfully
 
-    def __init__(self, year, month, noDutyDates=list(), sched=None, doubleDays=(4, 5),
-                 doubleDates=list(), notes=list(), status=DEFAULT):
+    def __init__(self, year, month, noDutyDates=None, sched=None, doubleDays=(4, 5),
+                 doubleDates=None, notes=None, status=DEFAULT):
         # Whether the schedule should be set for manual review
         self.review = False
 
@@ -594,16 +594,16 @@ class Schedule:
         self.reviewDays = set()
 
         # A list of the days in which no duty should be scheduled
-        self.noDutyDates = list(noDutyDates)
+        self.noDutyDates = [] if noDutyDates is None else list(noDutyDates)
 
         # A tuple containing the days of the week that should have two duty slots
         self.doubleDays = doubleDays
 
         # A list containing dates which should have two duty slots
-        self.doubleDates = list(doubleDates)
+        self.doubleDates = [] if doubleDates is None else list(doubleDates)
 
         # A list of note objects
-        self.schedNotes = notes
+        self.schedNotes = [] if notes is None else list(notes)
 
         # The status of the schedule object
         self.status = status
@@ -611,7 +611,7 @@ class Schedule:
         # If 'sched' is defined...
         if sched is not None:
             # then use this as the defined schedule.
-            self.schedule = sched
+            self.schedule = list(sched)
 
         else:
             # Since a schedule was not previously defined, generate a blank schedule.
