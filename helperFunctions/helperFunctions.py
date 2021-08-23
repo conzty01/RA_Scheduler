@@ -1,5 +1,5 @@
 from flask_login import current_user
-from flask import abort
+from flask import abort, jsonify
 import datetime
 import logging
 
@@ -250,6 +250,27 @@ def formatDateStr(day, month, year, format="YYYY-MM-DD", divider="-"):
     # Return the resulting date string excluding the lingering divider symbol
     #  at the end.
     return result[:-1]
+
+
+def packageReturnObject(obj, fromServer):
+    # Package up the provided object. If the fromServer parameter is set to
+    #  True, then the object will be returned as-is. If it is set to False,
+    #  then a serialized version of the object is returned.
+    #
+    #  This function accepts the following parameters:
+    #
+    #     obj          <obj>   -  Object to be packaged
+    #     fromServer   <bool>  -  Boolean denoting whether the object should
+    #                              be packaged as a Flask response or not.
+
+    # If the method was called from the server
+    if fromServer:
+        # Then return the result as-is
+        return obj
+
+    else:
+        # Otherwise return a JSON version of the result
+        return jsonify(obj)
 
 
 class AuthenticatedUser:
