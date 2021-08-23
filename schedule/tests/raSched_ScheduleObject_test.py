@@ -562,7 +562,7 @@ class TestScheduleObject(unittest.TestCase):
 
         # Create the objects used in this test
         testSchedule = Schedule(2021, 8)
-        desiredMsg = "Test Message"
+        desiredMsg = "Test Message\n"
         desiredStatus = Schedule.SUCCESS
         expectedSchedNotes = [Schedule.Note(desiredMsg, Schedule.DEFAULT), Schedule.Note(desiredMsg, desiredStatus)]
 
@@ -670,6 +670,30 @@ class TestScheduleObject(unittest.TestCase):
             Schedule.Note(testMsg1, testStatus1) ==
             Schedule.Note(testMsg2, testStatus2)
         )
+
+    def test_NoteObject_addsNewLineMessageWhenNotPresent(self):
+        # Test to ensure that the Note Object adds the "\n" character is added to the end
+        #  of the provided message if it is not already present at the end of the message.
+
+        # -- Arrange --
+
+        # Create the objects used in this test
+        desiredMsg = "Test"
+        expectedMsg = desiredMsg + "\n"
+
+        # -- Act --
+
+        # Create a Note Object with the desired message (without newline)
+        testNote_noNewline = Schedule.Note(desiredMsg, 1)
+
+        # Create a Note Object with the desired message (with newline)
+        testNote_withNewline = Schedule.Note(expectedMsg, 1)
+
+        # -- Assert --
+
+        # Assert that we received the expected result
+        self.assertEqual(expectedMsg, testNote_noNewline.msg)
+        self.assertEqual(expectedMsg, testNote_withNewline.msg)
 
 
 if __name__ == "__main__":
