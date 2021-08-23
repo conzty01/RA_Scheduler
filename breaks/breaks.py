@@ -1,12 +1,13 @@
 from flask import render_template, request, jsonify, Blueprint, abort
 from flask_login import login_required
+from datetime import date
 import logging
 
 # Import the appGlobals for this blueprint to use
 import appGlobals as ag
 
 # Import the needed functions from other parts of the application
-from helperFunctions.helperFunctions import getAuth, stdRet, getCurSchoolYear
+from helperFunctions.helperFunctions import getAuth, stdRet, getCurSchoolYear, packageReturnObject
 
 breaks_bp = Blueprint("breaks_bp", __name__,
                       template_folder="templates",
@@ -248,8 +249,8 @@ def getBreakDuties(hallId=None, start=None, end=None, showAllColors=False, raId=
         #  also contains timezone information that we do not care about in
         #  this method. As a result, the timezone information is split out
         #  immediately.
-        start = request.args.get("start").split("T")[0]
-        end = request.args.get("end").split("T")[0]
+        start = date.fromisoformat(request.args.get("start").split("T")[0])
+        end = date.fromisoformat(request.args.get("end").split("T")[0])
 
         # Get the value for allColors from the request arguments.
         showAllColors = request.args.get("allColors") == "true"
@@ -262,6 +263,15 @@ def getBreakDuties(hallId=None, start=None, end=None, showAllColors=False, raId=
         raId = authedUser.ra_id()
         # Mark that this method was not called from the server
         fromServer = False
+
+    # Create the result object to be returned
+    res = []
+
+    # Check to see if the date range provided is outside of the current academic year
+    if start < getCurSchoolYear(hallId)[0] or start > getCurSchoolYear(hallId)[1] \
+            or end < getCurSchoolYear(hallId)[0] or end > getCurSchoolYear(hallId)[1]:
+        # Package and return the empty result
+        return packageReturnObject(res, fromServer)
 
     # Create a DB cursor
     cur = ag.conn.cursor()
@@ -277,9 +287,6 @@ def getBreakDuties(hallId=None, start=None, end=None, showAllColors=False, raId=
         AND month.year >= TO_DATE(%s,'YYYY-MM')
         AND month.year <= TO_DATE(%s,'YYYY-MM')
     """, (hallId, start, end))
-
-    # Create the result object to be returned
-    res = []
 
     # Iterate through the query result (each day of the break schedule) and assemble
     #  the return result in the format outlined in the comments at the top of this method.
@@ -319,14 +326,8 @@ def getBreakDuties(hallId=None, start=None, end=None, showAllColors=False, raId=
     # Close the DB cursor
     cur.close()
 
-    # If this API method was called from the server
-    if fromServer:
-        # Then return the result as-is
-        return res
-
-    else:
-        # Otherwise return a JSON version of the result
-        return jsonify(res)
+    # Package and return the result
+    return packageReturnObject(res, fromServer)
 
 
 @breaks_bp.route("/api/addBreakDuty", methods=["POST"])

@@ -8,7 +8,7 @@ import os
 import appGlobals as ag
 
 # Import the needed functions from other parts of the application
-from helperFunctions.helperFunctions import getAuth, stdRet, getCurSchoolYear, getSchoolYear
+from helperFunctions.helperFunctions import getAuth, stdRet, getCurSchoolYear, packageReturnObject
 from staff.staff import getRAStats, addRAPointModifier
 
 schedule_bp = Blueprint("schedule_bp", __name__,
@@ -126,7 +126,10 @@ def getSchedule2(start=None, end=None, hallId=None, showAllColors=None):
     #  and timeframe. This method also allows for specification on whether or not
     #  the returned duties should be associated with their RA's respective colors
     #  or a default color. Regardless of this value, any duties associated with
-    #  the user are associated with their color.
+    #  the user are associated with their color. If the provided date range falls
+    #  outside of the current academic year, then no results will be returned.
+    #  For example, if a request comes in for May of 2021 but the current school year
+    #  is from 2021 to 2022, then an empty schedule will be returned.
     #
     #  Required Auth Level: None
     #
@@ -200,6 +203,13 @@ def getSchedule2(start=None, end=None, hallId=None, showAllColors=None):
 
     # Create the result object to be returned
     res = []
+
+    # Check to see if the date range provided is outside of the current academic year
+    if start < getCurSchoolYear(hallId)[0] or start > getCurSchoolYear(hallId)[1] \
+            or end < getCurSchoolYear(hallId)[0] or end > getCurSchoolYear(hallId)[1]:
+
+        # Package and return the empty result
+        return packageReturnObject(res, fromServer)
 
     # Create a DB cursor
     cur = ag.conn.cursor()
@@ -276,14 +286,8 @@ def getSchedule2(start=None, end=None, hallId=None, showAllColors=None):
             }
         })
 
-    # If this API method was called from the server
-    if fromServer:
-        # Then return the result as-is
-        return res
-
-    else:
-        # Otherwise return a JSON version of the result
-        return jsonify(res)
+    # Package up and return the result
+    return packageReturnObject(res, fromServer)
 
 
 @schedule_bp.route("/api/runScheduler", methods=["POST"])

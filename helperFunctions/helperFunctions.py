@@ -1,5 +1,6 @@
 from flask_login import current_user
-from flask import abort
+from flask import abort, jsonify
+from calendar import monthrange
 import datetime
 import logging
 
@@ -126,7 +127,7 @@ def fileAllowed(filename):
     return ('.' in filename) and (filename.rsplit('.', 1)[1].lower() in ag.ALLOWED_EXTENSIONS)
 
 
-def getSchoolYear(month, year):
+def getSchoolYear(month, year, hallID):
     # Return a tuple of 2 strings that denote the start and end date of the school year that
     #  the provided month and year belong to.
     #
@@ -139,24 +140,29 @@ def getSchoolYear(month, year):
 
     logging.debug("Calculate School Year: {} {}".format(month, year))
 
-    if int(month) >= 8:
-        # If the current month is August or later
+    # Create a new cursor object
+    cur = ag.conn.cursor()
+
+    # Get the configured start and end month for the given Res Hall
+    cur.execute("SELECT year_start_mon, year_end_mon FROM hall_settings WHERE res_hall_id = %s", (hallID,))
+
+    startMon, endMon = cur.fetchone()
+
+    if int(month) >= startMon:
+        # If the provided month is equal to the configured start month or later,
         #  then the current year is the startYear
         startYear = int(year)
         endYear = int(year) + 1
 
     else:
-        # If the current month is earlier than August
+        # If the provided month is earlier than the configured start month,
         #  then the current year is the endYear
         startYear = int(year) - 1
         endYear = int(year)
 
-    # TODO: Currently, a school year is considered from August to August.
-    #        Perhaps this should be configurable by the AHD/HDs?
-
-    # Concatenate the calculated years to the start and end date strings
-    start = str(startYear) + '-08-01'
-    end = str(endYear) + '-07-31'
+    # Create date objects to represent the start and end dates
+    start = datetime.date(startYear, startMon, 1)
+    end = datetime.date(endYear, endMon, monthrange(endYear, endMon)[-1])
 
     logging.debug("Start: " + start)
     logging.debug("End: " + end)
@@ -164,7 +170,7 @@ def getSchoolYear(month, year):
     return start, end
 
 
-def getCurSchoolYear():
+def getCurSchoolYear(hallID):
     # Calculate what school year it is based on the current date and return a tuple
     #  of strings that represent the start and end date of the school year.
 
@@ -177,7 +183,7 @@ def getCurSchoolYear():
     year = datetime.date.today().year
 
     # Call getSchoolYear, passing it the current month and year and return the value
-    return getSchoolYear(month, year)
+    return getSchoolYear(month, year, hallID)
 
 
 def formatDateStr(day, month, year, format="YYYY-MM-DD", divider="-"):
@@ -250,6 +256,27 @@ def formatDateStr(day, month, year, format="YYYY-MM-DD", divider="-"):
     # Return the resulting date string excluding the lingering divider symbol
     #  at the end.
     return result[:-1]
+
+
+def packageReturnObject(obj, fromServer):
+    # Package up the provided object. If the fromServer parameter is set to
+    #  True, then the object will be returned as-is. If it is set to False,
+    #  then a serialized version of the object is returned.
+    #
+    #  This function accepts the following parameters:
+    #
+    #     obj          <obj>   -  Object to be packaged
+    #     fromServer   <bool>  -  Boolean denoting whether the object should
+    #                              be packaged as a Flask response or not.
+
+    # If the method was called from the server
+    if fromServer:
+        # Then return the result as-is
+        return obj
+
+    else:
+        # Otherwise return a JSON version of the result
+        return jsonify(obj)
 
 
 class AuthenticatedUser:

@@ -6,7 +6,7 @@ import logging
 import appGlobals as ag
 
 # Import the needed functions from other parts of the application
-from helperFunctions.helperFunctions import getAuth, stdRet
+from helperFunctions.helperFunctions import getAuth, stdRet, packageReturnObject
 
 # Create the blueprint representing these routes
 conflicts_bp = Blueprint("conflicts_bp", __name__,
