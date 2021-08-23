@@ -58,7 +58,9 @@ class TestHallBP_getAuth(unittest.TestCase):
 
         # Configure the mocked current_user as desired
         self.username = "Test User"
+        self.id = 42
         self.mocked_currentUser.username = self.username
+        self.mocked_currentUser.id = self.id
 
         # -- Create a patchers for the logging --
         self.patcher_loggingDEBUG = patch("logging.debug", autospec=True)
@@ -136,6 +138,7 @@ class TestHallBP_getAuth(unittest.TestCase):
                         JOIN res_hall ON (sm.res_hall_id = res_hall.id)
                         JOIN school ON (school.id = res_hall.school_id)
             WHERE username = %s
+            AND res_hall.enabled = TRUE
             ORDER BY sm.selected DESC""", (self.username,)
         )
 
@@ -187,6 +190,7 @@ class TestHallBP_getAuth(unittest.TestCase):
                         JOIN res_hall ON (sm.res_hall_id = res_hall.id)
                         JOIN school ON (school.id = res_hall.school_id)
             WHERE username = %s
+            AND res_hall.enabled = TRUE
             ORDER BY sm.selected DESC""", (self.username,)
         )
 
@@ -272,6 +276,7 @@ class TestHallBP_getAuth(unittest.TestCase):
                         JOIN res_hall ON (sm.res_hall_id = res_hall.id)
                         JOIN school ON (school.id = res_hall.school_id)
             WHERE username = %s
+            AND res_hall.enabled = TRUE
             ORDER BY sm.selected DESC""", (self.username,)
         )
 

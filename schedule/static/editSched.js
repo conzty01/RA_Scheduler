@@ -64,7 +64,6 @@ function editSchedMovePrev()  { editSchedMoveCalendar(-1) }
 function editSchedMoveToday() { editSchedMoveCalendar( 0) }
 function editSchedMoveNext()  { editSchedMoveCalendar( 1) }
 
-
 function initEditSchedCal() {
     initCal({
         height: "75%",
@@ -491,10 +490,13 @@ function checkPendingSchedule(retMsg) {
         7,      // Max number of retries
         1000    // Starting backoff in milliseconds
     ).then((res) => {
-        passModalSave("#runModal", res, () => {
+        // Pass in a an object indicating that the scheduling was successful regardless of
+        //  what actually occurred. This is because the runScheduler modal does not handle
+        //  messages from the scheduler queue.
+        passModalSave("#runModal", {msg:"",status:1}, () => {
             document.getElementById("runButton").disabled = false;
             document.getElementById("runModalProgressBar").style.display = "none";
-            //$("body").css("cursor", "auto");
+
         });
     });
 
@@ -759,13 +761,15 @@ function showSchedQueueModal(info) {
             badgeStatusText = "In Progress";
             break;
 
+        case -1:
         case 1:
             // Status is successful
             badgeStatusColor += "success";
             badgeStatusText = "Success";
             break;
 
-        case -1:
+        case -3:
+        case -2:
             // Status is failed
             badgeStatusColor += "danger";
             badgeStatusText = "Failed";
@@ -823,12 +827,14 @@ function addSchedReqItem(schedReqDict) {
     newStatusSpan.classList.add("badge", "badge-secondary");
     let statusText;
     switch (schedReqDict.status) {
-        case -1:
+        case -3:
+        case -2:
             statusText = "Failed";
             break;
         case 0:
             statusText = "In Progress";
             break;
+        case -1:
         case 1:
             statusText = "Success";
             break;
@@ -870,7 +876,8 @@ function updateSchedReqList(schedReqDict) {
         let statusText;
         let statusClass;
         switch (schedReqDict[idKey].status) {
-            case -1:
+            case -3:
+            case -2:
                 statusText = "Failed";
                 statusClass = "badge-danger";
                 break;
@@ -878,6 +885,7 @@ function updateSchedReqList(schedReqDict) {
                 statusText = "In Progress";
                 statusClass = "badge-secondary";
                 break;
+            case -1:
             case 1:
                 statusText = "Success";
                 statusClass = "badge-success";

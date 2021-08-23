@@ -46,3 +46,11 @@ export BUG_URL=''
 #  it goes through to locate templates on every render_template call. This is
 #  used for debugging
 export EXPLAIN_TEMPLATE_LOADING=''
+
+# Whether to check for modifications of the Jinja template source and
+#  reload it automatically.
+export TEMPLATES_AUTO_RELOAD=true
+
+# Disabling SQLALCHEMY_TRACK_MODIFICATIONS will turn off Flask-SQLAlchemy events
+#  which are unnecessary for this application.
+export SQLALCHEMY_TRACK_MODIFICATIONS=false

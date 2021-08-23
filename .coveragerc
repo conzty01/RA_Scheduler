@@ -24,15 +24,13 @@ omit =
     # Exclude the following files from the project
     addNextMonth.py
     appGlobals.py
+    dataImport/*
     createDB.py
     migrateDB.py
     populateDB.py
-    scheduler*.py
-    schedule/scheduler1_0.py
-    schedule/scheduler2_0.py
-    schedule/scheduler3_0.py
-    schedule/scheduler3_1.py
-    schedule/scheduler4_0.py
+    ra_notifications.py
+    schedule/scheduler*.py
+
 
 [report]
 # Regexes for lines to exclude from consideration

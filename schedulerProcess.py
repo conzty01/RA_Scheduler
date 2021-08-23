@@ -1,14 +1,13 @@
 from schedule.rabbitConnectionManager import RabbitConnectionManager
-from json import loads, dumps, JSONDecodeError
-from schedule import scheduler4_1
-from schedule.ra_sched import RA
+from json import loads, JSONDecodeError
+from schedule import scheduler4_2
+from schedule.ra_sched import RA, Schedule
 from scheduleServer import app
 import copy as cp
 import calendar
 import psycopg2
 import logging
 import atexit
-import pika
 import os
 
 # import the needed functions from other parts of the application
@@ -18,12 +17,12 @@ from staff.staff import getRAStats, addRAPointModifier
 
 # Connect to RabbitMQ for both the consumer and the error queue.
 rabbitConsumerManager = RabbitConnectionManager(
-    os.environ.get('CLOUDAMQP_URL', 'amqp://guest:guest@localhost:5672/%2f'),
-    os.environ.get('RABBITMQ_SCHEDULER_QUEUE', 'genSched')
+    os.getenv('CLOUDAMQP_URL', 'amqp://guest:guest@localhost:5672/%2f'),
+    os.getenv('RABBITMQ_SCHEDULER_QUEUE', 'genSched')
 )
 rabbitErrorQueueManager = RabbitConnectionManager(
-    os.environ.get('CLOUDAMQP_URL', 'amqp://guest:guest@localhost:5672/%2f'),
-    os.environ.get('RABBITMQ_SCHEDULER_FAILURE_QUEUE', 'genSchedErrs'),
+    os.getenv('CLOUDAMQP_URL', 'amqp://guest:guest@localhost:5672/%2f'),
+    os.getenv('RABBITMQ_SCHEDULER_FAILURE_QUEUE', 'genSchedErrs'),
     durable=True
 )
 
@@ -31,7 +30,7 @@ logging.info("Connected to '{}' message queue channel.".format(rabbitConsumerMan
 logging.info("Connected to '{}' message queue channel.".format(rabbitErrorQueueManager.rabbitQueueName))
 
 # Establish DB connection
-psqlConnectionStr = os.environ.get('DATABASE_URL', 'postgres:///ra_sched')
+psqlConnectionStr = os.getenv('DATABASE_URL', 'postgres:///ra_sched')
 dbConn = psycopg2.connect(psqlConnectionStr)
 
 
@@ -462,16 +461,22 @@ def runScheduler(resHallID, monthNum, year, noDutyList, eligibleRAList):
     successful = False
     while not completed:
         # While we are not finished scheduling, create a candidate schedule
-        sched = scheduler4_1.schedule(copy_raList, year, monthNum, doubleDateNum=mulNumAssigned,
-                                      doubleDatePts=mulDutyPts, noDutyDates=copy_noDutyList,
-                                      doubleDays=mulDutyDays, doublePts=mulDutyPts,
-                                      ldaTolerance=ldat, doubleNum=mulNumAssigned,
-                                      prevDuties=prevRADuties, breakDuties=breakDuties,
-                                      setDDFlag=flagMultiDuty, regDutyPts=regDutyPts,
-                                      regNumAssigned=regNumAssigned)
+        sched = scheduler4_2.schedule(
+            copy_raList, year, monthNum, doubleDateNum=mulNumAssigned, doubleDatePts=mulDutyPts,
+            noDutyDates=copy_noDutyList, doubleDays=mulDutyDays, doublePts=mulDutyPts,
+            ldaTolerance=ldat, doubleNum=mulNumAssigned, prevDuties=prevRADuties,
+            breakDuties=breakDuties, setDDFlag=flagMultiDuty, regDutyPts=regDutyPts,
+            regNumAssigned=regNumAssigned
+        )
+
+        # If the schedule's status encountered an error and cannot create a schedule
+        if sched.getStatus() == Schedule.ERROR:
+            # Stop the scheduling attempt and report the error back to the user
+            completed = True
+            continue
 
         # If we were unable to schedule with the previous parameters,
-        if len(sched) == 0:
+        if sched.getStatus() == Schedule.FAIL:
             # Then we should attempt to modify the previous parameters
             #  and try again.
 
@@ -507,8 +512,8 @@ def runScheduler(resHallID, monthNum, year, noDutyList, eligibleRAList):
         logging.info("Unable to Generate Schedule for Hall: {} MonthNum: {} Year: {}"
                      .format(resHallID, monthNum, year))
 
-        # Notify the user of this result
-        return -1, "Unable to Generate Schedule."
+        # Return the schedule object to the caller
+        return sched.getStatus(), "; ".join(str(note) for note in sched.getNotes())
 
     # Add a record to the schedule table in the DB get its ID
     cur.execute("INSERT INTO schedule (hall_id, month_id, created) VALUES (%s, %s, NOW()) RETURNING id;",
@@ -592,7 +597,7 @@ def runScheduler(resHallID, monthNum, year, noDutyList, eligibleRAList):
         #  into the DB that was already in there.
 
         # Log the occurrence
-        logging.warning(
+        logging.exception(
             "IntegrityError encountered when attempting to save duties for Schedule: {}. Rolling back changes."
                 .format(schedId)
         )
@@ -643,7 +648,7 @@ def runScheduler(resHallID, monthNum, year, noDutyList, eligibleRAList):
     logging.info("Successfully Generated Schedule: {}".format(schedId))
 
     # Notify the user of the successful schedule generation!
-    return 1, "successful"
+    return 1, "Schedule generated successfully."
 
 
 if __name__ == "__main__":

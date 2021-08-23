@@ -13,17 +13,8 @@ as a dictionary
 
 This function does not accept any parameters.
 
-This function returns a dictionary in the following format:
-```
-{
-    "uEmail" : <"user".username>
-    "ra_id" : <ra.id>
-    name : <ra.first_name + " " + ra.last_name>
-    hall_id : <ra.hall_id>
-    auth_level : <ra.auth_level>
-    hall_name : <res_hall.name>
-}
-```
+This function returns an AuthenticatedUser Object.
+
 
 ### stdRet(status, msg)
 Create a standard return object to help simplify/unify API responses
@@ -137,3 +128,15 @@ For example:
 >>> formatDateStr(7, 11, 2020, format="DD/MM/YYYY", divider="/")
 >>> "07/11/2020"
 ```
+
+### packageReturnObject(obj, fromServer)
+Package up the provided object. If the fromServer parameter is set to
+True, then the object will be returned as-is. If it is set to False,
+then a serialized version of the object is returned.
+
+ This function accepts the following parameters:
+
+| Name       | Type      | Description |
+|------------|-----------|-------------|
+| obj        | `<obj>`   | Object to be packaged. |
+| fromServer | `<bool>`  | Boolean denoting whether the object should be packaged as a Flask response or not. |
