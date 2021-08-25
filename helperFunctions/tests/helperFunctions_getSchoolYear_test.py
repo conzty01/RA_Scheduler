@@ -1,4 +1,6 @@
 from unittest.mock import MagicMock, patch
+from calendar import monthrange
+import datetime
 import unittest
 
 from helperFunctions.helperFunctions import getSchoolYear
@@ -73,101 +75,169 @@ class TestHelperFunctions_getSchoolYear(unittest.TestCase):
         self.patcher_loggingCRITICAL.stop()
         self.patcher_loggingERROR.stop()
 
-    def test_whenPassedAugust_returnsSchoolYearBeginningInAugust(self):
-        # Test to ensure that when the function is passed the month of August
-        #  the result will be a school year that begins in August of the same
-        #  year that was passed.
+    def test_whenPassedConfiguredStartMonth_returnsSchoolYearBeginningInProvidedYear(self):
+        # Test to ensure that when the function is passed the month that has
+        #  been configured by the hall to the be start of the year, the result
+        #  will be a school year that begins in the same year that was passed.
 
         # -- Arrange --
 
-        # Set the values needed in this test
-        curMonthNum = 8
-        curYear = 2021
+        # Reset the mocks used in this test
+        self.mocked_appGlobals.conn.reset_mock()
 
-        expectedResult = ("2021-08-01", "2022-07-31")
+        # Set the values needed in this test
+        desiredMonthNum = 8
+        desiredYear = 2021
+        desiredHallID = 1
+
+        configuredYearStartMonth = desiredMonthNum
+        configuredYearEndMonth = 7
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (configuredYearStartMonth, configuredYearEndMonth),  # Return the year start and end month values
+        ]
+
+        expectedStartDate = datetime.date(desiredYear, configuredYearStartMonth, 1)
+        expectedEndDate = datetime.date(
+            desiredYear + 1,                                            # End School Year Year
+            configuredYearEndMonth,                                     # End School Year Month
+            monthrange(desiredYear + 1, configuredYearEndMonth)[-1]     # Last Day of End School Year Month
+        )
+
+        expectedResult = (expectedStartDate, expectedEndDate)
 
         # -- Act --
 
-        # Call the function
-        result = getSchoolYear(curMonthNum, curYear)
+        # Call the function being tested
+        result = getSchoolYear(desiredMonthNum, desiredYear, desiredHallID)
 
         # -- Assert --
 
         # Assert that we received the expected result.
         self.assertEqual(expectedResult, result)
 
-
-    def test_whenPassedJuly_returnsSchoolYearEndingInJuly(self):
-        # Test to ensure that when the function is passed the month of July
-        #  the result will be a school year that ends in July of the same
-        #  year that was passed.
+    def test_whenPassedConfiguredEndMonth_returnsSchoolYearEndingInNextYear(self):
+        # Test to ensure that when the function is passed the month that has
+        #  been configured by the hall to the be end of the year, the result
+        #  will be a school year that ends in the next year from the one
+        #  that was passed.
 
         # -- Arrange --
 
-        # Set the values needed in this test
-        curMonthNum = 7
-        curYear = 2022
+        # Reset the mocks used in this test
+        self.mocked_appGlobals.conn.reset_mock()
 
-        expectedResult = ("2021-08-01", "2022-07-31")
+        # Set the values needed in this test
+        desiredMonthNum = 7
+        desiredYear = 2021
+        desiredHallID = 1
+
+        configuredYearStartMonth = 8
+        configuredYearEndMonth = desiredMonthNum
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (configuredYearStartMonth, configuredYearEndMonth),  # Return the year start and end month values
+        ]
+
+        expectedStartDate = datetime.date(desiredYear - 1, configuredYearStartMonth, 1)
+        expectedEndDate = datetime.date(
+            desiredYear,                                            # End School Year Year
+            configuredYearEndMonth,                                 # End School Year Month
+            monthrange(desiredYear, configuredYearEndMonth)[-1]     # Last Day of End School Year Month
+        )
+
+        expectedResult = (expectedStartDate, expectedEndDate)
 
         # -- Act --
 
-        # Call the function
-        result = getSchoolYear(curMonthNum, curYear)
+        # Call the function being tested
+        result = getSchoolYear(desiredMonthNum, desiredYear, desiredHallID)
 
         # -- Assert --
 
         # Assert that we received the expected result.
         self.assertEqual(expectedResult, result)
 
-    def test_whenPassedMonthSeptemberThroughDecember_returnsSchoolYearBeginningInProvidedYear(self):
-        # Test to ensure that when the function is passed a month between September - December
-        #  (inclusive), the function returns a school year that begins in the year provided.
+    def test_whenPassedMonthNumGreaterThanConfiguredStartMonth_returnsSchoolYearBeginningInProvidedYear(self):
+        # Test to ensure that when the function is passed a month number that
+        #  is greater than the hall configured school year start month, the
+        #  function returns a school year that begins in the year provided.
 
         # -- Arrange --
 
-        expectedResult = ("2021-08-01", "2022-07-31")
+        # Reset the mocks used in this test
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the values needed in this test
+        desiredYear = 2021
+        desiredHallID = 1
+
+        configuredYearStartMonth = 8
+        configuredYearEndMonth = 7
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.return_value = (configuredYearStartMonth, configuredYearEndMonth)
+
+        expectedStartDate = datetime.date(desiredYear, configuredYearStartMonth, 1)
+        expectedEndDate = datetime.date(
+            desiredYear + 1,                                            # End School Year Year
+            configuredYearEndMonth,                                     # End School Year Month
+            monthrange(desiredYear + 1, configuredYearEndMonth)[-1]     # Last Day of End School Year Month
+        )
+
+        expectedResult = (expectedStartDate, expectedEndDate)
 
         # -- Act --
-
-        # Call the function
-        sepResult = getSchoolYear(9, 2021)
-        octResult = getSchoolYear(10, 2021)
-        novResult = getSchoolYear(11, 2021)
-        decResult = getSchoolYear(12, 2021)
-
         # -- Assert --
 
-        # Assert that we received the expected results.
-        self.assertEqual(expectedResult, sepResult)
-        self.assertEqual(expectedResult, octResult)
-        self.assertEqual(expectedResult, novResult)
-        self.assertEqual(expectedResult, decResult)
+        # Call the function being tested using different month num values
+        for monthNum in range(configuredYearStartMonth, 13):
+            result = getSchoolYear(monthNum, desiredYear, desiredHallID)
 
-    def test_whenPassedMonthJanuaryThroughJune_returnsSchoolYearEndingInProvidedYear(self):
-        # Test to ensure that when the function is passed a month between January - June
-        #  (inclusive), the function returns a school year that ends in the year provided.
+            # Assert that we received the expected results.
+            self.assertEqual(expectedResult, result)
+
+    def test_whenPassedMonthNumLessThanConfiguredStartMonth_returnsSchoolYearEndingInProvidedYear(self):
+        # Test to ensure that when the function is passed a month number that
+        #  is less than the hall configured school year start month, the
+        #  function returns a school year that ends in the year provided.
 
         # -- Arrange --
 
-        expectedResult = ("2021-08-01", "2022-07-31")
+        # Reset the mocks used in this test
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the values needed in this test
+        desiredYear = 2021
+        desiredHallID = 1
+
+        configuredYearStartMonth = 8
+        configuredYearEndMonth = 7
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.return_value = (configuredYearStartMonth, configuredYearEndMonth)
+
+        expectedStartDate = datetime.date(desiredYear - 1, configuredYearStartMonth, 1)
+        expectedEndDate = datetime.date(
+            desiredYear,                                            # End School Year Year
+            configuredYearEndMonth,                                 # End School Year Month
+            monthrange(desiredYear, configuredYearEndMonth)[-1]     # Last Day of End School Year Month
+        )
+
+        expectedResult = (expectedStartDate, expectedEndDate)
 
         # -- Act --
-
-        # Call the function
-        janResult = getSchoolYear(1, 2022)
-        febResult = getSchoolYear(2, 2022)
-        marResult = getSchoolYear(3, 2022)
-        aprResult = getSchoolYear(4, 2022)
-        mayResult = getSchoolYear(5, 2022)
-        junResult = getSchoolYear(6, 2022)
-
         # -- Assert --
 
-        # Assert that we received the expected results.
-        self.assertEqual(expectedResult, janResult)
-        self.assertEqual(expectedResult, febResult)
-        self.assertEqual(expectedResult, marResult)
-        self.assertEqual(expectedResult, aprResult)
-        self.assertEqual(expectedResult, mayResult)
-        self.assertEqual(expectedResult, junResult)
+        # Call the function being tested using different month num values
+        for monthNum in range(1, configuredYearStartMonth):
+            result = getSchoolYear(monthNum, desiredYear, desiredHallID)
+
+            # Assert that we received the expected results.
+            self.assertEqual(expectedResult, result)

@@ -128,15 +128,20 @@ def fileAllowed(filename):
 
 
 def getSchoolYear(month, year, hallID):
-    # Return a tuple of 2 strings that denote the start and end date of the school year that
-    #  the provided month and year belong to.
+    # Return a tuple of 2 datetime objects that denote the start and end date of
+    #  the school year that the provided month and year belong to.
     #
     #  This function accepts the following parameters:
     #
-    #     month  <int>  -  the integer value representing the month following the standard
-    #                       gregorian calendar convention.
-    #     year   <str>  -  the integer value representing the calendar year following the
-    #                       standard gregorian calendar convention.
+    #     month    <int>  -  an integer value representing the month following the standard
+    #                         gregorian calendar convention.
+    #     year     <int>  -  an integer value representing the calendar year following the
+    #                         standard gregorian calendar convention.
+    #     hallID   <int>  -  an integer value representing the res_hall.id of the hall in question.
+
+    # Ensure the provided month and year are integers
+    month = int(month)
+    year = int(year)
 
     logging.debug("Calculate School Year: {} {}".format(month, year))
 
@@ -148,24 +153,24 @@ def getSchoolYear(month, year, hallID):
 
     startMon, endMon = cur.fetchone()
 
-    if int(month) >= startMon:
+    if month >= startMon:
         # If the provided month is equal to the configured start month or later,
         #  then the current year is the startYear
-        startYear = int(year)
-        endYear = int(year) + 1
+        startYear = year
+        endYear = year + 1
 
     else:
         # If the provided month is earlier than the configured start month,
         #  then the current year is the endYear
-        startYear = int(year) - 1
-        endYear = int(year)
+        startYear = year - 1
+        endYear = year
 
     # Create date objects to represent the start and end dates
     start = datetime.date(startYear, startMon, 1)
     end = datetime.date(endYear, endMon, monthrange(endYear, endMon)[-1])
 
-    logging.debug("Start: " + start)
-    logging.debug("End: " + end)
+    logging.debug("Start: {}".format(start))
+    logging.debug("End: {}".format(end))
 
     return start, end
 
