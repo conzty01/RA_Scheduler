@@ -82,7 +82,7 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
             if day.getDate() in conCountDict.keys():
                 # If, after all the conflicts, there are not enough RAs
                 #  to fill all of the duty slots for the day.
-                if len(raList) - conCountDict[day] < day.numDutySlots():
+                if len(raList) - conCountDict[day.getDate()] < day.numberDutySlots():
                     # Then add the day to the results.
                     res.append(day)
 
@@ -150,7 +150,8 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
                                 isDoubleDay=True,
                                 # Set the flagDutySlot value to True if setDDFlag is True
                                 #  AND this is the last double-day duty slot for this day.
-                                flagDutySlot=(setDDFlag and i == doubleNum - 1)
+                                flagDutySlot=(setDDFlag and i == doubleNum - 1),
+                                numDutySlots=2
                             )
                             dateDict[d_] = tmp
                             d_ = tmp
@@ -180,7 +181,8 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
                                 isDoubleDay=True,
                                 # Set the flagDutySlot value to True if setDDFlag is True
                                 #  AND this is the last double-day duty slot for this day.
-                                flagDutySlot=(setDDFlag and i == doubleDateNum - 1)
+                                flagDutySlot=(setDDFlag and i == doubleDateNum - 1),
+                                numDutySlots=2
                             )
                             dateDict[d_] = tmp
                             d_ = tmp
@@ -196,7 +198,8 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
                             curMonthDay,
                             curWeekDay,
                             customPointVal=regDutyPts,
-                            isDoubleDay=False
+                            isDoubleDay=False,
+                            numDutySlots=1
                         )
                         dateDict[prevDay] = cmd
 
@@ -324,7 +327,7 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
         # Add a note to the schedule object
         retSched.addNote(
             "A schedule could not be generated due to too many duty conflicts on the following day(s): {}"
-                .format(", ".join(str(d) for d in tooManyConsList)),
+                .format(", ".join(str(d.getDate()) for d in tooManyConsList)),
             Schedule.FAIL
         )
 

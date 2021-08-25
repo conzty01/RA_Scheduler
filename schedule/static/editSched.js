@@ -490,10 +490,13 @@ function checkPendingSchedule(retMsg) {
         7,      // Max number of retries
         1000    // Starting backoff in milliseconds
     ).then((res) => {
-        passModalSave("#runModal", res, () => {
+        // Pass in a an object indicating that the scheduling was successful regardless of
+        //  what actually occurred. This is because the runScheduler modal does not handle
+        //  messages from the scheduler queue.
+        passModalSave("#runModal", {msg:"",status:1}, () => {
             document.getElementById("runButton").disabled = false;
             document.getElementById("runModalProgressBar").style.display = "none";
-            //$("body").css("cursor", "auto");
+
         });
     });
 
