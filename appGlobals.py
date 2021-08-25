@@ -13,6 +13,3 @@ conn = psycopg2.connect(os.getenv("DATABASE_URL", "postgres:///ra_sched"))
 UPLOAD_FOLDER = "./static"
 ALLOWED_EXTENSIONS = {'txt', 'csv'}
 
-# Retrieve and parse the list of support users that should be omitted from
-#  duty lists.
-
