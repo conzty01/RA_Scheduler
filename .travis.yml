@@ -6,5 +6,3 @@ script:
 services:
   - rabbitmq
 dist: trusty
-notifications:
-    slack: ra-scheduler:z6I7Y1LLLdzzVggMuJnw4Jiq
