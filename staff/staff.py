@@ -42,7 +42,7 @@ def manStaff():
 
     # Get the information for the current school year.
     #  This will be used to calculate duty points for the RAs.
-    start, end = getCurSchoolYear()
+    start, end = getCurSchoolYear(authedUser.hall_id())
 
     # Create a DB cursor
     cur = ag.conn.cursor()
@@ -178,8 +178,8 @@ def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None
                          (
                              SELECT month.id
                              FROM month
-                             WHERE month.year >= TO_DATE(%s, 'YYYY-MM-DD')
-                             AND month.year <= TO_DATE(%s, 'YYYY-MM-DD')
+                             WHERE month.year >= %s::date
+                             AND month.year <= %s::date
                          )
                          ORDER BY schedule.month_id, schedule.created DESC, schedule.id DESC
                       )
@@ -191,8 +191,8 @@ def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None
                       FROM break_duties JOIN day ON (day.id=break_duties.day_id)
                                         JOIN ra ON (ra.id=break_duties.ra_id)
                       WHERE break_duties.hall_id = %s
-                      AND day.date BETWEEN TO_DATE(%s, 'YYYY-MM-DD')
-                                       AND TO_DATE(%s, 'YYYY-MM-DD')
+                      AND day.date BETWEEN %s::date
+                                       AND %s::date
                       GROUP BY rid
                       
                    ) AS combined_res
@@ -299,7 +299,7 @@ def getStaffStats():
 
     # Get the information for the current school year.
     #  This will be used to calculate duty points for the RAs.
-    start, end = getCurSchoolYear()
+    start, end = getCurSchoolYear(authedUser.hall_id())
 
     # Get each of the RA's duty statistics for the current school year.
     pts = getRAStats(authedUser.hall_id(), start, end)

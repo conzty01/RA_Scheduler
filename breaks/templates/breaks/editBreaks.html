@@ -124,6 +124,19 @@ var bpAPIPrefix = '/breaks';
 <script src="{{url_for('static', filename='fullCal.js')}}"></script>
 <script src="{{url_for('breaks_bp.static', filename='editBreaks.js')}}"></script>
 <script>
+    {# Convert Python's date objects to Javascript's date objects #}
+    const schoolYearStart = new Date(
+        {{ opts["yearStart"].year }},
+        {{ opts["yearStart"].month - 1 }}, {# JS uses 0 based month numbers #}
+        {{ opts["yearStart"].day }}
+    );
+    const schoolYearEnd = new Date(
+        {{ opts["yearEnd"].year }},
+        {{ opts["yearEnd"].month - 1 }}, {# JS uses 0 based month numbers #}
+        {{ opts["yearEnd"].day }}
+    );
+
+    // Initialize the calendar
     initEditSchedCal();
 </script>
 {% endblock %}

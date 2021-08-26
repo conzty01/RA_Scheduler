@@ -49,7 +49,7 @@ def editSched():
 
     # Get the information for the current school year.
     #  This will be used to calculate duty points for the RAs.
-    start, end = getCurSchoolYear()
+    start, end = getCurSchoolYear(authedUser.hall_id())
 
     # Call getRAStats to get information on the number of Duty
     # points each RA has for the current school year
@@ -76,7 +76,9 @@ def editSched():
     # Create a custom settings dictionary
     custSettings = {
         "dutyFlagLabel": dfl,
-        "gCalConnected": gCalConn
+        "gCalConnected": gCalConn,
+        "yearStart": start,
+        "yearEnd": end
     }
 
     # Merge the base options into the custom settings dictionary to simplify passing
@@ -203,13 +205,6 @@ def getSchedule2(start=None, end=None, hallId=None, showAllColors=None):
 
     # Create the result object to be returned
     res = []
-
-    # Check to see if the date range provided is outside of the current academic year
-    if start < getCurSchoolYear(hallId)[0] or start > getCurSchoolYear(hallId)[1] \
-            or end < getCurSchoolYear(hallId)[0] or end > getCurSchoolYear(hallId)[1]:
-
-        # Package and return the empty result
-        return packageReturnObject(res, fromServer)
 
     # Create a DB cursor
     cur = ag.conn.cursor()

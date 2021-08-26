@@ -6,7 +6,7 @@ import logging
 import appGlobals as ag
 
 # Import the needed functions from other parts of the application
-from helperFunctions.helperFunctions import getAuth, stdRet, packageReturnObject
+from helperFunctions.helperFunctions import getAuth, stdRet, getCurSchoolYear
 
 # Create the blueprint representing these routes
 conflicts_bp = Blueprint("conflicts_bp", __name__,
@@ -29,9 +29,22 @@ def conflicts():
     # Authenticate the user against the DB
     authedUser = getAuth()
 
+    # Get the current school year information
+    yearStart, yearEnd = getCurSchoolYear(authedUser.hall_id())
+
+    # Create a custom settings dict
+    custSettings = {
+        "yearStart": yearStart,
+        "yearEnd": yearEnd
+    }
+
+    # Merge the base options into the custom settings dictionary to simplify passing
+    #  settings into the template renderer.
+    custSettings.update(ag.baseOpts)
+
     # Render and return the appropriate template.
     return render_template("conflicts/conflicts.html", auth_level=authedUser.auth_level(), curView=2,
-                           opts=ag.baseOpts, hall_name=authedUser.hall_name(),
+                           opts=custSettings, hall_name=authedUser.hall_name(),
                            linkedHalls=authedUser.getAllAssociatedResHalls())
 
 
@@ -58,6 +71,19 @@ def editCons():
         # Raise an 403 Access Denied HTTP Exception that will be handled by flask
         abort(403)
 
+    # Get the current school year information
+    yearStart, yearEnd = getCurSchoolYear(authedUser.hall_id())
+
+    # Create a custom settings dict
+    custSettings = {
+        "yearStart": yearStart,
+        "yearEnd": yearEnd
+    }
+
+    # Merge the base options into the custom settings dictionary to simplify passing
+    #  settings into the template renderer.
+    custSettings.update(ag.baseOpts)
+
     # Create a DB Cursor
     cur = ag.conn.cursor()
 
@@ -70,7 +96,7 @@ def editCons():
 
     # Render and return the appropriate template.
     return render_template("conflicts/editCons.html", raList=cur.fetchall(), auth_level=authedUser.auth_level(),
-                           curView=3, opts=ag.baseOpts, hall_name=authedUser.hall_name(),
+                           curView=3, opts=custSettings, hall_name=authedUser.hall_name(),
                            linkedHalls=authedUser.getAllAssociatedResHalls())
 
 

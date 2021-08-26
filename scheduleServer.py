@@ -14,7 +14,7 @@ import os
 import appGlobals as ag
 
 # Import the needed functions from other parts of the application
-from helperFunctions.helperFunctions import getAuth
+from helperFunctions.helperFunctions import getAuth, getCurSchoolYear
 
 # Import the blueprints that will be used.
 from breaks.breaks import breaks_bp
@@ -282,8 +282,21 @@ def index():
     # Authenticate the user against the DB
     authedUser = getAuth()
 
+    # Get the current school year information
+    yearStart, yearEnd = getCurSchoolYear(authedUser.hall_id())
+
+    # Create a custom settings dict
+    custSettings = {
+        "yearStart": yearStart,
+        "yearEnd": yearEnd
+    }
+
+    # Merge the base options into the custom settings dictionary to simplify passing
+    #  settings into the template renderer.
+    custSettings.update(ag.baseOpts)
+
     # Render the appropriate template
-    return render_template("index.html", auth_level=authedUser.auth_level(), curView=1, opts=ag.baseOpts,
+    return render_template("index.html", auth_level=authedUser.auth_level(), curView=1, opts=custSettings,
                            hall_name=authedUser.hall_name(), linkedHalls=authedUser.getAllAssociatedResHalls())
 
 

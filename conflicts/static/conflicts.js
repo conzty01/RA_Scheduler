@@ -44,33 +44,50 @@ function initConflictCal() {
 function conflictNext() {
     console.log("Change Month: Next");
 
-    appConfig.calDate.setMonth(appConfig.calDate.getMonth() + 1);
-    console.log(appConfig.calDate);
+    // Check to see if the 'next' button has been disabled
+    if (!$('.fc-customNextButton-button').prop('disabled')) {
+        appConfig.calDate.setMonth(appConfig.calDate.getMonth() + 1);
+        console.log(appConfig.calDate);
 
-    getPrevConflicts();
+        getPrevConflicts();
 
-    calendar.currentData.calendarApi.next();
+        calendar.currentData.calendarApi.next();
+
+        // Enable and disable the appropriate buttons
+        determineNavigationButtonStatus();
+    }
 }
 
 function conflictPrev() {
     console.log("Change Month: Prev");
 
-    appConfig.calDate.setMonth(appConfig.calDate.getMonth() - 1);
-    console.log(appConfig.calDate);
+    // Check to see if the 'previous' button has been disabled
+    if (!$('.fc-customPrevButton-button').prop('disabled')) {
 
-    getPrevConflicts();
+        appConfig.calDate.setMonth(appConfig.calDate.getMonth() - 1);
+        console.log(appConfig.calDate);
 
-    calendar.currentData.calendarApi.prev();
+        getPrevConflicts();
+
+        calendar.currentData.calendarApi.prev();
+
+        // Enable and disable the appropriate buttons
+        determineNavigationButtonStatus();
+    }
 }
 
 function conflictToday() {
     console.log("Change Month: Today");
 
     appConfig.calDate.setMonth(appConfig.curDate.getMonth());
+    appConfig.calDate.setFullYear(appConfig.curDate.getFullYear());
 
     getPrevConflicts();
 
     calendar.currentData.calendarApi.today();
+
+    // Enable and disable the appropriate buttons
+    determineNavigationButtonStatus();
 }
 
 function conflict_DateClick(info) {

@@ -13,6 +13,7 @@ breaks_bp = Blueprint("breaks_bp", __name__,
                       template_folder="templates",
                       static_folder="static")
 
+
 # ---------------------
 # --      Views      --
 # ---------------------
@@ -42,7 +43,7 @@ def editBreaks():
 
     # Get the information for the current school year.
     #  This will be used to calculate break duty points for the RAs.
-    start, end = getCurSchoolYear()
+    start, end = getCurSchoolYear(authedUser.hall_id())
 
     logging.debug(start)
     logging.debug(end)
@@ -52,6 +53,19 @@ def editBreaks():
     bkDict = getRABreakStats(authedUser.hall_id(), start, end)
 
     logging.debug(str(bkDict))
+
+    # Get the current school year information
+    yearStart, yearEnd = getCurSchoolYear(authedUser.hall_id())
+
+    # Create a custom settings dict
+    custSettings = {
+        "yearStart": yearStart,
+        "yearEnd": yearEnd
+    }
+
+    # Merge the base options into the custom settings dictionary to simplify passing
+    #  settings into the template renderer.
+    custSettings.update(ag.baseOpts)
 
     # Create a DB cursor
     cur = ag.conn.cursor()
@@ -66,7 +80,7 @@ def editBreaks():
     # Render and return the appropriate template
     return render_template("breaks/editBreaks.html", raList=cur.fetchall(), auth_level=authedUser.auth_level(),
                            bkDict=sorted(bkDict.items(), key=lambda x: x[1]["name"].split(" ")[1]),
-                           curView=3, opts=ag.baseOpts, hall_name=authedUser.hall_name(),
+                           curView=3, opts=custSettings, hall_name=authedUser.hall_name(),
                            linkedHalls=authedUser.getAllAssociatedResHalls())
 
 
@@ -147,7 +161,7 @@ def getRABreakStats(hallId=None, startDateStr=None, endDateStr=None):
         FROM ra LEFT JOIN (
             SELECT ra_id as rid, COUNT(break_duties.id)
             FROM break_duties JOIN day ON (day.id = break_duties.day_id)
-            WHERE day.date BETWEEN TO_DATE(%s, 'YYYY-MM-DD') AND TO_DATE(%s, 'YYYY-MM-DD')
+            WHERE day.date BETWEEN %s::date AND %s::date
             AND hall_id = %s
             GROUP BY ra_id
         ) AS numQuery ON (ra.id = numQuery.rid)
@@ -188,22 +202,22 @@ def getBreakDuties(hallId=None, start=None, end=None, showAllColors=False, raId=
     #
     #  If called from the server, this function accepts the following parameters:
     #
-    #     hallId         <int>  -  an integer representing the id of the desired residence
-    #                               hall in the res_hall table.
-    #     start          <str>  -  a string representing the first day that should be included
-    #                               for the returned duty schedule.
-    #     end            <str>  -  a string representing the last day that should be included
-    #                               for the returned duty schedule.
-    #     showAllColors  <bool> -  a boolean value representing whether the returned duty
-    #                               schedule should include the RA's ra.color value or if
-    #                               the generic value '#2C3E50' should be returned. Setting
-    #                               this value to True will return the RA's ra.color value.
-    #                               By default this parameter is set to False.
+    #     hallId         <int>   -  an integer representing the id of the desired residence
+    #                                hall in the res_hall table.
+    #     start          <date>  -  a datetime object representing the first day that should be included
+    #                                for the returned duty schedule.
+    #     end            <date>  -  a datetime object representing the last day that should be included
+    #                                for the returned duty schedule.
+    #     showAllColors  <bool>  -  a boolean value representing whether the returned duty
+    #                                schedule should include the RA's ra.color value or if
+    #                                the generic value '#2C3E50' should be returned. Setting
+    #                                this value to True will return the RA's ra.color value.
+    #                                By default this parameter is set to False.
     #
-    #     raId           <int>  -  an integer representing the id of the RA that should be
-    #                               considered the requesting user. By default this value is
-    #                               set to -1 which indicates that no RA should be considered
-    #                               the requesting user.
+    #     raId           <int>   -  an integer representing the id of the RA that should be
+    #                                considered the requesting user. By default this value is
+    #                                set to -1 which indicates that no RA should be considered
+    #                                the requesting user.
     #
     #  If called from a client, the following parameters are required:
     #
@@ -268,10 +282,10 @@ def getBreakDuties(hallId=None, start=None, end=None, showAllColors=False, raId=
     res = []
 
     # Check to see if the date range provided is outside of the current academic year
-    if start < getCurSchoolYear(hallId)[0] or start > getCurSchoolYear(hallId)[1] \
-            or end < getCurSchoolYear(hallId)[0] or end > getCurSchoolYear(hallId)[1]:
-        # Package and return the empty result
-        return packageReturnObject(res, fromServer)
+    # if start < getCurSchoolYear(hallId)[0] or start > getCurSchoolYear(hallId)[1] \
+    #         or end < getCurSchoolYear(hallId)[0] or end > getCurSchoolYear(hallId)[1]:
+    #     # Package and return the empty result
+    #     return packageReturnObject(res, fromServer)
 
     # Create a DB cursor
     cur = ag.conn.cursor()
@@ -284,8 +298,8 @@ def getBreakDuties(hallId=None, start=None, end=None, showAllColors=False, raId=
                           JOIN month ON (month.id=break_duties.month_id)
                           JOIN ra ON (ra.id=break_duties.ra_id)
         WHERE break_duties.hall_id = %s
-        AND month.year >= TO_DATE(%s,'YYYY-MM')
-        AND month.year <= TO_DATE(%s,'YYYY-MM')
+        AND month.year >= %s::date
+        AND month.year <= %s::date
     """, (hallId, start, end))
 
     # Iterate through the query result (each day of the break schedule) and assemble
@@ -500,7 +514,7 @@ def deleteBreakDuty():
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
-        logging.info("User Not Authorized - RA: {}attempted to add Break Duty for Hall: {}"
+        logging.info("User Not Authorized - RA: {} attempted to add Break Duty for Hall: {}"
                      .format(authedUser.ra_id(), authedUser.hall_id()))
 
         # Notify the user that they are not authorized.
@@ -528,7 +542,7 @@ def deleteBreakDuty():
     raId = cur.fetchone()
 
     # Query the DB for the day and month ids for the break duty on the provided day.
-    cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE(%s, 'MM/DD/YYYY');",
+    cur.execute("SELECT id, month_id FROM day WHERE date = %s::date;",
                 (data["dateStr"],))
 
     # Load the results from the DB
@@ -658,7 +672,7 @@ def changeBreakDuty():
     oldRA = cur.fetchone()
 
     # Query the DB for the day and month ids for the break duty on the provided day.
-    cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE(%s, 'MM/DD/YYYY');",
+    cur.execute("SELECT id, month_id FROM day WHERE date = %s::date;",
                 (data["dateStr"],))
 
     # Load the results from the DB
