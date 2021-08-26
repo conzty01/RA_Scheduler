@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 from scheduleServer import app
 import unittest
+import datetime
 
 from breaks.breaks import getRABreakStats
 from helperFunctions.helperFunctions import AuthenticatedUser
@@ -112,6 +113,17 @@ class TestBreakBP_getRABreakStats(unittest.TestCase):
         self.mocked_appGlobals.UPLOAD_FOLDER = "./static"
         self.mocked_appGlobals.ALLOWED_EXTENSIONS = {"txt", "csv"}
 
+        # Create a patcher for the getCurSchoolYear method
+        self.patcher_getCurSchoolYear = patch("breaks.breaks.getCurSchoolYear", autospec=True)
+
+        # Start the patcher - mock returned
+        self.mocked_getCurSchoolYear = self.patcher_getCurSchoolYear.start()
+
+        # Configure the mocked getCurSchoolYear
+        self.helper_schoolYearStart = datetime.date(2021, 8, 1)
+        self.helper_schoolYearEnd = datetime.date(2022, 7, 31)
+        self.mocked_getCurSchoolYear.return_value = (self.helper_schoolYearStart, self.helper_schoolYearEnd)
+
         # -- Create a patchers for the logging --
         self.patcher_loggingDEBUG = patch("logging.debug", autospec=True)
         self.patcher_loggingINFO = patch("logging.info", autospec=True)
@@ -131,6 +143,7 @@ class TestBreakBP_getRABreakStats(unittest.TestCase):
         self.patcher_getAuth.stop()
         self.patcher_appGlobals.stop()
         self.patcher_osEnviron.stop()
+        self.patcher_getCurSchoolYear.stop()
 
         self.patcher_loggingDEBUG.stop()
         self.patcher_loggingINFO.stop()
@@ -216,7 +229,7 @@ class TestBreakBP_getRABreakStats(unittest.TestCase):
         FROM ra LEFT JOIN (
             SELECT ra_id as rid, COUNT(break_duties.id)
             FROM break_duties JOIN day ON (day.id = break_duties.day_id)
-            WHERE day.date BETWEEN TO_DATE(%s, 'YYYY-MM-DD') AND TO_DATE(%s, 'YYYY-MM-DD')
+            WHERE day.date BETWEEN %s::date AND %s::date
             AND hall_id = %s
             GROUP BY ra_id
         ) AS numQuery ON (ra.id = numQuery.rid)
@@ -307,7 +320,7 @@ class TestBreakBP_getRABreakStats(unittest.TestCase):
         FROM ra LEFT JOIN (
             SELECT ra_id as rid, COUNT(break_duties.id)
             FROM break_duties JOIN day ON (day.id = break_duties.day_id)
-            WHERE day.date BETWEEN TO_DATE(%s, 'YYYY-MM-DD') AND TO_DATE(%s, 'YYYY-MM-DD')
+            WHERE day.date BETWEEN %s::date AND %s::date
             AND hall_id = %s
             GROUP BY ra_id
         ) AS numQuery ON (ra.id = numQuery.rid)
