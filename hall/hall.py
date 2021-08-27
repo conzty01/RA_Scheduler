@@ -1,4 +1,4 @@
-from flask import render_template, request, jsonify, Blueprint, abort
+from flask import render_template, request, Blueprint, abort
 from flask_login import login_required
 from psycopg2.extras import Json
 from calendar import month_name
@@ -8,7 +8,7 @@ import logging
 import appGlobals as ag
 
 # Import the needed functions from other parts of the application
-from helperFunctions.helperFunctions import getAuth, stdRet
+from helperFunctions.helperFunctions import getAuth, stdRet, packageReturnObject
 
 # Create the blueprint representing these routes
 hall_bp = Blueprint("hall_bp", __name__,
@@ -97,7 +97,7 @@ def getHallSettings(hallId=None):
                          .format(authedUser.ra_id()))
 
             # Notify the user that they are not authorized.
-            return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+            return packageReturnObject(stdRet(-1, "NOT AUTHORIZED"), fromServer)
 
     logging.debug("Retrieving Hall Setting information for Hall: {}, From Server: {}"
                   .format(hallId, fromServer))
@@ -202,14 +202,8 @@ def getHallSettings(hallId=None):
         # Append the setting to the settingList
         settingList.append(tmp)
 
-    # If this API method was called from the server
-    if fromServer:
-        # Then return the settingList as-is
-        return settingList
-
-    else:
-        # Otherwise return a JSON version of the settingList
-        return jsonify(settingList)
+    # Return the settings
+    return packageReturnObject(settingList, fromServer)
 
 
 @hall_bp.route("/api/saveHallSettings", methods=["POST"])
@@ -245,7 +239,7 @@ def saveHallSettings():
                      .format(authedUser.ra_id(), authedUser.hall_id()))
 
         # Notify the user that they are not authorized.
-        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+        return packageReturnObject(stdRet(-1, "NOT AUTHORIZED"))
 
     # Get the name and value of the setting that was changed.
     data = request.json
@@ -278,7 +272,7 @@ def saveHallSettings():
         cur.close()
 
         # Indicate to the client that the user does not belong to the provided hall
-        return jsonify(stdRet(0, "NOT AUTHORIZED"))
+        return packageReturnObject(stdRet(0, "NOT AUTHORIZED"))
 
     # Log that the user is updating the provided setting for the given hall
     logging.info("User: {} is updating Hall Setting: '{}' for Hall: {}"
@@ -298,7 +292,7 @@ def saveHallSettings():
         cur.close()
 
         # Return a successful result
-        return jsonify(stdRet(1, "successful"))
+        return packageReturnObject(stdRet(1, "successful"))
 
     elif setName == "Duty Configuration":
         # We are attempting to update the hall_settings.duty_config field in the DB
@@ -314,7 +308,7 @@ def saveHallSettings():
         cur.close()
 
         # Return a successful result
-        return jsonify(stdRet(1, "successful"))
+        return packageReturnObject(stdRet(1, "successful"))
 
     elif setName == "Defined School Year":
         # We are attempting to update the hall_settings.year_start_mon and
@@ -333,7 +327,7 @@ def saveHallSettings():
         cur.close()
 
         # Return a successful result
-        return jsonify(stdRet(1, "successful"))
+        return packageReturnObject(stdRet(1, "successful"))
 
     elif setName == "Multi-Duty Day Flag":
         # We are attempting to update the hall_settings.flag_multi_duty and
@@ -352,7 +346,7 @@ def saveHallSettings():
         cur.close()
 
         # Return a successful result
-        return jsonify(stdRet(1, "successful"))
+        return packageReturnObject(stdRet(1, "successful"))
 
     elif setName == "Automatic RA Point Adjustment":
         # We are attempting to update the hall_settings.auto_adj_excl_ra_pts
@@ -367,7 +361,7 @@ def saveHallSettings():
         cur.close()
 
         # Return a successful result
-        return jsonify(stdRet(1, "successful"))
+        return packageReturnObject(stdRet(1, "successful"))
 
     else:
         # We are attempting to update a setting that does not require any special attention.
@@ -381,7 +375,7 @@ def saveHallSettings():
     cur.close()
 
     # Indicate to the client that the save was successful
-    return jsonify(stdRet(0, "Unknown Setting Provided"))
+    return packageReturnObject(stdRet(0, "Unknown Setting Provided"))
 
 
 # ----------------------

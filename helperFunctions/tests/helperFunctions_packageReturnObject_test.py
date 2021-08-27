@@ -58,6 +58,43 @@ class TestHelperFunctions_getSchoolYear(unittest.TestCase):
 
         self.patcher_flaskJSONIFY.stop()
 
+    def test_ensureFromServerDefaultsToFalse(self):
+        # Test to ensure that when the provided fromServer parameter is
+        #  set to False, the method returns the object as it was provided.
+
+        # -- Arrange --
+
+        # Reset the mocks used in this test
+        self.mocked_flaskJSONIFY.reset_mock()
+
+        # Create the objects for this test
+        testList = [1, 2, 3]
+        testTuple = (1, 2, 3)
+        testString = "Test String"
+        testInt = 20210820
+
+        # -- Act --
+
+        # Call the method being tested
+        listRes = packageReturnObject(testList)
+        tupleRes = packageReturnObject(testTuple)
+        stringRes = packageReturnObject(testString)
+        intRes = packageReturnObject(testInt)
+
+        # -- Assert --
+
+        # Assert that the jsonify method was called on each of the test objects
+        self.mocked_flaskJSONIFY.assert_has_calls(
+            [call(testList), call(testTuple), call(testString), call(testInt)],
+            any_order=True
+        )
+
+        # Assert that we received the expected result
+        self.assertListEqual(testList, listRes)
+        self.assertTupleEqual(testTuple, tupleRes)
+        self.assertEqual(testString, stringRes)
+        self.assertEqual(testInt, intRes)
+
     def test_whenFromServerParameterIsFalse_returnsSerializedObject(self):
         # Test to ensure that when the provided fromServer parameter is
         #  set to False, the method returns the object as it was provided.

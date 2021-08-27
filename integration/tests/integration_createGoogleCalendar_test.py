@@ -192,11 +192,8 @@ class TestIntegration_createGoogleCalendar(unittest.TestCase):
         # Assert that appGlobals.conn.cursor().close was called
         self.mocked_appGlobals.conn.cursor().close.assert_called_once()
 
-        # Assert that we received a json response
-        self.assertTrue(resp.is_json)
-
         # Assert that we received our expected result
-        self.assertEqual(expectedResponse, resp.json)
+        self.assertEqual(expectedResponse, resp)
 
     @patch("integration.integrations.BytesIO", autospec=True)
     @patch("integration.integrations.pickle", autospec=True)

@@ -1,4 +1,4 @@
-from flask import render_template, request, jsonify, redirect, url_for, Blueprint, abort
+from flask import render_template, request, redirect, url_for, Blueprint, abort
 from flask_login import login_required
 from psycopg2 import IntegrityError
 import logging
@@ -7,7 +7,7 @@ import logging
 import appGlobals as ag
 
 # Import the needed functions from other parts of the application
-from helperFunctions.helperFunctions import getAuth, stdRet, getCurSchoolYear, fileAllowed
+from helperFunctions.helperFunctions import getAuth, stdRet, getCurSchoolYear, fileAllowed, packageReturnObject
 
 staff_bp = Blueprint("staff_bp", __name__,
                      template_folder="templates",
@@ -117,13 +117,14 @@ def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None
 
         # Get the user's information from the database
         authedUser = getAuth()
+        # Mark that this method was not called from the server
+        fromServer = False
         # Set the value of hallId from the userDict
         hallId = authedUser.hall_id()
         # Get the startDateStr and endDateStr from the request arguments
         startDateStr = request.args.get("start")
         endDateStr = request.args.get("end")
-        # Mark that this method was not called from the server
-        fromServer = False
+
 
     logging.debug("Get RA Stats - FromServer: {}".format(fromServer))
 
@@ -227,14 +228,8 @@ def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None
     # Close the DB cursor
     cur.close()
 
-    # If this API method was called from the server
-    if fromServer:
-        # Then return the result as-is
-        return res
-
-    else:
-        # Otherwise return a JSON version of the result
-        return jsonify(res)
+    # Return the result
+    return packageReturnObject(res, fromServer)
 
 
 @staff_bp.route("/api/getStaffInfo", methods=["GET"])
@@ -284,7 +279,7 @@ def getStaffStats():
         logging.info("User Not Authorized - RA: {}".format(authedUser.ra_id()))
 
         # Notify the user that they are not authorized.
-        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+        return packageReturnObject(stdRet(-1, "NOT AUTHORIZED"))
 
     # Create a DB cursor
     cur = ag.conn.cursor()
@@ -308,7 +303,7 @@ def getStaffStats():
     ret = {"raList": cur.fetchall(), "pts": pts}
 
     # return a JSON version of the return result
-    return jsonify(ret)
+    return packageReturnObject(ret)
 
 
 @staff_bp.route("/api/changeStaffInfo", methods=["POST"])
@@ -352,7 +347,7 @@ def changeStaffInfo():
         logging.info("User Not Authorized - RA: {}".format(authedUser.ra_id()))
 
         # Notify the user that they are not authorized.
-        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+        return packageReturnObject(stdRet(-1, "NOT AUTHORIZED"))
 
     # Load the data provided by the client
     data = request.json
@@ -378,7 +373,7 @@ def changeStaffInfo():
         cur.close()
 
         # Indicate to the client that the user does not belong to the provided hall
-        return jsonify(stdRet(0, "NOT AUTHORIZED"))
+        return packageReturnObject(stdRet(0, "NOT AUTHORIZED"))
 
     else:
         # Otherwise go ahead and update the RA's information
@@ -406,7 +401,7 @@ def changeStaffInfo():
         cur.close()
 
     # Indicate to the client that the save was successful
-    return jsonify(stdRet(1, "successful"))
+    return packageReturnObject(stdRet(1, "successful"))
 
 
 @staff_bp.route("/api/removeStaffer", methods=["POST"])
@@ -444,7 +439,7 @@ def removeStaffer():
         logging.info("User Not Authorized - RA: {}".format(authedUser.ra_id()))
 
         # Notify the user that they are not authorized.
-        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+        return packageReturnObject(stdRet(-1, "NOT AUTHORIZED"))
 
     # Load the raID from the request's JSON
     raID = request.json
@@ -472,7 +467,7 @@ def removeStaffer():
         cur.close()
 
         # Indicate to the client that the user does not belong to the provided hall
-        return jsonify(stdRet(0, "NOT AUTHORIZED"))
+        return packageReturnObject(stdRet(0, "NOT AUTHORIZED"))
 
     else:
         # Otherwise go ahead and remove the RA from the hall
@@ -488,7 +483,7 @@ def removeStaffer():
         cur.close()
 
     # Indicate to the client that the save was successful
-    return jsonify(stdRet(1, "successful"))
+    return packageReturnObject(stdRet(1, "successful"))
 
 
 @staff_bp.route("/api/addStaffer", methods=["POST"])
@@ -529,7 +524,7 @@ def addStaffer():
                      .format(authedUser.ra_id(), authedUser.hall_id()))
 
         # Notify the user that they are not authorized.
-        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+        return packageReturnObject(stdRet(-1, "NOT AUTHORIZED"))
 
     # Load the data from the request's JSON
     data = request.json
@@ -582,7 +577,7 @@ def addStaffer():
     ag.conn.commit()
 
     # Notify the client that the save was successful
-    return jsonify(stdRet(1, "successful"))
+    return packageReturnObject(stdRet(1, "successful"))
 
 
 @staff_bp.route("/api/importStaff", methods=["POST"])
@@ -623,7 +618,7 @@ def importStaff():
                      .format(authedUser.ra_id(), authedUser.hall_id()))
 
         # Notify the user that they are not authorized.
-        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+        return packageReturnObject(stdRet(-1, "NOT AUTHORIZED"))
 
     logging.info("Import File: {} for Hall: {}".format(request.files, authedUser.hall_id()))
 
@@ -633,7 +628,9 @@ def importStaff():
         logging.info("No file part found")
 
         # Notify the client that there was a transmission issue.
-        return jsonify(stdRet(0, "There appears to have been an issue uploading the file. - No File Part Found"))
+        return packageReturnObject(
+            stdRet(0, "There appears to have been an issue uploading the file. - No File Part Found")
+        )
 
     # Otherwise load the file
     file = request.files['file']
@@ -647,7 +644,7 @@ def importStaff():
         logging.info("No File Selected")
 
         # Notify the client that this issue occurred.
-        return jsonify(stdRet(0, "No File Selected"))
+        return packageReturnObject(stdRet(0, "No File Selected"))
 
     # Check to ensure that 1) we have a file and 2) the file type is allowed
     if file and fileAllowed(file.filename):
@@ -699,7 +696,7 @@ def importStaff():
                                  .format(authedUser.hall_id()))
 
                     # Notify the client of this issue.
-                    return jsonify(ret)
+                    return packageReturnObject(ret)
 
                 # Check the authorization level indicated by the row
                 #  and translate the human-readable text into the values

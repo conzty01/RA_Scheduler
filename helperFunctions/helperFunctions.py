@@ -263,7 +263,7 @@ def formatDateStr(day, month, year, format="YYYY-MM-DD", divider="-"):
     return result[:-1]
 
 
-def packageReturnObject(obj, fromServer):
+def packageReturnObject(obj, fromServer=False):
     # Package up the provided object. If the fromServer parameter is set to
     #  True, then the object will be returned as-is. If it is set to False,
     #  then a serialized version of the object is returned.

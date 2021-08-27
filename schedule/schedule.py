@@ -1,5 +1,5 @@
-from flask import render_template, request, jsonify, Blueprint, abort
 from schedule.rabbitConnectionManager import RabbitConnectionManager
+from flask import render_template, request, Blueprint, abort
 from flask_login import login_required
 import logging
 import os
@@ -187,6 +187,9 @@ def getSchedule2(start=None, end=None, hallId=None, showAllColors=None):
         # Set the value of hallId from the userDict
         hallId = authedUser.hall_id()
 
+        # Mark that this method was not called from the server
+        fromServer = False
+
         # Get the start and end string values from the request arguments.
         #  Since we utilize the fullCal.js library, we know that the request
         #  also contains timezone information that we do not care about in
@@ -197,9 +200,6 @@ def getSchedule2(start=None, end=None, hallId=None, showAllColors=None):
 
         # Load the showAllColors from the request arguments
         showAllColors = request.args.get("allColors") == "true"
-
-        # Mark that this method was not called from the server
-        fromServer = False
 
     logging.debug("Get Schedule - From Server: {}".format(fromServer))
 
@@ -334,7 +334,7 @@ def queueScheduler():
                      .format(authedUser.ra_id()))
 
         # Notify the user that they are not authorized.
-        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+        return packageReturnObject(stdRet(-1, "NOT AUTHORIZED"))
 
     logging.debug("Request.json: {}".format(request.json))
 
@@ -376,7 +376,7 @@ def queueScheduler():
                         .format(ve))
 
         # Notify the user of the error
-        return jsonify(
+        return packageReturnObject(
             stdRet(-1, "Error Parsing Scheduler Request Parameters. Please refresh and try again.")
         )
 
@@ -389,7 +389,7 @@ def queueScheduler():
                         .format(ke))
 
         # Notify the user of the error
-        return jsonify(stdRet(-1, "Missing Scheduler Parameters. Please refresh and try again."))
+        return packageReturnObject(stdRet(-1, "Missing Scheduler Parameters. Please refresh and try again."))
 
     # Set the value of the hallId from the userDict
     hallId = authedUser.hall_id()
@@ -432,12 +432,14 @@ def queueScheduler():
         # If the channel gave us an error, then re-establish the RabbitMQ connection.
 
         # Notify the user to try again
-        return jsonify(stdRet(-1, "Connection to message broker interrupted. Please try again."))
+        return packageReturnObject(stdRet(-1, "Connection to message broker interrupted. Please try again."))
 
     logging.info("Successfully queued scheduler request {} for Res Hall: {}".format(sqid, hallId))
 
     # Notify the user of the successful schedule generation!
-    return jsonify({"status": status, "created_date": created_date.strftime("%m/%d/%y"), "sqid": sqid})
+    return packageReturnObject(
+        {"status": status, "created_date": created_date.strftime("%m/%d/%y"), "sqid": sqid}
+    )
 
 
 @schedule_bp.route("/api/checkSchedulerStatus", methods=["GET"])
@@ -471,6 +473,9 @@ def checkSchedulerStatus(sqid=None):
         # Get the user's information from the database
         authedUser = getAuth()
 
+        # Mark that this method was not called from the server
+        fromServer = False
+
         # Check to see if the user is authorized to query schedule statuses
         # If the user is not at least an AHD
         if authedUser.auth_level() < 2:
@@ -483,13 +488,10 @@ def checkSchedulerStatus(sqid=None):
             )
 
             # Notify the user that they are not authorized.
-            return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+            return packageReturnObject(stdRet(-1, "NOT AUTHORIZED"), fromServer)
 
         # Get the SQID from the request
         sqid = request.args.get("sqid")
-
-        # Mark that this method was not called from the server
-        fromServer = False
 
     logging.debug("Check Scheduler Status - SQID: {}".format(sqid))
 
@@ -517,14 +519,8 @@ def checkSchedulerStatus(sqid=None):
     # Close the cursor
     cur.close()
 
-    # If this API method was called from the server
-    if fromServer:
-        # Then return the result as-is
-        return {"status": status, "msg": reason, "sqid": sqid}
-
-    else:
-        # Otherwise return a JSON version of the result
-        return jsonify({"status": status, "msg": reason, "sqid": sqid})
+    # Return the result
+    return packageReturnObject({"status": status, "msg": reason, "sqid": sqid}, fromServer)
 
 
 @schedule_bp.route("/api/getSchedulerQueueItemInfo", methods=["GET"])
@@ -565,6 +561,9 @@ def getScheduleQueueItemInfo(sqid=None, resHallID=None):
         # Get the user's information from the database
         authedUser = getAuth()
 
+        # Mark that this method was not called from the server
+        fromServer = False
+
         # Check to see if the user is authorized to query schedule statuses
         # If the user is not at least an AHD
         if authedUser.auth_level() < 2:
@@ -577,7 +576,7 @@ def getScheduleQueueItemInfo(sqid=None, resHallID=None):
             )
 
             # Notify the user that they are not authorized.
-            return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+            return packageReturnObject(stdRet(-1, "NOT AUTHORIZED"), fromServer)
 
         try:
             # Get the SQID from the request
@@ -590,13 +589,10 @@ def getScheduleQueueItemInfo(sqid=None, resHallID=None):
             logging.warning("Unable to parse SQID from getScheduleQueueItemInfo API request")
 
             # Notify the user that there was an error
-            return jsonify(stdRet(-1, "Invalid SQID"))
+            return packageReturnObject(stdRet(-1, "Invalid SQID"), fromServer)
 
         # Get the user's res hall ID
         resHallID = authedUser.hall_id()
-
-        # Mark that this method was not called from the server
-        fromServer = False
 
     logging.debug("Get Scheduler Info - SQID: {}, Hall: {}".format(sqid, resHallID))
 
@@ -641,14 +637,8 @@ def getScheduleQueueItemInfo(sqid=None, resHallID=None):
     # Close the cursor
     cur.close()
 
-    # If this API method was called from the server
-    if fromServer:
-        # Then return the result as-is
-        return ret
-
-    else:
-        # Otherwise return a JSON version of the result
-        return jsonify(ret)
+    # Return the result
+    return packageReturnObject(ret, fromServer)
 
 
 @schedule_bp.route("/api/getRecentSchedulerRequests", methods=["GET"])
@@ -689,6 +679,9 @@ def getRecentSchedulerRequests(resHallID=None):
         # Get the user's information from the database
         authedUser = getAuth()
 
+        # Mark that this method was not called from the server
+        fromServer = False
+
         # Check to see if the user is authorized to query schedule statuses
         # If the user is not at least an AHD
         if authedUser.auth_level() < 2:
@@ -701,13 +694,10 @@ def getRecentSchedulerRequests(resHallID=None):
             )
 
             # Notify the user that they are not authorized.
-            return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+            return packageReturnObject(stdRet(-1, "NOT AUTHORIZED"), fromServer)
 
         # Get the user's res hall ID
         resHallID = authedUser.hall_id()
-
-        # Mark that this method was not called from the server
-        fromServer = False
 
     logging.debug("Get Scheduler Requests - Hall: {}".format(resHallID))
 
@@ -736,14 +726,8 @@ def getRecentSchedulerRequests(resHallID=None):
     # Close the cursor
     cur.close()
 
-    # If this API method was called from the server
-    if fromServer:
-        # Then return the result as-is
-        return res
-
-    else:
-        # Otherwise return a JSON version of the result
-        return jsonify(res)
+    # Return the result
+    return packageReturnObject(res, fromServer)
 
 
 @schedule_bp.route("/api/alterDuty", methods=["POST"])
@@ -789,7 +773,7 @@ def alterDuty():
                      .format(authedUser.ra_id(), authedUser.hall_id()))
 
         # Notify the user that they are not authorized.
-        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+        return packageReturnObject(stdRet(-1, "NOT AUTHORIZED"))
 
     # Load the data from the request json
     data = request.json
@@ -823,7 +807,7 @@ def alterDuty():
         cur.close()
 
         # Notify the user and stop processing
-        return jsonify(stdRet(0, "New Assigned RA is Not a Valid Selection"))
+        return packageReturnObject(stdRet(0, "New Assigned RA is Not a Valid Selection"))
 
     # Query the DB for the RA that is currently assigned for the duty.
     cur.execute("""
@@ -846,7 +830,7 @@ def alterDuty():
         cur.close()
 
         # Notify the user and stop processing
-        return jsonify(stdRet(0, "Unable to Locate Previously Assigned RA for Duty."))
+        return packageReturnObject(stdRet(0, "Unable to Locate Previously Assigned RA for Duty."))
 
     # Query the DB for the day that the duty occurs on
     cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE(%s, 'MM/DD/YYYY');", (data["dateStr"],))
@@ -864,7 +848,7 @@ def alterDuty():
         cur.close()
 
         # Notify the user and stop processing
-        return jsonify(stdRet(0, "Invalid Date"))
+        return packageReturnObject(stdRet(0, "Invalid Date"))
 
     else:
         # Otherwise, unpack the query results
@@ -887,7 +871,7 @@ def alterDuty():
         cur.close()
 
         # Notify the user and stop processing
-        return jsonify(stdRet(0, "Unable to validate schedule."))
+        return packageReturnObject(stdRet(0, "Unable to validate schedule."))
 
     # Execute an UPDATE statement to alter the duty in the DB
     cur.execute("""UPDATE duties
@@ -909,7 +893,7 @@ def alterDuty():
     cur.close()
 
     # Notify the user that the save was a success
-    return jsonify(stdRet(1, "successful"))
+    return packageReturnObject(stdRet(1, "successful"))
 
 
 @schedule_bp.route("/api/addNewDuty", methods=["POST"])
@@ -953,7 +937,7 @@ def addNewDuty():
                      .format(authedUser.ra_id(), authedUser.hall_id()))
 
         # Notify the user that they are not authorized.
-        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+        return packageReturnObject(stdRet(-1, "NOT AUTHORIZED"))
 
     # Load the provided data from the request json
     data = request.json
@@ -984,7 +968,7 @@ def addNewDuty():
         cur.close()
 
         # Notify the user and stop processing
-        return jsonify(stdRet(-1, "Chosen RA is not a Valid Selection"))
+        return packageReturnObject(stdRet(-1, "Chosen RA is not a Valid Selection"))
 
     # Query the DB for the given day
     cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE(%s, 'YYYY-MM-DD');", (data["dateStr"],))
@@ -1002,7 +986,7 @@ def addNewDuty():
         cur.close()
 
         # Notify the user and stop processing
-        return jsonify(stdRet(0, "Invalid Date"))
+        return packageReturnObject(stdRet(0, "Invalid Date"))
 
     else:
         # Otherwise, unpack the query results
@@ -1043,7 +1027,7 @@ def addNewDuty():
     logging.debug("Successfully added new duty")
 
     # Notify the user that the save was successful
-    return jsonify(stdRet(1, "successful"))
+    return packageReturnObject(stdRet(1, "successful"))
 
 
 @schedule_bp.route("/api/deleteDuty", methods=["POST"])
@@ -1083,7 +1067,7 @@ def deleteDuty():
                      .format(authedUser.ra_id(), authedUser.hall_id()))
 
         # Notify the user that they are not authorized.
-        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+        return packageReturnObject(stdRet(-1, "NOT AUTHORIZED"))
 
     # Load the data from the request json
     data = request.json
@@ -1120,7 +1104,7 @@ def deleteDuty():
         cur.close()
 
         # Notify the user and stop processing
-        return jsonify(stdRet(0, "Unable to Verify Previously Assigned RA."))
+        return packageReturnObject(stdRet(0, "Unable to Verify Previously Assigned RA."))
 
     # Query the DB to find the day the duty belongs to
     cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE(%s, 'MM/DD/YYYY');", (data["dateStr"],))
@@ -1138,7 +1122,7 @@ def deleteDuty():
         cur.close()
 
         # Notify the user and stop processing
-        return jsonify(stdRet(0, "Invalid Date"))
+        return packageReturnObject(stdRet(0, "Invalid Date"))
 
     else:
         # Otherwise, unpack the query results
@@ -1161,7 +1145,7 @@ def deleteDuty():
         cur.close()
 
         # Notify the user and stop processing
-        return jsonify(stdRet(0, "Unable to validate schedule."))
+        return packageReturnObject(stdRet(0, "Unable to validate schedule."))
 
     # Execute DELETE statement to remove the provided duty from the DB
     cur.execute("""DELETE FROM duties
@@ -1181,4 +1165,4 @@ def deleteDuty():
                  .format(data["dateStr"], authedUser.hall_id()))
 
     # Notify the user that the delete was successful
-    return jsonify(stdRet(1, "successful"))
+    return packageReturnObject(stdRet(1, "successful"))
