@@ -838,6 +838,7 @@ class State:
         if self.predetermined:
             # Set the provided raList as the candidate list
             self.candList = raList
+            self.conList = list()
 
         elif len(raList) == 0:
             # Else if the provided raList is empty, then do not attempt to calculate
