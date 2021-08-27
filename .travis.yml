@@ -5,4 +5,4 @@ script:
   - python -m unittest discover -p "*_test.py" -v
 services:
   - rabbitmq
-dist: trusty
+dist: xenial
