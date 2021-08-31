@@ -979,6 +979,10 @@ class State:
         # Get the next candidate RA for the curDay's duty
         candRA = self.getNextCandidate()
 
+        # If flagged duty, then update numFlagDuties
+        if self.curDay.nextDutySlotIsFlagged():
+            self.nfd[candRA] += 1
+
         # Assign the candidate RA for the curDay's duty
         self.curDay.addRA(candRA)
 
