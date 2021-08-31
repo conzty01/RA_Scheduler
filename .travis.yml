@@ -6,3 +6,7 @@ script:
 services:
   - rabbitmq
 dist: xenial
+addons:
+  apt:
+    packages:
+      - rabbitmq-server
