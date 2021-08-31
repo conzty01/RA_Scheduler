@@ -794,6 +794,336 @@ class TestStateObject(unittest.TestCase):
         self.assertFalse(origDiffPredeterminedComparision)
         self.assertFalse(origDiffOverrideConsComparison)
 
+    def test_magicMethodLt_raisesTypeErrorIfOtherObjectIsNotStateObject(self):
+        # Test to ensure that when the __lt__ method is called with an object
+        #  that is not of Type State, the method raises a TypeError.
+
+        # -- Arrange --
+
+        # Create the objects used in this test
+        desiredDate = 27
+        desiredDay = Day(desiredDate, 1)
+        desiredLDATolerance = 15
+        desiredNDDTolerance = .141
+        desiredPredetermined = False
+        desiredLastDateAssigned = {}
+        desiredNumDoubleDays = {}
+        desiredNumFlagDuties = {}
+        desiredRAList = [
+            # Candidate RAs
+            RA("Test", "RA1", 1, 1, "2021-08-27"),
+            RA("Test", "RA2", 2, 1, "2021-08-27")
+        ]
+
+        # Populate the lda, ndd, and nfd dictionaries
+        for ra in desiredRAList:
+            desiredLastDateAssigned[ra] = 0
+            desiredNumDoubleDays[ra] = 0
+            desiredNumFlagDuties[ra] = 0
+
+        # Create the State object being tested
+        testState = State(
+            desiredDay,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined
+        )
+
+        # -- Act --
+        # -- Assert --
+
+        # Assert that we see the expected behavior.
+        self.assertRaises(TypeError, testState.__lt__, 1)                   # Integer
+        self.assertRaises(TypeError, testState.__lt__, "Test")              # String
+        self.assertRaises(TypeError, testState.__lt__, 1.0)                 # Floating Point
+        self.assertRaises(TypeError, testState.__lt__, True)                # Boolean
+        self.assertRaises(TypeError, testState.__lt__, desiredRAList[0])    # RA Object
+        self.assertRaises(TypeError, testState.__lt__, desiredDay)          # Day Object
+
+    def test_magicMethodLt_returnsTrueIfOtherObjectIsNone(self):
+        # Test to ensure that when the __lt__ magic method is pass
+        #  a None object, the method returns True.
+
+        # -- Arrange --
+
+        # Create the objects used in this test
+        desiredDate = 27
+        desiredDay = Day(desiredDate, 1)
+        desiredLDATolerance = 15
+        desiredNDDTolerance = .141
+        desiredPredetermined = False
+        desiredLastDateAssigned = {}
+        desiredNumDoubleDays = {}
+        desiredNumFlagDuties = {}
+        desiredRAList = [
+            # Candidate RAs
+            RA("Test", "RA1", 1, 1, "2021-08-27"),
+            RA("Test", "RA2", 2, 1, "2021-08-27")
+        ]
+
+        # Populate the lda, ndd, and nfd dictionaries
+        for ra in desiredRAList:
+            desiredLastDateAssigned[ra] = 0
+            desiredNumDoubleDays[ra] = 0
+            desiredNumFlagDuties[ra] = 0
+
+        # Create the State object being tested
+        testState = State(
+            desiredDay,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined
+        )
+
+        # -- Act --
+
+        res = testState < None
+
+        # -- Assert --
+
+        # Assert that we received the expected result
+        self.assertTrue(res)
+
+    def test_magicMethodLt_returnsTrueIfAndOnlyIfTheCurDaysIdIsLessThanTheOtherStatesCurDay(self):
+        # Test to ensure that the __gt__ magic method returns True if and only if the State
+        #  object's curDay.id is less than the other State object's curDay.id.
+
+        # -- Arrange --
+
+        # Create the objects used in this test
+        desiredDate = 27
+        desiredDay1 = Day(desiredDate, 1, dayID=1)
+        desiredDay2 = Day(desiredDate, 1, dayID=2)
+        desiredLDATolerance = 15
+        desiredNDDTolerance = .141
+        desiredPredetermined = False
+        desiredLastDateAssigned = {}
+        desiredNumDoubleDays = {}
+        desiredNumFlagDuties = {}
+        desiredRAList = [
+            # Candidate RAs
+            RA("Test", "RA1", 1, 1, "2021-08-27"),
+            RA("Test", "RA2", 2, 1, "2021-08-27")
+        ]
+
+        # Populate the lda, ndd, and nfd dictionaries
+        for ra in desiredRAList:
+            desiredLastDateAssigned[ra] = 0
+            desiredNumDoubleDays[ra] = 0
+            desiredNumFlagDuties[ra] = 0
+
+        # Create the State object being tested
+        testState1 = State(
+            desiredDay1,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined
+        )
+
+        testState2 = State(
+            desiredDay2,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined
+        )
+
+        # -- Act --
+
+        # Call the method being tested in a variety of scenarios
+        res1_lt_2 = testState1 < testState2
+        res2_lt_1 = testState2 < testState1
+        res1_lt_1 = testState1 < testState1
+        res2_lt_2 = testState2 < testState2
+
+        # -- Assert --
+
+        # Assert that we received the expected results
+        self.assertTrue(res1_lt_2)
+        self.assertFalse(res2_lt_1)
+        self.assertFalse(res1_lt_1)
+        self.assertFalse(res2_lt_2)
+
+    def test_magicMethodGt_raisesTypeErrorIfOtherObjectIsNotStateObject(self):
+        # Test to ensure that when the __gt__ method is called with an object
+        #  that is not of Type State, the method raises a TypeError.
+
+        # -- Arrange --
+
+        # Create the objects used in this test
+        desiredDate = 27
+        desiredDay = Day(desiredDate, 1)
+        desiredLDATolerance = 15
+        desiredNDDTolerance = .141
+        desiredPredetermined = False
+        desiredLastDateAssigned = {}
+        desiredNumDoubleDays = {}
+        desiredNumFlagDuties = {}
+        desiredRAList = [
+            # Candidate RAs
+            RA("Test", "RA1", 1, 1, "2021-08-27"),
+            RA("Test", "RA2", 2, 1, "2021-08-27")
+        ]
+
+        # Populate the lda, ndd, and nfd dictionaries
+        for ra in desiredRAList:
+            desiredLastDateAssigned[ra] = 0
+            desiredNumDoubleDays[ra] = 0
+            desiredNumFlagDuties[ra] = 0
+
+        # Create the State object being tested
+        testState = State(
+            desiredDay,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined
+        )
+
+        # -- Act --
+        # -- Assert --
+
+        # Assert that we see the expected behavior.
+        self.assertRaises(TypeError, testState.__gt__, 1)  # Integer
+        self.assertRaises(TypeError, testState.__gt__, "Test")  # String
+        self.assertRaises(TypeError, testState.__gt__, 1.0)  # Floating Point
+        self.assertRaises(TypeError, testState.__gt__, True)  # Boolean
+        self.assertRaises(TypeError, testState.__gt__, desiredRAList[0])  # RA Object
+        self.assertRaises(TypeError, testState.__gt__, desiredDay)  # Day Object
+
+    def test_magicMethodGt_returnsTrueIfOtherObjectIsNone(self):
+        # Test to ensure that when the __gt__ magic method is pass
+        #  a None object, the method returns True.
+
+        # -- Arrange --
+
+        # Create the objects used in this test
+        desiredDate = 27
+        desiredDay = Day(desiredDate, 1)
+        desiredLDATolerance = 15
+        desiredNDDTolerance = .141
+        desiredPredetermined = False
+        desiredLastDateAssigned = {}
+        desiredNumDoubleDays = {}
+        desiredNumFlagDuties = {}
+        desiredRAList = [
+            # Candidate RAs
+            RA("Test", "RA1", 1, 1, "2021-08-27"),
+            RA("Test", "RA2", 2, 1, "2021-08-27")
+        ]
+
+        # Populate the lda, ndd, and nfd dictionaries
+        for ra in desiredRAList:
+            desiredLastDateAssigned[ra] = 0
+            desiredNumDoubleDays[ra] = 0
+            desiredNumFlagDuties[ra] = 0
+
+        # Create the State object being tested
+        testState = State(
+            desiredDay,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined
+        )
+
+        # -- Act --
+
+        res = testState > None
+
+        # -- Assert --
+
+        # Assert that we received the expected result
+        self.assertTrue(res)
+
+    def test_magicMethodGt_returnsTrueIfAndOnlyIfTheCurDaysIdIsLessThanTheOtherStatesCurDay(self):
+        # Test to ensure that the __gt__ magic method returns True if and only if the State
+        #  object's curDay.id is less than the other State object's curDay.id.
+
+        # -- Arrange --
+
+        # Create the objects used in this test
+        desiredDate = 27
+        desiredDay1 = Day(desiredDate, 1, dayID=10)
+        desiredDay2 = Day(desiredDate, 1, dayID=2)
+        desiredLDATolerance = 15
+        desiredNDDTolerance = .141
+        desiredPredetermined = False
+        desiredLastDateAssigned = {}
+        desiredNumDoubleDays = {}
+        desiredNumFlagDuties = {}
+        desiredRAList = [
+            # Candidate RAs
+            RA("Test", "RA1", 1, 1, "2021-08-27"),
+            RA("Test", "RA2", 2, 1, "2021-08-27")
+        ]
+
+        # Populate the lda, ndd, and nfd dictionaries
+        for ra in desiredRAList:
+            desiredLastDateAssigned[ra] = 0
+            desiredNumDoubleDays[ra] = 0
+            desiredNumFlagDuties[ra] = 0
+
+        # Create the State object being tested
+        testState1 = State(
+            desiredDay1,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined
+        )
+
+        testState2 = State(
+            desiredDay2,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined
+        )
+
+        # -- Act --
+
+        # Call the method being tested in a variety of scenarios
+        res1_gt_2 = testState1 > testState2
+        res2_gt_1 = testState2 > testState1
+        res1_gt_1 = testState1 > testState1
+        res2_gt_2 = testState2 > testState2
+
+        # -- Assert --
+
+        # Assert that we received the expected results
+        self.assertTrue(res1_gt_2)
+        self.assertFalse(res2_gt_1)
+        self.assertFalse(res1_gt_1)
+        self.assertFalse(res2_gt_2)
+
     def test_restoreState_returnsExpectedInformation(self):
         # Test to ensure that the restoreState method returns
         #  the expected attributes of the State Object
@@ -1140,22 +1470,266 @@ class TestStateObject(unittest.TestCase):
         self.assertTrue(doubleDutyRes)
 
     def test_getNextCandidate_returnsFirstItemInCandList(self):
+        # Test to ensure that the getNextCandidate method returns the
+        #  first item in the candList and removes the item from the list
+
         # -- Arrange --
+
+        # Create the objects used in this test
+        desiredDate = 27
+        singleDutyDay = Day(desiredDate, 1)
+        desiredLDATolerance = 15
+        desiredNDDTolerance = .141
+        desiredPredetermined = False
+        desiredLastDateAssigned = {}
+        desiredNumDoubleDays = {}
+        desiredNumFlagDuties = {}
+        desiredRAList = [
+            # Candidate RAs
+            RA("Test", "RA1", 1, 1, "2021-08-27"),
+            RA("Test", "RA2", 2, 1, "2021-08-27")
+        ]
+
+        # Populate the lda, ndd, and nfd dictionaries
+        for ra in desiredRAList:
+            desiredLastDateAssigned[ra] = 0
+            desiredNumDoubleDays[ra] = 0
+            desiredNumFlagDuties[ra] = 0
+
+        # Create the State object being tested
+        testState = State(
+            singleDutyDay,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined
+        )
+
+        preTestCandList = testState.candList.copy()
+
         # -- Act --
+
+        # Call the method being tested
+        res = testState.getNextCandidate()
+
         # -- Assert --
-        pass
+
+        # Assert that the result was the first item in the preTestCandList
+        self.assertIn(res, preTestCandList)
+        self.assertEqual(preTestCandList[0], res)
+
+        # Assert that the result is no longer in the testState's candList
+        self.assertNotIn(res, testState.candList)
 
     def test_assignNextRA_returnsAssignedRA(self):
+        # Test to ensure that the assignNextRA method returns the RA
+        #  that was assigned for duty to the calling method.
+
         # -- Arrange --
+
+        # Create the objects used in this test
+        desiredDate = 27
+        singleDutyDay = Day(desiredDate, 1)
+        desiredLDATolerance = 15
+        desiredNDDTolerance = .141
+        desiredPredetermined = False
+        desiredLastDateAssigned = {}
+        desiredNumDoubleDays = {}
+        desiredNumFlagDuties = {}
+        expectedAssignedRA = RA("Test", "RA1", 1, 1, "2021-08-27")
+        desiredRAList = [expectedAssignedRA]
+
+        # Populate the lda, ndd, and nfd dictionaries
+        for ra in desiredRAList:
+            desiredLastDateAssigned[ra] = 0
+            desiredNumDoubleDays[ra] = 0
+            desiredNumFlagDuties[ra] = 0
+
+        # Create the State object being tested
+        testState = State(
+            singleDutyDay,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined
+        )
+
         # -- Act --
+
+        # Call the method being tested.
+        res = testState.assignNextRA()
+
         # -- Assert --
-        pass
+
+        # Assert that we received the expected result
+        self.assertEqual(expectedAssignedRA, res)
+
+        # Assert that the returned RA was also assigned for duty
+        self.assertEqual(res, testState.curDay.getRAs()[0])
+
+    def test_assignNextRA_updatesLastDateAssignedAsNecessary(self):
+        # Test to ensure that the assignNextRA updates the lastDateAssigned
+        #  dictionary when assigning an RA for duty.
+
+        # -- Arrange --
+
+        # Create the objects used in this test
+        desiredDate = 27
+        singleDutyDay = Day(desiredDate, 1)
+        desiredLDATolerance = 15
+        desiredNDDTolerance = .141
+        desiredPredetermined = False
+        desiredLastDateAssigned = {}
+        desiredNumDoubleDays = {}
+        desiredNumFlagDuties = {}
+        desiredRAList = [
+            RA("Test", "RA1", 1, 1, "2021-08-27"),
+            RA("Test", "RA2", 2, 1, "2021-08-27")
+        ]
+
+        # Populate the lda, ndd, and nfd dictionaries
+        for ra in desiredRAList:
+            desiredLastDateAssigned[ra] = 0
+            desiredNumDoubleDays[ra] = 0
+            desiredNumFlagDuties[ra] = 0
+
+        # Create the State object being tested
+        testState = State(
+            singleDutyDay,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined
+        )
+
+        # Grab the RA that is expected to be assigned for duty
+        expectedAssignedRA = testState.candList[0]
+
+        # -- Act --
+
+        # Call the method being tested.
+        res = testState.assignNextRA()
+
+        # -- Assert --
+
+        # Assert that the lastDateAssigned dictionary was updated as expected.
+        self.assertEqual(desiredLastDateAssigned[expectedAssignedRA], desiredDate)
+        self.assertEqual(desiredLastDateAssigned[testState.candList[0]], 0)
 
     def test_assignNextRA_ifDoubleDay_incrementsNumDoubleDaysAsNecessary(self):
+        # Test to ensure that the assignNextRA updates the numDoubleDays
+        #  dictionary when assigning an RA for duty if the curDay is a
+        #  doubleDay.
+
         # -- Arrange --
+
+        # Create the objects used in this test
+        desiredDate = 27
+        singleDutyDay = Day(desiredDate, 1, isDoubleDay=True)
+        desiredLDATolerance = 15
+        desiredNDDTolerance = .141
+        desiredPredetermined = False
+        desiredLastDateAssigned = {}
+        desiredNumDoubleDays = {}
+        desiredNumFlagDuties = {}
+        desiredRAList = [
+            RA("Test", "RA1", 1, 1, "2021-08-27"),
+            RA("Test", "RA2", 2, 1, "2021-08-27")
+        ]
+
+        # Populate the lda, ndd, and nfd dictionaries
+        for ra in desiredRAList:
+            desiredLastDateAssigned[ra] = 0
+            desiredNumDoubleDays[ra] = 0
+            desiredNumFlagDuties[ra] = 0
+
+        # Create the State object being tested
+        testState = State(
+            singleDutyDay,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined
+        )
+
+        # Grab the RA that is expected to be assigned for duty
+        expectedAssignedRA = testState.candList[0]
+
         # -- Act --
+
+        # Call the method being tested.
+        res = testState.assignNextRA()
+
         # -- Assert --
-        pass
+
+        # Assert that the lastDateAssigned dictionary was updated as expected.
+        self.assertEqual(desiredNumDoubleDays[expectedAssignedRA], 1)
+        self.assertEqual(desiredNumDoubleDays[testState.candList[0]], 0)
+
+    def test_assignNextRA_ifFlaggedDuty_incrementsNumFlagDutiesAsNecessary(self):
+        # Test to ensure that the assignNextRA updates the numFlagDuties
+        #  dictionary when assigning an RA for duty if the next duty slot
+        #  is a flagged duty.
+
+        # -- Arrange --
+
+        # Create the objects used in this test
+        desiredDate = 27
+        singleDutyDay = Day(desiredDate, 1, flagDutySlot=True)
+        desiredLDATolerance = 15
+        desiredNDDTolerance = .141
+        desiredPredetermined = False
+        desiredLastDateAssigned = {}
+        desiredNumDoubleDays = {}
+        desiredNumFlagDuties = {}
+        desiredRAList = [
+            RA("Test", "RA1", 1, 1, "2021-08-27"),
+            RA("Test", "RA2", 2, 1, "2021-08-27")
+        ]
+
+        # Populate the lda, ndd, and nfd dictionaries
+        for ra in desiredRAList:
+            desiredLastDateAssigned[ra] = 0
+            desiredNumDoubleDays[ra] = 0
+            desiredNumFlagDuties[ra] = 0
+
+        # Create the State object being tested
+        testState = State(
+            singleDutyDay,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined
+        )
+
+        # Grab the RA that is expected to be assigned for duty
+        expectedAssignedRA = testState.candList[0]
+
+        # -- Act --
+
+        # Call the method being tested.
+        res = testState.assignNextRA()
+
+        # -- Assert --
+
+        # Assert that the lastDateAssigned dictionary was updated as expected.
+        self.assertEqual(desiredNumFlagDuties[expectedAssignedRA], 1)
+        self.assertEqual(desiredNumFlagDuties[testState.candList[0]], 0)
 
     def test_assignNextRA_assignsNextRAToCurDay(self):
         # -- Arrange --
