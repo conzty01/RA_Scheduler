@@ -898,6 +898,7 @@ class State:
             self.ldaTol == other.ldaTol and \
             self.nddTol == other.nddTol and \
             self.candList == other.candList and \
+            self.nfd == other.nfd and \
             self.predetermined == other.predetermined and \
             self.overrideCons == other.overrideCons
 
