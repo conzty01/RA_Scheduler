@@ -898,7 +898,8 @@ class State:
             self.ldaTol == other.ldaTol and \
             self.nddTol == other.nddTol and \
             self.candList == other.candList and \
-            self.predetermined == other.predetermined
+            self.predetermined == other.predetermined and \
+            self.overrideCons == other.overrideCons
 
     def __lt__(self, other):
         # Return True if this state is considered less than
