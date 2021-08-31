@@ -283,52 +283,861 @@ class TestStateObject(unittest.TestCase):
         self.assertListEqual(testState.conList, expectedConList)
 
     def test_magicMethodDeepcopy_createsDeepcopyOfStateObject(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
+        # Test to ensure that the __deepcopy__ magic method returns
+        #  a pseudo deep copy of the State object.
 
-    def test_deepcopy_calls_deepcopyMagicMethod(self):
         # -- Arrange --
+
+        # Create the objects used in this test
+        desiredDate = 27
+        desiredDay = Day(desiredDate, 1)
+        desiredLDATolerance = 15
+        desiredNDDTolerance = .141
+        desiredPredetermined = False
+        desiredLastDateAssigned = {}
+        desiredNumDoubleDays = {}
+        desiredNumFlagDuties = {}
+        desiredRAList = [
+            # Candidate RAs
+            RA("Test", "RA1", 1, 1, "2021-08-27"),
+            RA("Test", "RA2", 2, 1, "2021-08-27")
+        ]
+
+        # Populate the lda, ndd, and nfd dictionaries
+        for ra in desiredRAList:
+            desiredLastDateAssigned[ra] = 0
+            desiredNumDoubleDays[ra] = 0
+            desiredNumFlagDuties[ra] = 0
+
+        # Create the State object being tested
+        testState = State(
+            desiredDay,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined
+        )
+
+        # -- Act --
+
+        # Call the method being tested
+        result = testState.__deepcopy__()
+
+        # -- Assert --
+
+        # Assert that we received a deep copy of the testState
+        self.assertEqual(testState, result)
+        # curDay
+        self.assertEqual(testState.curDay, result.curDay)
+        # candList
+        self.assertListEqual(testState.candList, result.candList)
+        self.assertIsNot(testState.candList, result.candList)
+        # lda
+        self.assertDictEqual(testState.lda, result.lda)
+        self.assertIsNot(testState.lda, result.lda)
+        # ndd
+        self.assertDictEqual(testState.ndd, result.ndd)
+        self.assertIsNot(testState.ndd, result.ndd)
+        # ldaTol
+        self.assertEqual(testState.ldaTol, result.ldaTol)
+        # nddTol
+        self.assertEqual(testState.nddTol, result.nddTol)
+        # nfd
+        self.assertDictEqual(testState.nfd, result.nfd)
+        self.assertIsNot(testState.nfd, result.nfd)
+        # predetermined
+        self.assertEqual(testState.predetermined, result.predetermined)
+        # overrideCons
+        self.assertEqual(testState.overrideCons, result.overrideCons)
+
+    def test_deepcopy_createsDeepcopyOfStateObject(self):
+        # Test to ensure that the deepcopy method returns
+        #  a pseudo deep copy of the State object.
+
+        # -- Arrange --
+
+        # Create the objects used in this test
+        desiredDate = 27
+        desiredDay = Day(desiredDate, 1)
+        desiredLDATolerance = 15
+        desiredNDDTolerance = .141
+        desiredPredetermined = False
+        desiredLastDateAssigned = {}
+        desiredNumDoubleDays = {}
+        desiredNumFlagDuties = {}
+        desiredRAList = [
+            # Candidate RAs
+            RA("Test", "RA1", 1, 1, "2021-08-27"),
+            RA("Test", "RA2", 2, 1, "2021-08-27")
+        ]
+
+        # Populate the lda, ndd, and nfd dictionaries
+        for ra in desiredRAList:
+            desiredLastDateAssigned[ra] = 0
+            desiredNumDoubleDays[ra] = 0
+            desiredNumFlagDuties[ra] = 0
+
+        # Create the State object being tested
+        testState = State(
+            desiredDay,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined
+        )
+
+        # -- Act --
+
+        # Call the method being tested
+        result = testState.deepcopy()
+
+        # -- Assert --
+
+        # Assert that we received a deep copy of the testState
+        self.assertEqual(testState, result)
+        # curDay
+        self.assertEqual(testState.curDay, result.curDay)
+        # candList
+        self.assertListEqual(testState.candList, result.candList)
+        self.assertIsNot(testState.candList, result.candList)
+        # lda
+        self.assertDictEqual(testState.lda, result.lda)
+        self.assertIsNot(testState.lda, result.lda)
+        # ndd
+        self.assertDictEqual(testState.ndd, result.ndd)
+        self.assertIsNot(testState.ndd, result.ndd)
+        # ldaTol
+        self.assertEqual(testState.ldaTol, result.ldaTol)
+        # nddTol
+        self.assertEqual(testState.nddTol, result.nddTol)
+        # nfd
+        self.assertDictEqual(testState.nfd, result.nfd)
+        self.assertIsNot(testState.nfd, result.nfd)
+        # predetermined
+        self.assertEqual(testState.predetermined, result.predetermined)
+        # overrideCons
+        self.assertEqual(testState.overrideCons, result.overrideCons)
+
+    def test_magicMethodCopy_createsShallowCopyOfStateObject(self):
+        # Test to ensure that the __copy__ magic method returns
+        #  a shallow copy of the State object.
+
+        # -- Arrange --
+
+        # Create the objects used in this test
+        desiredDate = 27
+        desiredDay = Day(desiredDate, 1)
+        desiredLDATolerance = 15
+        desiredNDDTolerance = .141
+        desiredPredetermined = False
+        desiredLastDateAssigned = {}
+        desiredNumDoubleDays = {}
+        desiredNumFlagDuties = {}
+        desiredRAList = [
+            # Candidate RAs
+            RA("Test", "RA1", 1, 1, "2021-08-27"),
+            RA("Test", "RA2", 2, 1, "2021-08-27")
+        ]
+
+        # Populate the lda, ndd, and nfd dictionaries
+        for ra in desiredRAList:
+            desiredLastDateAssigned[ra] = 0
+            desiredNumDoubleDays[ra] = 0
+            desiredNumFlagDuties[ra] = 0
+
+        # Create the State object being tested
+        testState = State(
+            desiredDay,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined
+        )
+
+        # -- Act --
+
+        # Call the method being tested
+        result = testState.__copy__()
+
+        # -- Assert --
+
+        # Assert that we received a deep copy of the testState
+        self.assertEqual(testState, result)
+        # curDay
+        self.assertEqual(testState.curDay, result.curDay)
+        self.assertIs(testState.curDay, result.curDay)
+        # candList
+        self.assertListEqual(testState.candList, result.candList)
+        # lda
+        self.assertDictEqual(testState.lda, result.lda)
+        self.assertIs(testState.lda, result.lda)
+        # ndd
+        self.assertDictEqual(testState.ndd, result.ndd)
+        self.assertIs(testState.ndd, result.ndd)
+        # ldaTol
+        self.assertEqual(testState.ldaTol, result.ldaTol)
+        self.assertIs(testState.ldaTol, result.ldaTol)
+        # nddTol
+        self.assertEqual(testState.nddTol, result.nddTol)
+        self.assertIs(testState.ldaTol, result.ldaTol)
+        # nfd
+        self.assertDictEqual(testState.nfd, result.nfd)
+        self.assertIs(testState.nfd, result.nfd)
+        # predetermined
+        self.assertEqual(testState.predetermined, result.predetermined)
+        self.assertIs(testState.predetermined, result.predetermined)
+        # overrideCons
+        self.assertEqual(testState.overrideCons, result.overrideCons)
+        self.assertIs(testState.overrideCons, result.overrideCons)
+
+    def test_copy_createsShallowCopyOfStateObject(self):
+        # Test to ensure that the copy method returns
+        #  a shallow deep copy of the State object.
+
+        # -- Arrange --
+
+        # Create the objects used in this test
+        desiredDate = 27
+        desiredDay = Day(desiredDate, 1)
+        desiredLDATolerance = 15
+        desiredNDDTolerance = .141
+        desiredPredetermined = False
+        desiredLastDateAssigned = {}
+        desiredNumDoubleDays = {}
+        desiredNumFlagDuties = {}
+        desiredRAList = [
+            # Candidate RAs
+            RA("Test", "RA1", 1, 1, "2021-08-27"),
+            RA("Test", "RA2", 2, 1, "2021-08-27")
+        ]
+
+        # Populate the lda, ndd, and nfd dictionaries
+        for ra in desiredRAList:
+            desiredLastDateAssigned[ra] = 0
+            desiredNumDoubleDays[ra] = 0
+            desiredNumFlagDuties[ra] = 0
+
+        # Create the State object being tested
+        testState = State(
+            desiredDay,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined
+        )
+
+        # -- Act --
+
+        # Call the method being tested
+        result = testState.copy()
+
+        # -- Assert --
+
+        # Assert that we received a deep copy of the testState
+        self.assertEqual(testState, result)
+        # curDay
+        self.assertEqual(testState.curDay, result.curDay)
+        self.assertIs(testState.curDay, result.curDay)
+        # candList
+        self.assertListEqual(testState.candList, result.candList)
+        # lda
+        self.assertDictEqual(testState.lda, result.lda)
+        self.assertIs(testState.lda, result.lda)
+        # ndd
+        self.assertDictEqual(testState.ndd, result.ndd)
+        self.assertIs(testState.ndd, result.ndd)
+        # ldaTol
+        self.assertEqual(testState.ldaTol, result.ldaTol)
+        self.assertIs(testState.ldaTol, result.ldaTol)
+        # nddTol
+        self.assertEqual(testState.nddTol, result.nddTol)
+        self.assertIs(testState.ldaTol, result.ldaTol)
+        # nfd
+        self.assertDictEqual(testState.nfd, result.nfd)
+        self.assertIs(testState.nfd, result.nfd)
+        # predetermined
+        self.assertEqual(testState.predetermined, result.predetermined)
+        self.assertIs(testState.predetermined, result.predetermined)
+        # overrideCons
+        self.assertEqual(testState.overrideCons, result.overrideCons)
+        self.assertIs(testState.overrideCons, result.overrideCons)
+
+    def test_magicMethodEq_raisesTypeErrorIfOtherObjectIsNotStateObject(self):
+        # Test to ensure that when the __eq__ method is called with an object
+        #  that is not of Type State, the method raises a TypeError.
+
+        # -- Arrange --
+
+        # Create the objects used in this test
+        desiredDate = 27
+        desiredDay = Day(desiredDate, 1)
+        desiredLDATolerance = 15
+        desiredNDDTolerance = .141
+        desiredPredetermined = False
+        desiredLastDateAssigned = {}
+        desiredNumDoubleDays = {}
+        desiredNumFlagDuties = {}
+        desiredRAList = [
+            # Candidate RAs
+            RA("Test", "RA1", 1, 1, "2021-08-27"),
+            RA("Test", "RA2", 2, 1, "2021-08-27")
+        ]
+
+        # Populate the lda, ndd, and nfd dictionaries
+        for ra in desiredRAList:
+            desiredLastDateAssigned[ra] = 0
+            desiredNumDoubleDays[ra] = 0
+            desiredNumFlagDuties[ra] = 0
+
+        # Create the State object being tested
+        testState = State(
+            desiredDay,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined
+        )
+
         # -- Act --
         # -- Assert --
-        pass
+
+        # Assert that we see the expected behavior.
+        self.assertRaises(TypeError, testState.__eq__, 1)                   # Integer
+        self.assertRaises(TypeError, testState.__eq__, "Test")              # String
+        self.assertRaises(TypeError, testState.__eq__, 1.0)                 # Floating Point
+        self.assertRaises(TypeError, testState.__eq__, True)                # Boolean
+        self.assertRaises(TypeError, testState.__eq__, desiredRAList[0])    # RA Object
+        self.assertRaises(TypeError, testState.__eq__, desiredDay)          # Day Object
+
+    def test_magicMethodEq_returnsTrueIfAndOnlyIfAllAttributesAreEqual(self):
+        # Test to ensure that the __eq__ magic method returns True if and
+        #  only if all attributes of the two State objects are equal.
+
+        # -- Arrange --
+
+        # Create the objects used in this test
+        desiredDate = 27
+        desiredDay = Day(desiredDate, 1)
+        desiredLDATolerance = 15
+        desiredNDDTolerance = .141
+        desiredPredetermined = False
+        desiredOverrideCons = False
+        desiredLastDateAssigned = {}
+        desiredNumDoubleDays = {}
+        desiredNumFlagDuties = {}
+        desiredRAList = []
+
+        # Populate the lda, ndd, and nfd dictionaries
+        for ra in desiredRAList:
+            desiredLastDateAssigned[ra] = 0
+            desiredNumDoubleDays[ra] = 0
+            desiredNumFlagDuties[ra] = 0
+
+        diffDate = 26
+        diffDay = Day(diffDate, 2)
+        diffLDATolerance = 11
+        diffNDDTolerance = .14
+        diffPredetermined = True
+        diffOverrideCons = True
+        diffLastDateAssigned = {}
+        diffNumDoubleDays = {}
+        diffNumFlagDuties = {}
+        diffRAList = [
+            # Candidate RAs
+            RA("Test", "RA1.2", 1, 1, "2021-08-27"),
+            RA("Test", "RA2.2", 2, 1, "2021-08-27")
+        ]
+
+        # Populate the lda, ndd, and nfd dictionaries
+        for ra in diffRAList:
+            diffLastDateAssigned[ra] = 0
+            diffNumDoubleDays[ra] = 0
+            diffNumFlagDuties[ra] = 0
+
+        # Create the State objects being tested
+        origState = State(
+            desiredDay,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined,
+            overrideConflicts=desiredOverrideCons
+        )
+
+        diffDayState = State(
+            diffDay,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined,
+            overrideConflicts=desiredOverrideCons
+        )
+
+        diffRAListState = State(
+            desiredDay,
+            diffRAList,
+            diffLastDateAssigned,
+            diffNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            diffNumFlagDuties,
+            predetermined=desiredPredetermined,
+            overrideConflicts=desiredOverrideCons
+        )
+
+        diffLDATolState = State(
+            desiredDay,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            diffLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined,
+            overrideConflicts=desiredOverrideCons
+        )
+
+        diffNDDTolState = State(
+            desiredDay,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            diffNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined,
+            overrideConflicts=desiredOverrideCons
+        )
+
+        diffPredeterminedState = State(
+            desiredDay,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=diffPredetermined,
+            overrideConflicts=desiredOverrideCons
+        )
+
+        diffOverrideConflictsState = State(
+            desiredDay,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined,
+            overrideConflicts=diffOverrideCons
+        )
+
+        diffState = State(
+            diffDay,
+            diffRAList,
+            diffLastDateAssigned,
+            diffNumDoubleDays,
+            diffLDATolerance,
+            diffNDDTolerance,
+            diffNumFlagDuties,
+            predetermined=diffPredetermined,
+            overrideConflicts=diffOverrideCons
+        )
+
+        # -- Act --
+
+        # Call the method being tested in a variety of different scenarios.
+        origOrigComparison = origState == origState
+        origDiffDayComparison = origState == diffDayState
+        origDiffRAListStateComparison = origState == diffRAListState
+        origDiffLDATolStateComparison = origState == diffLDATolState
+        origDiffNDDTolStateComparison = origState == diffNDDTolState
+        origDiffPredeterminedComparision = origState == diffPredeterminedState
+        origDiffOverrideConsComparison = origState == diffOverrideConflictsState
+        diffDiffComparison = diffState == diffState
+
+        # -- Assert --
+
+        # Assert that we received the expected results
+
+        # Expected True
+        self.assertTrue(origOrigComparison)
+        self.assertTrue(diffDiffComparison)
+
+        # Expected False
+        self.assertFalse(origDiffDayComparison)
+        self.assertFalse(origDiffRAListStateComparison)
+        self.assertFalse(origDiffLDATolStateComparison)
+        self.assertFalse(origDiffNDDTolStateComparison)
+        self.assertFalse(origDiffPredeterminedComparision)
+        self.assertFalse(origDiffOverrideConsComparison)
 
     def test_restoreState_returnsExpectedInformation(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
+        # Test to ensure that the restoreState method returns
+        #  the expected attributes of the State Object
 
-    def test_hasEmptyCandList_returnsTrueIfCandListIsEmpty(self):
         # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
 
-    def test_hasEmptyCandList_returnsFalseIfCandListIsNOTEmpty(self):
-        # -- Arrange --
+        # Create the objects used in this test
+        desiredDate = 27
+        desiredDay = Day(desiredDate, 1)
+        desiredLDATolerance = 15
+        desiredNDDTolerance = .141
+        desiredPredetermined = False
+        desiredLastDateAssigned = {}
+        desiredNumDoubleDays = {}
+        desiredNumFlagDuties = {}
+        desiredRAList = [
+            # Candidate RAs
+            RA("Test", "RA1", 1, 1, "2021-08-27"),
+            RA("Test", "RA2", 2, 1, "2021-08-27")
+        ]
+
+        # Populate the lda, ndd, and nfd dictionaries
+        for ra in desiredRAList:
+            desiredLastDateAssigned[ra] = 0
+            desiredNumDoubleDays[ra] = 0
+            desiredNumFlagDuties[ra] = 0
+
+        # Create the State object being tested
+        testState = State(
+            desiredDay,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined
+        )
+
         # -- Act --
+
+        # Call the method being tested
+        resCurDay, resCandList, resLDA, resNDD, resNFD = testState.restoreState()
+
         # -- Assert --
-        pass
+
+        # Assert that we received the expected values
+        self.assertEqual(testState.curDay, resCurDay)
+        self.assertEqual(testState.candList, resCandList)
+        self.assertEqual(testState.lda, resLDA)
+        self.assertEqual(testState.ndd, resNDD)
+        self.assertEqual(testState.nfd, resNFD)
+
+    def test_hasEmptyCandList_returnsTrueIfAndOnlyIfCandListIsEmpty(self):
+        # Test to ensure that the hasEmptyCandList returns True if and only
+        #  if the State Object's candList is empty
+
+        # -- Arrange --
+
+        # Create the objects used in this test
+        desiredDate = 27
+        desiredDay = Day(desiredDate, 1)
+        desiredLDATolerance = 15
+        desiredNDDTolerance = .141
+        desiredPredetermined = False
+        desiredLastDateAssigned = {}
+        desiredNumDoubleDays = {}
+        desiredNumFlagDuties = {}
+        desiredRAList = [
+            # Candidate RAs
+            RA("Test", "RA1", 1, 1, "2021-08-27"),
+            RA("Test", "RA2", 2, 1, "2021-08-27")
+        ]
+
+        # Populate the lda, ndd, and nfd dictionaries
+        for ra in desiredRAList:
+            desiredLastDateAssigned[ra] = 0
+            desiredNumDoubleDays[ra] = 0
+            desiredNumFlagDuties[ra] = 0
+
+        # Create the State object being tested
+        populatedState = State(
+            desiredDay,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined
+        )
+
+        emptyState = State(
+            desiredDay,
+            [],
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined
+        )
+
+        # -- Act --
+
+        # Call the method being tested in several permutations
+        populatedResult = populatedState.hasEmptyCandList()
+        emptyResult = emptyState.hasEmptyCandList()
+
+        # -- Assert --
+
+        # Assert that we received the desired result
+        self.assertFalse(populatedResult)
+        self.assertTrue(emptyResult)
+
+    def test_hasEmptyConList_returnsTrueIfAndOnlyIfCandListIsEmpty(self):
+        # Test to ensure that the hasEmptyConList returns True if and only
+        #  if the State Object's conList is empty
+
+        # -- Arrange --
+
+        # Create the objects used in this test
+        desiredDate = 27
+        desiredDay = Day(desiredDate, 1)
+        desiredLDATolerance = 15
+        desiredNDDTolerance = .141
+        desiredPredetermined = False
+        desiredLastDateAssigned = {}
+        desiredNumDoubleDays = {}
+        desiredNumFlagDuties = {}
+        raList = [
+            # Candidate RAs
+            RA("Test", "RA1", 1, 1, "2021-08-27"),
+            RA("Test", "RA2", 2, 1, "2021-08-27")
+        ]
+        conRAList = [
+            # Candidate RAs
+            RA("Test", "RA1", 1, 1, "2021-08-27", conflicts=[desiredDay.getDate()]),
+            RA("Test", "RA2", 2, 1, "2021-08-27", conflicts=[desiredDay.getDate()])
+        ]
+
+        # Populate the lda, ndd, and nfd dictionaries
+        for ra in raList:
+            desiredLastDateAssigned[ra] = 0
+            desiredNumDoubleDays[ra] = 0
+            desiredNumFlagDuties[ra] = 0
+
+        # Create the State object being tested
+        conState = State(
+            desiredDay,
+            conRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined
+        )
+
+        noConState = State(
+            desiredDay,
+            raList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined
+        )
+
+        emptyState = State(
+            desiredDay,
+            [],
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined
+        )
+
+        # -- Act --
+
+        # Call the method being tested in several permutations
+        conResult = conState.hasEmptyConList()
+        noConResult = noConState.hasEmptyConList()
+        emptyResult = emptyState.hasEmptyCandList()
+
+        # -- Assert --
+
+        # Assert that we received the desired result
+        self.assertFalse(conResult)
+        self.assertTrue(noConResult)
+        self.assertTrue(emptyResult)
 
     def test_returnedFromPreviousState_returnsTrueIfRAIsAssignedForDutyOnCurDay(self):
-        # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
+        # Test to ensure that the returnedFromPreviousState method returns True if
+        #  and only if at least one RA has been assigned for duty on the curDay.
 
-    def test_returnedFromPreviousState_returnsFalseIfRAIsNOTAssignedForDutyOnCurDay(self):
         # -- Arrange --
-        # -- Act --
-        # -- Assert --
-        pass
 
-    def test_isDoubleDay_callsDayIsDoubleDayMethod(self):
-        # -- Arrange --
+        # Create the objects used in this test
+        desiredDate = 27
+        unassignedDay = Day(desiredDate, 1)
+        assignedDay = Day(desiredDate, 1, numDutySlots=2)
+        desiredLDATolerance = 15
+        desiredNDDTolerance = .141
+        desiredPredetermined = False
+        desiredLastDateAssigned = {}
+        desiredNumDoubleDays = {}
+        desiredNumFlagDuties = {}
+        desiredRAList = [
+            # Candidate RAs
+            RA("Test", "RA1", 1, 1, "2021-08-27"),
+            RA("Test", "RA2", 2, 1, "2021-08-27")
+        ]
+
+        # Assign an RA to the assigned Day
+        assignedDay.addRA(desiredRAList[0])
+        assignedDay.addRA(desiredRAList[1])
+
+        # Populate the lda, ndd, and nfd dictionaries
+        for ra in desiredRAList:
+            desiredLastDateAssigned[ra] = 0
+            desiredNumDoubleDays[ra] = 0
+            desiredNumFlagDuties[ra] = 0
+
+        # Create the State object being tested
+        unassignedState = State(
+            unassignedDay,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined
+        )
+
+        assignedState = State(
+            assignedDay,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined
+        )
+
         # -- Act --
+
+        # Test the method with a State object that has never been assigned an RA
+        unassignedRes = unassignedState.returnedFromPreviousState()
+
+        # Test the method with a State object that has been assigned an RA
+        multipleAssignedRes = assignedState.returnedFromPreviousState()
+
+        # Remove an RA assigned for duty
+        assignedState.curDay.removeRA(desiredRAList[0])
+
+        # Test the method with a State object that has been assigned an RA
+        singleAssignedRes = assignedState.returnedFromPreviousState()
+
+        # Remove all RAs assigned for duty
+        assignedState.curDay.removeAllRAs()
+
+        # Test the method with a State object that has had their RA removed from duty
+        removedRes = assignedState.returnedFromPreviousState()
+
         # -- Assert --
-        pass
+
+        # Assert that we received the expected results
+        self.assertFalse(unassignedRes)
+        self.assertTrue(multipleAssignedRes)
+        self.assertTrue(singleAssignedRes)
+        self.assertFalse(removedRes)
+
+    def test_isDoubleDay_returnsTrueIfAndOnlyIfCurDayIsDoubleDay(self):
+        # Test to ensure that the isDoubleDay method returns True
+        #  if and only if the State object's curDay is a double day.
+
+        # -- Arrange --
+
+        # -- Arrange --
+
+        # Create the objects used in this test
+        desiredDate = 27
+        singleDutyDay = Day(desiredDate, 1)
+        doubleDutyDay = Day(desiredDate, 1, isDoubleDay=True)
+        desiredLDATolerance = 15
+        desiredNDDTolerance = .141
+        desiredPredetermined = False
+        desiredLastDateAssigned = {}
+        desiredNumDoubleDays = {}
+        desiredNumFlagDuties = {}
+        desiredRAList = [
+            # Candidate RAs
+            RA("Test", "RA1", 1, 1, "2021-08-27"),
+            RA("Test", "RA2", 2, 1, "2021-08-27")
+        ]
+
+        # Populate the lda, ndd, and nfd dictionaries
+        for ra in desiredRAList:
+            desiredLastDateAssigned[ra] = 0
+            desiredNumDoubleDays[ra] = 0
+            desiredNumFlagDuties[ra] = 0
+
+        # Create the State object being tested
+        singleDutyState = State(
+            singleDutyDay,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined
+        )
+
+        doubleDutyState = State(
+            doubleDutyDay,
+            desiredRAList,
+            desiredLastDateAssigned,
+            desiredNumDoubleDays,
+            desiredLDATolerance,
+            desiredNDDTolerance,
+            desiredNumFlagDuties,
+            predetermined=desiredPredetermined
+        )
+
+        # -- Act --
+
+        # Test the method with a State object that is not a double duty day
+        singleDutyRes = singleDutyState.isDoubleDay()
+
+        # Test the method with a State object that is a double duty day
+        doubleDutyRes = doubleDutyState.isDoubleDay()
+
+        # -- Assert --
+
+        # Assert that we received the expected results
+        self.assertFalse(singleDutyRes)
+        self.assertTrue(doubleDutyRes)
 
     def test_getNextCandidate_returnsFirstItemInCandList(self):
         # -- Arrange --
