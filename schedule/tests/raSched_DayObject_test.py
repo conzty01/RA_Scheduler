@@ -21,15 +21,6 @@ class TestDayObject(unittest.TestCase):
         self.mocked_loggingCRITICAL = self.patcher_loggingCRITICAL.start()
         self.mocked_loggingERROR = self.patcher_loggingERROR.start()
 
-        # LEGACY TEST DATA - TO BE REMOVED
-        s = []
-        n = 5
-        for i in range(n):
-            ra = RA("T", "C", i, 1, date(2017, 1, 1))
-            s.append(ra)
-
-        self.day = Day(date(2018, 5, 24), 3, numDutySlots=n+1, ras=s)
-
     def tearDown(self):
         # Stop all of the patchers
         self.patcher_loggingDEBUG.stop()
