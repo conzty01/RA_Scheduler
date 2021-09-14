@@ -268,6 +268,31 @@ def createSchedulerQueueDB(conn):
         );""")
 
 
+def createTradeRequestDB(conn):
+    conn.execute("DROP TABLE IF EXISTS duty_trade_requests CASCADE;")
+    conn.execute("""
+        CREATE TABLE duty_trade_requests(
+            id                      serial UNIQUE,
+            trader_ra_id            int NOT NULL,
+            trade_with_ra_id        int,
+            trade_duty              int NOT NULL,
+            exchange_with_duty      int,
+            res_hall_id             int NOT NULL,
+            status                  int NOT NULL DEFAULT 0,
+            trade_reason            varchar(255) NOT NULL DEFAULT '',
+            reject_reason           varchar(255) NOT NULL DEFAULT '',
+            created                 timestamp DEFAULT CURRENT_TIMESTAMP,
+            
+            PRIMARY KEY (id),
+            FOREIGN KEY (res_hall_id) REFERENCES res_hall(id),
+            FOREIGN KEY (trader_ra_id) REFERENCES ra(id),
+            FOREIGN KEY (trade_with_ra_id) REFERENCES ra(id),
+            FOREIGN KEY (trade_duty) REFERENCES duties(id),
+            FOREIGN KEY (exchange_with_duty) REFERENCES duties(id),
+            UNIQUE (trader_ra_id, trade_duty)
+        );""")
+
+
 def main():
     conn = psycopg2.connect(os.environ["DATABASE_URL"])
     createSchoolDB(conn.cursor())
@@ -286,6 +311,7 @@ def main():
     createHallSettingsDB(conn.cursor())
     createStaffMembershipDB(conn.cursor())
     createSchedulerQueueDB(conn.cursor())
+    createTradeRequestDB(conn.cursor())
 
     conn.commit()
 

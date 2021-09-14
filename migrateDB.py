@@ -8,39 +8,90 @@ import os
 def migrate(conn):
     cur = conn.cursor()
 
-    # --------------------------------------------
-    # --  Add enabled column to res_hall table  --
-    # --------------------------------------------
+    # ----------------------------------------
+    # --  Create duty_trade_requests table  --
+    # ----------------------------------------
+
+    # Check to see if the table already exists
+    cur.execute(
+        "SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'duty_trade_requests' AND schemaname = 'public');"
+    )
+
+    # If the table does not already exist...
+    if not cur.fetchone()[0]:
+        logging.info("  Creating 'duty_trade_requests' table")
+
+        cur.execute("""
+        CREATE TABLE duty_trade_requests(
+            id                      serial UNIQUE,
+            trader_ra_id            int NOT NULL,
+            trade_with_ra_id        int,
+            trade_duty_id           int NOT NULL,
+            exchange_with_duty_id   int,
+            res_hall_id             int NOT NULL,
+            status                  int NOT NULL DEFAULT 0,
+            trade_reason            varchar(255) NOT NULL DEFAULT '',
+            reject_reason           varchar(255) NOT NULL DEFAULT '',
+            
+            PRIMARY KEY (id),
+            FOREIGN KEY (res_hall_id) REFERENCES res_hall(id),
+            FOREIGN KEY (trader_ra_id) REFERENCES ra(id),
+            FOREIGN KEY (trade_with_ra_id) REFERENCES ra(id),
+            FOREIGN KEY (trade_duty_id) REFERENCES duties(id),
+            FOREIGN KEY (exchange_with_duty_id) REFERENCES duties(id)
+        );""")
+
+        logging.info("  Finished creating 'duty_trade_requests' table")
+
+    # ---------------------------------------------------------
+    # --  Add 'created' column to duty_trade_requests table  --
+    # ---------------------------------------------------------
 
     # Check to see if the column already exists
     cur.execute(
         """SELECT EXISTS (
             SELECT column_name 
             FROM information_schema.columns 
-            WHERE table_name='res_hall' 
-            AND column_name='enabled');"""
+            WHERE table_name='duty_trade_requests' 
+            AND column_name='created');"""
     )
 
     # If the column does not already exist...
     if not cur.fetchone()[0]:
-        logging.info("  Adding 'enabled' column to res_hall table")
+        logging.info("  Adding 'created' column to duty_trade_requests table")
 
-        # Create the column in the res_hall.
+        # Create the column in the duty_trade_requests.
         cur.execute("""
-            ALTER TABLE res_hall
-            ADD COLUMN enabled BOOLEAN
+            ALTER TABLE duty_trade_requests
+            ADD COLUMN created timestamp DEFAULT CURRENT_TIMESTAMP
             ;""")
 
-        # Set a default value for the enabled column
-        cur.execute("UPDATE res_hall SET enabled = TRUE;")
+        logging.info("  Finished adding 'created' column to duty_trade_requests table")
 
-        # Set the enabled column to not allow Null values
-        cur.execute("ALTER TABLE res_hall ALTER COLUMN enabled SET NOT NULL;")
+    # ----------------------------------------------------------
+    # --  Add UNIQUE constraint to duty_trade_requests table  --
+    # ----------------------------------------------------------
 
-        # Set the enabled column to have a default value
-        cur.execute("ALTER TABLE res_hall ALTER COLUMN enabled SET DEFAULT FALSE;")
+    # Check to see if the constraint already exists
+    cur.execute(
+        """SELECT EXISTS (
+            SELECT constraint_name 
+            FROM information_schema.constraint_column_usage 
+            WHERE table_name='duty_trade_requests' 
+            AND constraint_name='trader_id_duty_id');"""
+    )
 
-        logging.info("  Finished adding 'enabled' column to res_hall table")
+    # If the constraint does not already exist...
+    if not cur.fetchone()[0]:
+        logging.info("  Adding unique constraint to duty_trade_requests table")
+
+        # Create the constraint in the res_hall.
+        cur.execute("""
+            ALTER TABLE duty_trade_requests
+            ADD CONSTRAINT trader_id_duty_id UNIQUE (trader_ra_id, trade_duty_id)
+            ;""")
+
+        logging.info("  Finished adding unique constraint to duty_trade_requests table")
 
 
 if __name__ == "__main__":
