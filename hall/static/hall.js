@@ -436,7 +436,7 @@ function generateGoogleRow(alreadyConnected) {
     // If an account/partial account has not already been connected
     if (alreadyConnected) {
         // Set the Disconnect Attributes
-        disconnButton.innerHTML = "Disconnect Account";
+        disconnButton.innerHTML = 'Disconnect<span class="d-none d-sm-inline"> Account</span>';
         disconnButton.setAttribute("type", "button");
         disconnButton.setAttribute("class", "btn btn-danger");
         disconnButton.setAttribute("onclick", "location.href='../int/disconnectGCal'");
@@ -449,7 +449,7 @@ function generateGoogleRow(alreadyConnected) {
     connectButton.setAttribute("type", "button");
     connectButton.setAttribute("class", "btn btn-primary");
     connectButton.setAttribute("onclick", "location.href='../int/GCalRedirect'");
-    connectButton.innerHTML = alreadyConnected ? "Reconnect Account" : "Connect Account";
+    connectButton.innerHTML = alreadyConnected ? 'Reconnect<span class="d-none d-sm-inline"> Account</span>' : 'Connect<span class="d-none d-sm-inline"> Account</span>';
 
     // Assemble the valDiv
     valDiv.appendChild(connectButton);
