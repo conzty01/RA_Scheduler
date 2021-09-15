@@ -65,7 +65,9 @@ function initIndexCal() {
 }
 
 function displayFlaggedDuties(event) {
-    // Add the
+    // Alter any duties that are flagged so that
+    //  they appear visually different from the
+    //  non-flagged duties.
 
     // Create a temporary event object
     let tmp = {};
@@ -87,31 +89,78 @@ function displayFlaggedDuties(event) {
     return tmp;
 }
 
-function addSchedule( dutyList ){
-    console.log(dutyList);
+var selectedTrade_traderName;
+var selectedTrade_date;
+var selectedTrade_ID;
+var selectedTrade_specUser;
+var tradeDutyFormatOptions = {weekday:'short', year:'numeric', month:'short', day:'numeric'};
 
-    for (let duty of dutyList) {
-        // duty : ('Lue', 'Girardin', '#66CDAA', 3, '2020-08-01')
+function getDutyTradeInfo(tradeID, traderName, date, tradeSpecUser) {
+    // Grab the necessary information from the server
 
-        console.log(1);
-        addSingleEvent(duty[3], duty[0] + ' ' + duty[1], duty[4], duty[2]);
-    }
-    calendar.rerender
+    // Set global information for the selected duty trade request
+    selectedTrade_traderName = traderName;
+    selectedTrade_date = date;
+    selectedTrade_ID = tradeID;
+    selectedTrade_specUser = tradeSpecUser;
 
+    // Call the appropriate API
+    appConfig.base.callAPI(
+        "getAddTradeInfo",
+        {tradeReqID: tradeID},
+        showDutyExchangeModal,
+        "GET",
+        console.err,
+        "/schedule"
+    );
 }
 
-function addSingleEvent( id, title, startStr, colorStr, allDay = true ) {
-    var date = new Date(startStr + 'T00:00:00'); // will be in local time
+function showAppropriateModal(tradeInfo) {
+    // Show the appropriate trade duty modal to the user depending
+    //  on whether or not the trade is with a specific user.
 
-    if (!isNaN(date.valueOf())) { // valid?
-        calendar.addEvent({
-            id: id,
-            title: title,
-            start: date,
-            color: colorStr,
-            allDay: allDay
-        });
+    if (selectedTrade_specUser) {
+        showDutyExchangeModal(tradeInfo);
     } else {
-        console.log('Invalid date: ' + startStr + ' -> ' + date);
+        showAcceptDutyModal(tradeInfo);
     }
+}
+
+function showDutyExchangeModal(tradeInfo) {
+    // Show the selected Duty Exchange Request to the user.
+
+    console.log(tradeInfo);
+    console.log(selectedTrade_traderName);
+    console.log(selectedTrade_date);
+    console.log(selectedTrade_ID);
+    console.log(selectedTrade_specUser);
+
+    // Update the modal's fields to appropriate values based on the
+    //  provided tradeInfo.
+    document.getElementById("tradeDutyTraderName").innerHTML = selectedTrade_traderName;
+    document.getElementById("tradeDutyDate").value = selectedTrade_date.toLocaleDateString("en-us", tradeDutyFormatOptions);
+    document.getElementById("tradeDutyDateFlag").checked = tradeInfo.trDuty.flagged;
+    document.getElementById("trFlaggedDutyLabel").innerHTML = tradeInfo.trDuty.label;
+    document.getElementById("tradeDutyReason").value = tradeInfo.tradeReason;
+
+    document.getElementById("exchangeDutyDate").value = new Date(tradeInfo.exDuty.date).toLocaleDateString("en-us", tradeDutyFormatOptions);
+    document.getElementById("exchangeDutyDateFlag"). checked = tradeInfo.exDuty.flagged;
+    document.getElementById("exFlaggedDutyLabel").innerHTML = tradeInfo.trDuty.label;
+
+    document.getElementById("textExchangeDutyDate").innerHTML = new Date(tradeInfo.exDuty.date).toLocaleDateString();
+    document.getElementById("textTradeDutyDate").innerHTML = selectedTrade_date.toLocaleDateString();
+
+    // Hide any errors from previous event clicks
+    let modal = document.getElementById("exchangeDutyModal");
+    let errDiv = modal.getElementsByClassName("modalError")[0];
+    errDiv.style.display = "none";
+
+    // Reset the global variables
+    selectedTrade_traderName = undefined;
+    selectedTrade_date = undefined;
+    selectedTrade_ID = undefined;
+    selectedTrade_specUser = undefined;
+
+    // Show the modal to the user
+    $('#exchangeDutyModal').modal('show');
 }

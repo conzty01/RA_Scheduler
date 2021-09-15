@@ -1183,3 +1183,178 @@ def deleteDuty():
 
     # Notify the user that the delete was successful
     return jsonify(stdRet(1, "successful"))
+
+
+@schedule_bp.route("/api/getTradeRequestsForUser", methods=["GET"])
+@login_required
+def getUserTradeRequests(authedUser=None):
+    # API method to return any duty trade requests that the user could
+    #  accept. This includes trade requests for duties that the user
+    #  has as well as trade requests that are not for a particular user.
+    #
+    #  Required Auth Level: None
+    #
+    #  If called from the server, this function accepts the following parameters:
+    #
+    #     authedUser   <AuthenticatedUser>  -  an AuthenticatedUser object for the
+    #                                          user whose duty trade requests are
+    #                                          being fetched.
+    #
+    #  If called from a client, the method does not require any additional
+    #  parameters.
+    #
+    #  This method returns an object with the following specifications:
+    #
+    #     [
+    #       {
+    #         "id": <duty_trade_requests.id>,
+    #         "traderName": <ra.first_name> + " " + <ra.last_name>,
+    #         "tradeWithSpecificUser": True if <duty_trade_requests.trade_with_ra_id> else False
+    #         "date": <day.date>
+    #       },
+    #       ...
+    #     ]
+
+    # Assume this API was called from the server and verify that this is true.
+    fromServer = True
+    if authedUser is None:
+        # If the authedUser is None, then this method was called from a remote client.
+
+        # Get the user's information from the database
+        authedUser = getAuth()
+
+        # Mark that this method was not called from the server
+        fromServer = False
+
+    # Create a DB cursor
+    cur = ag.conn.cursor()
+
+    # Query the DB for a list of pending trade requests that pertain to the user.
+    cur.execute(
+        """SELECT dtr.id, CONCAT(trader.first_name, ' ', trader.last_name), dtr.trade_with_ra_id, trade_duty_day.date
+        FROM duty_trade_requests AS dtr 
+            JOIN duties AS trade_duty ON (dtr.trade_duty_id = trade_duty.id)
+            JOIN day AS trade_duty_day ON (trade_duty_day.id = trade_duty.day_id)
+            JOIN ra AS trader ON (dtr.trader_ra_id = trader.id)
+        WHERE (dtr.trade_with_ra_id IS NULL 
+            OR dtr.trade_with_ra_id = %s)
+        AND dtr.res_hall_id = %s
+        AND dtr.status = 0
+        ORDER BY trade_duty_day.date ASC;""",
+        (authedUser.ra_id(), authedUser.hall_id())
+    )
+
+    # Parse and assemble trade requests
+    tradeRequests = []
+    for req in cur.fetchall():
+        tradeRequests.append({
+            "id": req[0],
+            "traderName": req[1],
+            "tradeWithSpecificUser": True if req[2] is not None else False,
+            "date": req[3],
+        })
+
+    # If this API method was called from the server
+    if fromServer:
+        # Then return the result as-is
+        return tradeRequests
+
+    else:
+        # Otherwise return a JSON version of the result
+        return jsonify(tradeRequests)
+
+
+@schedule_bp.route("/api/getAddTradeInfo", methods=["GET"])
+@login_required
+def getAdditionalTradeInfo():
+    # API method to return additional information about the provided
+    #  trade duty request. NOTE: Trade request information will not
+    #  be returned if the trade request ID does not belong to the
+    #  user's selected Res Hall.
+    #
+    #  Required Auth Level: None
+    #
+    #  This method is currently unable to be called from the server.
+    #
+    #  If called from a client, the following parameters are required:
+    #
+    #     tradeReqID  <int>  -  an integer representing the ID of the
+    #                            trade duty request desired.
+    #
+    #  This method returns an object with the following specifications:
+    #
+    #     {
+    #       "trDuty": {
+    #         "flagged": <duties.flagged>,
+    #         "label": <hall_settings.duty_flag_label>
+    #       },
+    #       "exDuty": {
+    #         "date": <day.date>,
+    #         "flagged": <duties.flagged>
+    #       }
+    #       "tradeReason": <duty_trade_requests.trade_reason>
+    #     }
+
+    # Get the user's information from the database
+    authedUser = getAuth()
+
+    try:
+        # Get the trade request ID from the request
+        tradeReqID = int(request.args.get("tradeReqID"))
+
+    except ValueError:
+        # If there was an issue, then return an error notification
+
+        # Log the occurrence
+        logging.warning("Unable to parse duty trade request ID from getAdditionalTradeInfo API request")
+
+        # Notify the user that there was an error
+        return jsonify(stdRet(-1, "Invalid trade request ID"))
+
+    # Create a DB cursor
+    cur = ag.conn.cursor()
+
+    # Query the DB for the additional duty trade information.
+    cur.execute(
+        """SELECT trade_duty.flagged, exchange_duty_day.date, exchange_duty.flagged, dtr.trade_reason
+        FROM duty_trade_requests AS dtr
+            JOIN duties AS trade_duty ON (dtr.trade_duty_id = trade_duty.id)
+            LEFT JOIN duties AS exchange_duty ON (dtr.exchange_with_duty_id = exchange_duty.id)
+            LEFT JOIN day AS exchange_duty_day ON (exchange_duty_day.id = exchange_duty.day_id)
+            LEFT JOIN ra AS trade_with_ra ON (dtr.trade_with_ra_id = trade_with_ra.id)
+        WHERE dtr.res_hall_id = %s
+        AND dtr.id = %s;""",
+        (authedUser.hall_id(), tradeReqID)
+    )
+
+    # Fetch the results
+    res = cur.fetchone()
+
+    # If the result is not None, then parse and package the result
+    if res is not None:
+
+        # Grab the flagged duty label.
+        cur.execute("SELECT duty_flag_label FROM hall_settings WHERE res_hall_id = %s", (authedUser.hall_id(),))
+
+        # Load the query result
+        dfl = cur.fetchone()[0]
+
+        # Assemble the return object
+        ret = {
+            "trDuty": {
+                "flagged": res[0],
+                "label": dfl
+            },
+            "exDuty": {
+                "date": res[1].strftime("%Y/%m/%d"),
+                "flagged": res[2]
+            },
+            "tradeReason": res[3]
+        }
+
+    else:
+        # Set the return result to an empty dictionary
+        ret = dict()
+
+    # Return the result to the user.
+    return jsonify(ret)

@@ -15,6 +15,7 @@ import appGlobals as ag
 
 # Import the needed functions from other parts of the application
 from helperFunctions.helperFunctions import getAuth
+from schedule.schedule import getUserTradeRequests
 
 # Import the blueprints that will be used.
 from breaks.breaks import breaks_bp
@@ -282,8 +283,35 @@ def index():
     # Authenticate the user against the DB
     authedUser = getAuth()
 
+    # Create a DB cursor
+    cur = ag.conn.cursor()
+
+    # Query the DB for a list of all of the RAs and their information for the user's staff.
+    cur.execute(
+        """SELECT ra.id, ra.first_name, ra.last_name, ra.color 
+            FROM ra JOIN staff_membership AS sm ON (ra.id = sm.ra_id)
+            WHERE sm.res_hall_id = %s 
+            ORDER BY ra.first_name ASC;""",
+        (authedUser.hall_id(),)
+    )
+
+    # Load the RA query results
+    raList = cur.fetchall()
+
+    # Parse and assemble trade requests
+    tradeRequests = getUserTradeRequests(authedUser)
+
+    # Assemble the custom options to be passed to the renderer
+    indexOpts = {
+        "raList": raList,
+        "tradeRequests": tradeRequests
+    }
+
+    # Update the index options with the base options
+    indexOpts.update(ag.baseOpts)
+
     # Render the appropriate template
-    return render_template("index.html", auth_level=authedUser.auth_level(), curView=1, opts=ag.baseOpts,
+    return render_template("index.html", auth_level=authedUser.auth_level(), curView=1, opts=indexOpts,
                            hall_name=authedUser.hall_name(), linkedHalls=authedUser.getAllAssociatedResHalls())
 
 

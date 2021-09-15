@@ -2,3 +2,83 @@
     background-color: #D0D0D0 !important;
     border-color: #C1C1C1 !important;
 }
+
+.tradeList {
+    width: 100%;
+    height: 100%;
+    margin: 5%;
+    margin-left: 0;
+
+    overflow-y: scroll;
+    font-size: 1.2em;
+    border: 1px solid #e1e1e1;
+    padding: 5px;
+    display: block;
+    float: right;
+}
+.tradeList ul {
+    list-style: none;
+    margin-left: 0;
+    padding: 0;
+}
+.tradeList ul li {
+    display: block;
+    clear: left;
+    overflow: auto;
+}
+#pendingDutyTrades {
+    overflow-y: scroll;
+    list-style: none;
+    padding: 10px 0px 10px 10px;
+}
+
+#calContainer {
+    float: left;
+}
+#dutySwitchContainer {
+    float: right;
+    margin-top: 5%;
+    height: 71.5%;
+}
+
+.card {
+    margin-bottom: 10px;
+    cursor: pointer;
+}
+
+.card > * {
+    padding: 7px;
+}
+
+.card-header {
+    text-align: center;
+    padding: 2px;
+}
+
+.modalError {
+    display: none;
+    color: rgb(255,0,0);
+}
+
+.fa-plus, .fa-arrow-right, .fa-exchange-alt {
+    margin: auto;
+    position: relative;
+    top: 45%;
+    font-size: 1.5em;
+}
+
+.fa-container {
+    text-align: center;
+}
+
+.modal .form-control[readonly], .modal .form-check-input[readonly] {
+    background-color: transparent;
+}
+
+.form-check-input:disabled ~ .form-check-label {
+    color: inherit
+}
+
+.modal .custom-control.custom-checkbox {
+    margin-top: 5px;
+}

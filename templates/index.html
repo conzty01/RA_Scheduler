@@ -9,9 +9,89 @@
 {% endblock %}
 
 {% block rows %}
-<div id="calendar">
+<!-- Exchange Duty Modal -->
+<div class="modal fade" id="exchangeDutyModal" tabindex="-1" role="dialog" aria-labelledby="exchangeDutyModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Trade Duty Request</h3>
+      </div>
+      <div class="modal-body">
+          <div class="form-group form-row">
+              <div class="col-sm-5">
+                  <label for="tradeDutyDate"><span id="tradeDutyTraderName">None</span>'s Duty:</label>
+                  <input class="form-control" type="datetime-local" id="tradeDutyDate" readonly>
+                  <div class="custom-control custom-checkbox">
+                      <input class="custom-control-input" type="checkbox" id="tradeDutyDateFlag" disabled>
+                      <label class="custom-control-label" for="tradeDutyDateFlag">
+                          <span id="trFlaggedDutyLabel">None</span>
+                      </label>
+                  </div>
+              </div>
 
+              <div class="col-sm-2 fa-container">
+                  <span class="fa fa-exchange-alt"></span>
+              </div>
+
+              <div class="col-sm-5">
+                  <label for="exchangeDutyDate">Your Duty:</label>
+                  <input class="form-control" type="datetime-local" id="exchangeDutyDate" readonly>
+                  <div class="custom-control custom-checkbox">
+                      <input class="custom-control-input" type="checkbox" id="exchangeDutyDateFlag" disabled>
+                      <label class="custom-control-label" for="exchangeDutyDateFlag">
+                          <span id="exFlaggedDutyLabel">None</span>
+                      </label>
+                  </div>
+              </div>
+          </div>
+
+          <div class="form-group form-row">
+              <div class="col">
+                  <label for="tradeDutyReason">Reason for Trade</label>
+                  <textarea class="form-control" id="tradeDutyReason" rows="3" disabled style="max-height:100px"></textarea>
+              </div>
+          </div>
+
+          <div id="textForTrade" class="form-group form-row">
+              <div class="col">
+                  <p><i>
+                      By accepting this trade, you will no longer be assigned for duty on
+                      <b><span id="textExchangeDutyDate">None</span></b> and will instead be
+                      assigned for duty on <b><span id="textTradeDutyDate">None</span></b>.
+                  </i></p>
+              </div>
+          </div>
+
+          <div class="modalError">Failed to Accept Trade: <span class="msg"></span></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        <button id="tradeDutyButt" type="button" class="btn btn-primary" onclick="acceptTrade()">Accept Trade</button>
+      </div>
+    </div>
+  </div>
 </div>
+
+
+<div id="calContainer" class="col-lg-9">
+    <div id="calendar">
+
+    </div>
+</div>
+<div id="dutySwitchContainer" class="col-lg-3">
+    <div id="pendingDutyTrades" class="tradeList">
+        {% for req in opts["tradeRequests"] %}
+        <div class="card" onclick="getDutyTradeInfo({{ req['id'] }}, '{{ req['traderName'] }}', new Date('{{ req['date'].strftime('%Y/%m/%d') }}'), {{ req['tradeWithSpecificUser'].__str__().lower() }})">
+            <p class="card-header">{{ req["date"].strftime("%m/%d/%Y") }}</p>
+            <div class="card-body">
+                <p class="card-text"><b>{{ req["traderName"] }}</b> is asking to trade duties with
+                    <b>{{ "you" if req["tradeWithSpecificUser"] else "anyone" }}</b>.</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
 
 {% endblock %}
 
@@ -23,5 +103,6 @@
 <script src="{{url_for('.static', filename='index.js')}}"></script>
 <script>
     initIndexCal();
+    $('#tradeDutyModal').modal('show');
 </script>
 {% endblock %}
