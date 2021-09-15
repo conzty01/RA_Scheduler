@@ -108,7 +108,7 @@ function getDutyTradeInfo(tradeID, traderName, date, tradeSpecUser) {
     appConfig.base.callAPI(
         "getAddTradeInfo",
         {tradeReqID: tradeID},
-        showDutyExchangeModal,
+        showAppropriateModal,
         "GET",
         console.err,
         "/schedule"
@@ -150,17 +150,81 @@ function showDutyExchangeModal(tradeInfo) {
     document.getElementById("textExchangeDutyDate").innerHTML = new Date(tradeInfo.exDuty.date).toLocaleDateString();
     document.getElementById("textTradeDutyDate").innerHTML = selectedTrade_date.toLocaleDateString();
 
+    document.getElementById("tradeDutyButt").onclick = () => {acceptTrade(selectedTrade_ID)};
+
     // Hide any errors from previous event clicks
     let modal = document.getElementById("exchangeDutyModal");
     let errDiv = modal.getElementsByClassName("modalError")[0];
     errDiv.style.display = "none";
 
-    // Reset the global variables
-    selectedTrade_traderName = undefined;
-    selectedTrade_date = undefined;
-    selectedTrade_ID = undefined;
-    selectedTrade_specUser = undefined;
-
     // Show the modal to the user
     $('#exchangeDutyModal').modal('show');
+}
+
+function acceptTrade(tradeID) {
+    // Make a call to the appropriate API endpoint to accept the
+    //  selected trade request.
+
+    // Call the appropriate API
+    appConfig.base.callAPI(
+        "getAddTradeInfo",
+        {tradeReqID: tradeID},
+        modal_handleAPIResponse,
+        "GET",
+        console.err,
+        "/schedule"
+    );
+
+}
+
+function modal_handleAPIResponse(modalId, msg, extraWork=() => {}) {
+
+    //console.log(msg);
+
+    let modal = document.getElementById(modalId.slice(1));
+
+    // If the status is '1', then the save was successful
+    switch (msg.status) {
+        case 1:
+            // If the status is '1', then the save was successful
+
+            // Refetch the current month's calendar
+            calendar.currentData.calendarApi.refetchEvents();
+            // Get the updated break duties
+            getBreakCount();
+            // Complete any additional work
+            extraWork();
+            // Hide the modal
+            $(modalId).modal('hide');
+
+            // Ensure the respective errorDiv is hidden
+            modal.getElementsByClassName("modalError")[0].style.display = "none";
+
+            break;
+
+        case -1:
+            // If the status is '-1', then there was an error
+
+            // Log the Error
+            console.error(msg.msg);
+
+            // Continue to handle the unsuccessful save
+        case 0:
+            // If the status is '0', then the save was unsuccessful
+
+            console.log(msg.msg);
+            // Get the modal's errorDiv
+            let errDiv = modal.getElementsByClassName("modalError")[0];
+
+            // Update the errorDiv with the message
+            errDiv.getElementsByClassName("msg")[0].innerHTML = msg.msg;
+            // Display the errorDiv
+            errDiv.style.display = "block";
+
+            break;
+
+        default:
+            console.error("REACHED DEFAULT STATE: ",msg);
+            break;
+    }
 }

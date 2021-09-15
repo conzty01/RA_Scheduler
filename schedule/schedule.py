@@ -1346,7 +1346,7 @@ def getAdditionalTradeInfo():
                 "label": dfl
             },
             "exDuty": {
-                "date": res[1].strftime("%Y/%m/%d"),
+                "date": res[1].strftime("%Y/%m/%d") if res[1] is not None else None,
                 "flagged": res[2]
             },
             "tradeReason": res[3]
@@ -1358,3 +1358,53 @@ def getAdditionalTradeInfo():
 
     # Return the result to the user.
     return jsonify(ret)
+
+
+@schedule_bp.route("/api/acceptTradeRequest", methods=["POST"])
+@login_required
+def acceptTradeRequest():
+    # API endpoint that can be used to accept a given duty trade
+    #  request. NOTE: Trade requests CANNOT be accepted by users
+    #  who are 1) not in the same Res Hall as the requesting user,
+    #  and 2) the user who initiated the request themself, or 3)
+    #  not the user that is being requested to trade with.
+    #
+    #  Required Auth Level: None
+    #
+    #  This method is currently unable to be called from the server.
+    #
+    #  If called from a client, the following parameters are required:
+    #
+    #     tradeReqID  <int>  -  an integer representing the ID of the
+    #                            trade duty request desired.
+    #
+    #  This method returns an object with the following specifications:
+    #
+    #  This method returns a standard return object whose status is one of the
+    #  following:
+    #
+    #      1 : the trade was accepted successfully
+    #      0 : the trade was NOT accepted successfully
+    #     -1 : an error occurred during the trade procedure
+
+    # Get the user's information from the database
+    authedUser = getAuth()
+
+    try:
+        # Get the trade request ID from the request
+        tradeReqID = int(request.args.get("tradeReqID"))
+
+    except ValueError:
+        # If there was an issue, then return an error notification
+
+        # Log the occurrence
+        logging.warning("Unable to parse duty trade request ID from getAdditionalTradeInfo API request")
+
+        # Notify the user that there was an error
+        return jsonify(stdRet(-1, "Invalid trade request ID"))
+
+    # Create a DB cursor
+    cur = ag.conn.cursor()
+
+    # Get the duty trade request from the DB
+    #cur.execute("""SELECT """)

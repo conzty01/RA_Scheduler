@@ -63,7 +63,7 @@
 .fa-plus, .fa-arrow-right, .fa-exchange-alt {
     margin: auto;
     position: relative;
-    top: 45%;
+    top: 40%;
     font-size: 1.5em;
 }
 
@@ -75,7 +75,7 @@
     background-color: transparent;
 }
 
-.form-check-input:disabled ~ .form-check-label {
+.custom-control-input:disabled ~ .custom-control-label {
     color: inherit
 }
 
