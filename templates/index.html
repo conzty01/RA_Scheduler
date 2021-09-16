@@ -85,7 +85,7 @@
         <div class="card" onclick="getDutyTradeInfo({{ req['id'] }}, '{{ req['traderName'] }}', new Date('{{ req['date'].strftime('%Y/%m/%d') }}'), {{ req['tradeWithSpecificUser'].__str__().lower() }})">
             <p class="card-header">{{ req["date"].strftime("%m/%d/%Y") }}</p>
             <div class="card-body">
-                <p class="card-text"><b>{{ req["traderName"] }}</b> is asking to trade duties with
+                <p class="card-text"><b>{{ req["traderName"] }}</b> is seeking to trade duties with
                     <b>{{ "you" if req["tradeWithSpecificUser"] else "anyone" }}</b>.</p>
             </div>
         </div>

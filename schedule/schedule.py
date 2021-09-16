@@ -1,6 +1,7 @@
 from flask import render_template, request, jsonify, Blueprint, abort
 from schedule.rabbitConnectionManager import RabbitConnectionManager
 from flask_login import login_required
+from psycopg2 import Error
 import logging
 import os
 
@@ -1391,8 +1392,11 @@ def acceptTradeRequest():
     authedUser = getAuth()
 
     try:
+        # Load the data from the request json
+        data = request.json
+
         # Get the trade request ID from the request
-        tradeReqID = int(request.args.get("tradeReqID"))
+        tradeReqID = int(data["tradeReqID"])
 
     except ValueError:
         # If there was an issue, then return an error notification
@@ -1403,8 +1407,137 @@ def acceptTradeRequest():
         # Notify the user that there was an error
         return jsonify(stdRet(-1, "Invalid trade request ID"))
 
+    logging.info("Processing Duty Trade Request")
+
     # Create a DB cursor
     cur = ag.conn.cursor()
 
     # Get the duty trade request from the DB
-    #cur.execute("""SELECT """)
+    cur.execute(
+        """SELECT trader_ra_id, trade_duty_id, trade_with_ra_id, exchange_with_duty_id
+        FROM duty_trade_requests
+        WHERE id = %s
+        AND res_hall_id = %s
+        AND status = 0
+        AND (trade_with_ra_id = %s OR trade_with_ra_id is NULL);""",
+        (tradeReqID, authedUser.hall_id(), authedUser.ra_id())
+    )
+
+    # Load the results
+    tradeRequest = cur.fetchone()
+
+    # Check to see if we were able to find the desired trade request.
+    if tradeRequest is None:
+        # This could be because for the following reasons:
+        #   - The desired Trade Duty Request ID is not associated with the user's Res Hall
+        #   - The user is not able to accept the desired Trade Duty Request ID.
+        #   - The desired Trade Duty Request does not have a pending status.
+        #   - The desired Trade Duty Request ID does not exist in the DB.
+
+        # Notify the user that we were unable to find the desired Trade Request.
+        return jsonify(stdRet(0, "Unable to find Trade Request."))
+
+    # Unpack the query results
+    traderID, tradeDutyID, tradeWithRAID, exchangeDutyID = tradeRequest
+
+    # Check to ensure that we either have both a trade with RA and exchange duty or neither
+    if (tradeWithRAID is None and exchangeDutyID is not None) or \
+            (tradeWithRAID is not None and exchangeDutyID is None):
+        # If we get here, then there appears to be a data integrity error.
+
+        # Log the occurrence
+        logging.warning("Trade Duty Request {} appears to be missing key values.".format(tradeReqID))
+
+        # Notify the user that we ran into an issue
+        return jsonify(stdRet(-1, "Unable to handle request, please try again later."))
+
+    # Check to see if there is a duty/RA to exchange with
+    if tradeWithRAID is not None and exchangeDutyID is not None:
+        # There is a duty to exchange with-- adjust both duties as needed.
+
+        # Ensure that the two duties exist in the DB
+        cur.execute("SELECT id FROM duties WHERE id = %s OR id = %s;", (tradeDutyID, exchangeDutyID))
+
+        # Check to make sure we found two duties
+        if len(cur.fetchall()) != 2:
+            # If not, there is something fishy going on.
+
+            # Log the occurrence
+            logging.warning("Unable to locate two duties for exchange: {}, {}".format(tradeDutyID, exchangeDutyID))
+
+            # Notify the user of the error
+            return jsonify(stdRet(-1, "Unable to handle request, please try again later."))
+
+        try:
+            # Assign the tradeWithRA to the tradeDuty
+            cur.execute("UPDATE duties SET ra_id = %s WHERE id = %s;", (tradeWithRAID, tradeDutyID))
+
+            # Assign the trader to the exchangeDuty
+            cur.execute("UPDATE duties SET ra_id = %s WHERE id = %s;", (traderID, exchangeDutyID))
+
+            # Commit the changes to the DB.
+            ag.conn.commit()
+
+        except Error as e:
+            # An error was encountered while trying to update the duty.
+
+            # Log the occurrence
+            logging.exception(
+                "PSQL error encountered while trading duties with exchanging: {}, {}".format(e.pgcode, e.pgerror)
+            )
+
+            # Rollback the commit
+            ag.conn.rollback()
+
+            # Notify the user that there was an error
+            return jsonify(stdRet(-1, "Unable to handle request, please try again later."))
+
+    else:
+        # There is no duty to exchange with-- let the user accept the duty.
+
+        try:
+            # Update the existing duty record to point to the new RA.
+            cur.execute("UPDATE duties SET ra_id = %s WHERE id = %s;", (authedUser.ra_id(), tradeReqID))
+            # Commit the change to the DB.
+            ag.conn.commit()
+
+        except Error as e:
+            # An error was encountered while trying to update the duty.
+
+            # Log the occurrence
+            logging.exception(
+                "PSQL error encountered while trading duties without exchanging: {}, {}".format(e.pgcode, e.pgerror)
+            )
+
+            # Rollback the commit
+            ag.conn.rollback()
+
+            # Notify the user that there was an error
+            return jsonify(stdRet(-1, "Unable to handle request, please try again later."))
+
+    try:
+
+        # Mark the trade duty request as complete
+        cur.execute("UPDATE duty_trade_requests SET status = 1 WHERE id = %s", (tradeReqID, ))
+
+        # Commit the change to the DB
+        ag.conn.commit()
+
+    except Error as e:
+        # An error was encountered while trying to update the duty trade request
+
+        # Log the occurrence
+        logging.exception(
+            "PSQL error encountered while trading duties without exchanging: {}, {}".format(e.pgcode, e.pgerror)
+        )
+
+        # Rollback the commit
+        ag.conn.rollback()
+
+        # Notify the user that there was an error
+        return jsonify(stdRet(-1, "Unable to handle request, please try again later."))
+
+    logging.info("Finished Duty Trade Processing")
+
+    # Notify the user that the trade was successful
+    return jsonify(stdRet(1, "successful"))

@@ -167,14 +167,30 @@ function acceptTrade(tradeID) {
 
     // Call the appropriate API
     appConfig.base.callAPI(
-        "getAddTradeInfo",
+        "acceptTradeRequest",
         {tradeReqID: tradeID},
-        modal_handleAPIResponse,
-        "GET",
+        (msg) => {modal_handleAPIResponse("#exchangeDutyModal", msg)},
+        "POST",
         console.err,
         "/schedule"
     );
 
+}
+
+function rejectTrade(tradeID) {
+    // Prompt the user to enter a rejection reason and call
+    //  the appropriate API endpoint to reject the trade request.
+    let rejectReason = prompt("Please enter a reason for rejecting the request.");
+
+    // Call the appropriate API
+    appConfig.base.callAPI(
+        "rejectTradeRequest",
+        {tradeReqID: tradeID, reason: rejectReason},
+        (msg) => {modal_handleAPIResponse("#exchangeDutyModal", msg)},
+        "POST",
+        console.err,
+        "/schedule"
+    );
 }
 
 function modal_handleAPIResponse(modalId, msg, extraWork=() => {}) {
@@ -190,8 +206,6 @@ function modal_handleAPIResponse(modalId, msg, extraWork=() => {}) {
 
             // Refetch the current month's calendar
             calendar.currentData.calendarApi.refetchEvents();
-            // Get the updated break duties
-            getBreakCount();
             // Complete any additional work
             extraWork();
             // Hide the modal
