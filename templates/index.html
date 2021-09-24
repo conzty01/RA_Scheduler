@@ -23,7 +23,7 @@
                   <input class="form-control" type="datetime-local" id="tradeDutyDate" readonly>
                   <div class="custom-control custom-checkbox">
                       <input class="custom-control-input" type="checkbox" id="tradeDutyDateFlag" disabled>
-                      <label class="custom-control-label" for="tradeDutyDateFlag">
+                      <label class="custom-control-label overrideDisableColor" for="tradeDutyDateFlag">
                           <span id="trFlaggedDutyLabel">None</span>
                       </label>
                   </div>
@@ -35,7 +35,7 @@
 
               <div class="col-sm-5">
                   <label for="exchangeDutyDate">Your Duty:</label>
-                  <input class="form-control" type="datetime-local" id="exchangeDutyDate" readonly>
+                  <input class="form-control" type="datetime-local" id="exchangeDutyDate" readonly disabled>
                   <div class="custom-control custom-checkbox">
                       <input class="custom-control-input" type="checkbox" id="exchangeDutyDateFlag" disabled>
                       <label class="custom-control-label" for="exchangeDutyDateFlag">
@@ -48,17 +48,13 @@
           <div class="form-group form-row">
               <div class="col">
                   <label for="tradeDutyReason">Reason for Trade</label>
-                  <textarea class="form-control" id="tradeDutyReason" rows="3" disabled style="max-height:100px"></textarea>
+                  <textarea class="form-control" id="tradeDutyReason" rows="3" readonly style="max-height:100px"></textarea>
               </div>
           </div>
 
-          <div id="textForTrade" class="form-group form-row">
+          <div class="form-group form-row">
               <div class="col">
-                  <p><i>
-                      By accepting this trade, you will no longer be assigned for duty on
-                      <b><span id="textExchangeDutyDate">None</span></b> and will instead be
-                      assigned for duty on <b><span id="textTradeDutyDate">None</span></b>.
-                  </i></p>
+                  <p id="textForTrade"></p>
               </div>
           </div>
 
@@ -66,13 +62,12 @@
       </div>
       <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-          <button id="editDelButt" type="button" class="btn btn-danger" onclick="rejectTrade()">Reject<span class="d-none d-sm-inline"> Trade</span></button>
+          <button id="rejectDutyButt" type="button" class="btn btn-danger" onclick="rejectTrade()">Reject<span class="d-none d-sm-inline"> Trade</span></button>
           <button id="tradeDutyButt" type="button" class="btn btn-primary" onclick="acceptTrade()">Accept<span class="d-none d-sm-inline"> Trade</span></button>
       </div>
     </div>
   </div>
 </div>
-
 
 <div id="calContainer" class="col-lg-9">
     <div id="calendar">

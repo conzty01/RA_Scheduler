@@ -89,6 +89,33 @@ function displayFlaggedDuties(event) {
     return tmp;
 }
 
+function eventClicked(info) {
+    // Function to be called when an event on the calendar is clicked.
+
+    let modalTitle = document.getElementById("editModalLongTitle");
+    modalTitle.innerHTML = info.event.start.toLocaleDateString();
+
+    let prevRA = document.getElementById("editModalPrevRA");
+    prevRA.value = info.event.title;
+
+    let selector = document.getElementById("editModalNextRA");
+    selector.value = info.event.title;
+
+    // Load the duty's point value
+    document.getElementById("editDatePts").value = info.event.extendedProps.pts;
+
+    // Set the ID of the clicked element so that we can find the event later
+    info.el.id = "lastEventSelected";
+
+    // Hide any errors from previous event clicks
+    let modal = document.getElementById("editModal");
+    let errDiv = modal.getElementsByClassName("modalError")[0];
+    errDiv.style.display = "none";
+
+    // Display the modal with RAs
+    $('#editModal').modal('show');
+}
+
 var selectedTrade_traderName;
 var selectedTrade_date;
 var selectedTrade_ID;
@@ -108,22 +135,11 @@ function getDutyTradeInfo(tradeID, traderName, date, tradeSpecUser) {
     appConfig.base.callAPI(
         "getAddTradeInfo",
         {tradeReqID: tradeID},
-        showAppropriateModal,
+        showDutyExchangeModal,
         "GET",
         console.err,
         "/schedule"
     );
-}
-
-function showAppropriateModal(tradeInfo) {
-    // Show the appropriate trade duty modal to the user depending
-    //  on whether or not the trade is with a specific user.
-
-    if (selectedTrade_specUser) {
-        showDutyExchangeModal(tradeInfo);
-    } else {
-        showAcceptDutyModal(tradeInfo);
-    }
 }
 
 function showDutyExchangeModal(tradeInfo) {
@@ -135,22 +151,59 @@ function showDutyExchangeModal(tradeInfo) {
     console.log(selectedTrade_ID);
     console.log(selectedTrade_specUser);
 
-    // Update the modal's fields to appropriate values based on the
-    //  provided tradeInfo.
+    let textForTrade;
+
+    // Update the modal's Trade Duty Fields as appropriate
     document.getElementById("tradeDutyTraderName").innerHTML = selectedTrade_traderName;
     document.getElementById("tradeDutyDate").value = selectedTrade_date.toLocaleDateString("en-us", tradeDutyFormatOptions);
     document.getElementById("tradeDutyDateFlag").checked = tradeInfo.trDuty.flagged;
     document.getElementById("trFlaggedDutyLabel").innerHTML = tradeInfo.trDuty.label;
     document.getElementById("tradeDutyReason").value = tradeInfo.tradeReason;
-
-    document.getElementById("exchangeDutyDate").value = new Date(tradeInfo.exDuty.date).toLocaleDateString("en-us", tradeDutyFormatOptions);
-    document.getElementById("exchangeDutyDateFlag"). checked = tradeInfo.exDuty.flagged;
     document.getElementById("exFlaggedDutyLabel").innerHTML = tradeInfo.trDuty.label;
 
-    document.getElementById("textExchangeDutyDate").innerHTML = new Date(tradeInfo.exDuty.date).toLocaleDateString();
-    document.getElementById("textTradeDutyDate").innerHTML = selectedTrade_date.toLocaleDateString();
+    // If the trade request is for a specific user...
+    if (selectedTrade_specUser) {
+        // Then format the textForTrade appropriately
+        textForTrade = `
+            <i>By accepting this trade, you will no longer be assigned for duty on
+            <b><span id="textExchangeDutyDate">${new Date(tradeInfo.exDuty.date).toLocaleDateString()}</span></b> and will instead be
+            assigned for duty on <b><span id="textTradeDutyDate">${selectedTrade_date.toLocaleDateString()}</span></b>.</i>
+        `
+        // Show the reject button
+        document.getElementById("rejectDutyButt").hidden = false;
+        // White-out the the exchangeDutyDate
+        document.getElementById("exchangeDutyDate").removeAttribute("disabled");
+        document.getElementById("exchangeDutyDate").setAttribute("readonly", true);
+
+        // Update the Exchange Duty Information
+        document.getElementById("exchangeDutyDate").value = new Date(tradeInfo.exDuty.date).toLocaleDateString("en-us", tradeDutyFormatOptions);
+        document.getElementById("exchangeDutyDateFlag").checked = tradeInfo.exDuty.flagged;
+
+    } else {
+        // Otherwise format the textForTrade appropriately
+        textForTrade = `
+            <i>By accepting this trade, you will be assigned for duty on
+            <b><span id="textTradeDutyDate">${selectedTrade_date.toLocaleDateString()}</span></b>.</i>
+        `
+        // Hide the reject button
+        document.getElementById("rejectDutyButt").hidden = false;
+        // Grey-out the the exchangeDutyDate
+        document.getElementById("exchangeDutyDate").setAttribute("disabled", true);
+        document.getElementById("exchangeDutyDate").removeAttribute("readonly");
+
+        // Remove the Exchange Duty Information
+        document.getElementById("exchangeDutyDate").value = '';
+        document.getElementById("exchangeDutyDateFlag").checked = false;
+    }
+
+
+    //document.getElementById("textExchangeDutyDate").innerHTML = new Date(tradeInfo.exDuty.date).toLocaleDateString();
+    //document.getElementById("textTradeDutyDate").innerHTML = selectedTrade_date.toLocaleDateString();
+
+    document.getElementById("textForTrade").innerHTML = textForTrade;
 
     document.getElementById("tradeDutyButt").onclick = () => {acceptTrade(selectedTrade_ID)};
+
 
     // Hide any errors from previous event clicks
     let modal = document.getElementById("exchangeDutyModal");
