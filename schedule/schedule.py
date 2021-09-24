@@ -1455,19 +1455,6 @@ def acceptTradeRequest():
     if tradeWithRAID is not None and exchangeDutyID is not None:
         # There is a duty to exchange with-- adjust both duties as needed.
 
-        # Ensure that the two duties exist in the DB
-        cur.execute("SELECT id FROM duties WHERE id = %s OR id = %s;", (tradeDutyID, exchangeDutyID))
-
-        # Check to make sure we found two duties
-        if len(cur.fetchall()) != 2:
-            # If not, there is something fishy going on.
-
-            # Log the occurrence
-            logging.warning("Unable to locate two duties for exchange: {}, {}".format(tradeDutyID, exchangeDutyID))
-
-            # Notify the user of the error
-            return jsonify(stdRet(-1, "Unable to handle request, please try again later."))
-
         try:
             # Assign the tradeWithRA to the tradeDuty
             cur.execute("UPDATE duties SET ra_id = %s WHERE id = %s;", (tradeWithRAID, tradeDutyID))
