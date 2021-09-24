@@ -1252,7 +1252,7 @@ def getUserTradeRequests(authedUser=None):
             "id": req[0],
             "traderName": req[1],
             "tradeWithSpecificUser": True if req[2] is not None else False,
-            "date": req[3],
+            "date": req[3] if fromServer else req[3].strftime('%Y/%m/%d'),
         })
 
     # If this API method was called from the server

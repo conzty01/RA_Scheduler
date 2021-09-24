@@ -222,7 +222,7 @@ function acceptTrade(tradeID) {
     appConfig.base.callAPI(
         "acceptTradeRequest",
         {tradeReqID: tradeID},
-        (msg) => {modal_handleAPIResponse("#exchangeDutyModal", msg)},
+        (msg) => {modal_handleAPIResponse("#exchangeDutyModal", msg, getDutyTradeRequests)},
         "POST",
         console.err,
         "/schedule"
@@ -239,11 +239,109 @@ function rejectTrade(tradeID) {
     appConfig.base.callAPI(
         "rejectTradeRequest",
         {tradeReqID: tradeID, reason: rejectReason},
-        (msg) => {modal_handleAPIResponse("#exchangeDutyModal", msg)},
+        (msg) => {modal_handleAPIResponse("#exchangeDutyModal", msg, getDutyTradeRequests)},
         "POST",
         console.err,
         "/schedule"
     );
+}
+
+function getDutyTradeRequests() {
+    // Call the appropriate API to get the duty trade requests for the user.
+
+    // Call the appropriate API
+    appConfig.base.callAPI(
+        "getTradeRequestsForUser",
+        {},
+        redrawTradeRequests,
+        "GET",
+        console.err,
+        "/schedule"
+    );
+}
+
+function redrawTradeRequests(data) {
+    // Redraw the section of the UI with Duty Trade Requests
+
+    console.log("Redrawing Duty Trade Requests Section");
+
+    // Grab the Duty Trade Request Container
+    let dtrCont = document.getElementById("dutySwitchContainer");
+    let oldPDTCont = document.getElementById("pendingDutyTrades");
+
+    // Create a new pendingDutyTrades container
+    let newPDTCont = document.createElement("div");
+    newPDTCont.setAttribute("id", "pendingDutyTrades");
+    newPDTCont.classList.add("tradeList");
+    dtrCont.replaceChild(newPDTCont, oldPDTCont);
+
+    // If there are any pending duty requests..
+    if (data.length > 0) {
+        console.log(data.length + " Pending Trades Found");
+
+        // Parse through them
+        let newCardDiv;
+        let newCardDiv_onClick;
+        let newCardDiv_header;
+        let newCardDiv_body;
+        let newCardDiv_bodyText;
+        let newCardDiv_date;
+
+        // Iterate over the data and create cards for each Duty Trade Request
+        for (let tradeReq of data) {
+            // Expected data format:
+            // {
+            //    "id": xx,
+            //    "traderName": xx xx,
+            //    "tradeWithSpecificUser": true/false,
+            //    "date": xx
+            // }
+
+            // Create a date object for the current trade request
+            newCardDiv_date = new Date(tradeReq.date);
+
+            // Create the new card's onclick function
+            newCardDiv_onClick = "getDutyTradeInfo(" + tradeReq.id + ",'"+ tradeReq.traderName + "'," +
+                                 "new Date('" + tradeReq.date + "')," + tradeReq.tradeWithSpecificUser + ")";
+
+            // Create the new card
+            newCardDiv = document.createElement("div");
+            newCardDiv.classList.add("card");
+            newCardDiv.setAttribute("onclick", newCardDiv_onClick);
+            //setAttribute("onClick", newCardDiv_onClick);
+
+            // Create the card's header
+            newCardDiv_header = document.createElement("p");
+            newCardDiv_header.classList.add("card-header");
+            newCardDiv_header.innerHTML = newCardDiv_date.toLocaleDateString();
+            newCardDiv.appendChild(newCardDiv_header);
+
+            // Create the card's body
+            newCardDiv_body = document.createElement("div");
+            newCardDiv_body.classList.add("card-body");
+            newCardDiv.appendChild(newCardDiv_body);
+
+            // Create the card's body text
+            newCardDiv_bodyText = document.createElement("p");
+            newCardDiv_bodyText.classList.add("card-text");
+            newCardDiv_bodyText.innerHTML = "<b>" + tradeReq.traderName + "</b> is seeking to trade duties with <b>" +
+                                            (tradeReq.tradeWithSpecificUser ? 'you' : 'anyone') + "</b>."
+            newCardDiv_body.appendChild(newCardDiv_bodyText);
+
+            // Add the new card to the new pendingDutyTrades container
+            newPDTCont.appendChild(newCardDiv);
+        }
+    } else {
+        console.log("No Pending Trades Found");
+
+        // Otherwise just add an empty message
+        let noRequests = document.createElement("p");
+        noRequests.classList.add("noPendingTrades");
+        noRequests.innerHTML = "*No Pending Trade Requests*";
+        newPDTCont.appendChild(noRequests);
+    }
+
+
 }
 
 function modal_handleAPIResponse(modalId, msg, extraWork=() => {}) {

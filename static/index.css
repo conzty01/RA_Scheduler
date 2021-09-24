@@ -5,7 +5,7 @@
 
 .tradeList {
     width: 100%;
-    height: 100%;
+    height: 94%;
     margin: 5%;
     margin-left: 0;
 
@@ -15,16 +15,6 @@
     padding: 5px;
     display: block;
     float: right;
-}
-.tradeList ul {
-    list-style: none;
-    margin-left: 0;
-    padding: 0;
-}
-.tradeList ul li {
-    display: block;
-    clear: left;
-    overflow: auto;
 }
 #pendingDutyTrades {
     overflow-y: scroll;
@@ -81,4 +71,8 @@
 
 .modal .custom-control.custom-checkbox {
     margin-top: 5px;
+}
+
+.noPendingTrades {
+    text-align: center;
 }

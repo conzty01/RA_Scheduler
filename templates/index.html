@@ -76,15 +76,19 @@
 </div>
 <div id="dutySwitchContainer" class="col-lg-3">
     <div id="pendingDutyTrades" class="tradeList">
+        {% if opts["tradeRequests"]|length > 0 %}
         {% for req in opts["tradeRequests"] %}
         <div class="card" onclick="getDutyTradeInfo({{ req['id'] }}, '{{ req['traderName'] }}', new Date('{{ req['date'].strftime('%Y/%m/%d') }}'), {{ req['tradeWithSpecificUser'].__str__().lower() }})">
-            <p class="card-header">{{ req["date"].strftime("%m/%d/%Y") }}</p>
+            <p class="card-header">{{ req["date"].strftime("%-m/%-d/%Y") }}</p>
             <div class="card-body">
                 <p class="card-text"><b>{{ req["traderName"] }}</b> is seeking to trade duties with
                     <b>{{ "you" if req["tradeWithSpecificUser"] else "anyone" }}</b>.</p>
             </div>
         </div>
         {% endfor %}
+        {% else %}
+        <p class="noPendingTrades">*No Pending Trade Requests*</p>
+        {% endif %}
     </div>
 </div>
 
