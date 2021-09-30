@@ -166,7 +166,8 @@ def getSchedule2(start=None, end=None, hallId=None, showAllColors=None):
     #           "extendedProps": {
     #               "dutyType": "std",
     #               "flagged": <duties.flagged>,
-    #               "pts": <duties.point_val>
+    #               "pts": <duties.point_val>,
+    #               "isUser": 1 if the user is the RA on duty else 0
     #           }
     #        }
     #     ]
@@ -243,6 +244,9 @@ def getSchedule2(start=None, end=None, hallId=None, showAllColors=None):
 
         # logging.debug("Ra is same as user? {}".format(userDict["ra_id"] == row[3]))
 
+        # Default isUser to 0
+        isUser = 0
+
         # If the desired behavior is to NOT show all of the unique RAs' colors...
         if not(showAllColors):
 
@@ -253,6 +257,7 @@ def getSchedule2(start=None, end=None, hallId=None, showAllColors=None):
             if not fromServer and authedUser.ra_id() == row[3]:
                 # If it is the RA, then show their unique color
                 c = row[2]
+                isUser = 1
 
             else:
                 # If it is NOT the RA, then show the default color.
@@ -273,7 +278,8 @@ def getSchedule2(start=None, end=None, hallId=None, showAllColors=None):
             "extendedProps": {
                 "dutyType": "std",
                 "flagged": row[5],
-                "pts": row[6]
+                "pts": row[6],
+                "isUser": isUser
             }
         })
 

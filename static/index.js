@@ -60,7 +60,8 @@ function initIndexCal() {
         ],
         lazyFetching: true,
         fixedWeekCount: false,
-        eventOrder: "flagged, title"
+        eventOrder: "flagged, title",
+        eventClick: eventClicked
     });
 }
 
@@ -80,6 +81,14 @@ function displayFlaggedDuties(event) {
     tmp.color = event.color;
     tmp.extendedProps = event.extendedProps;
 
+    let formattedDateStr = tmp.start.replaceAll("-", "/");
+
+    // If the event date is before the current date
+    if (new Date(formattedDateStr) >= appConfig.curDate) {
+        // Add a css class to the event
+        tmp.classNames = ["clickable"];
+    }
+
     // Check to see if this event has been flagged
     if (tmp.extendedProps.flagged) {
        tmp.display = "list-item";
@@ -92,28 +101,39 @@ function displayFlaggedDuties(event) {
 function eventClicked(info) {
     // Function to be called when an event on the calendar is clicked.
 
-    let modalTitle = document.getElementById("editModalLongTitle");
-    modalTitle.innerHTML = info.event.start.toLocaleDateString();
+    console.log(info);
+    console.log(info.event.extendedProps.isUser);
 
-    let prevRA = document.getElementById("editModalPrevRA");
-    prevRA.value = info.event.title;
+    // If the event that was clicked is a duty that has already happened
+    if (info.event.start < appConfig.curDate) {
+        // These duties cannot be traded.
+        return;
+    }
 
-    let selector = document.getElementById("editModalNextRA");
-    selector.value = info.event.title;
+    // If the event that was clicked is assigned to the user...
+    if (info.event.extendedProps.isUser == 1) {
+        // then call an API to get a list of staff members to trade with
+        appConfig.base.callAPI(
+            "getStats",
+            {start:"", end:""},
+            showYourTradeDutyModal,
+            "GET",
+            console.err,
+            "/staff"
+        )
 
-    // Load the duty's point value
-    document.getElementById("editDatePts").value = info.event.extendedProps.pts;
+    } else {
+        // Otherwise, call an API to get a list of the user's duties to trade with.
+        appConfig.base.callAPI(
+            "getStafferDuties",
+            {start:"", end:""},
+            showOtherTradeDutyModal,
+            "GET",
+            console.err,
+            "/staff"
+        )
+    }
 
-    // Set the ID of the clicked element so that we can find the event later
-    info.el.id = "lastEventSelected";
-
-    // Hide any errors from previous event clicks
-    let modal = document.getElementById("editModal");
-    let errDiv = modal.getElementsByClassName("modalError")[0];
-    errDiv.style.display = "none";
-
-    // Display the modal with RAs
-    $('#editModal').modal('show');
 }
 
 var selectedTrade_traderName;

@@ -846,6 +846,92 @@ def changeHallView(newHallID):
     return redirect(url_for("index"))
 
 
+@staff_bp.route("/api/getStafferDuties", methods=["GET"])
+@login_required
+def getStafferDuties(resHallID=None, raID=None, startDateStr=None, endDateStr=None):
+    # API method to return a list of duties that the provided RA is assigned for
+    #  for the provided Res Hall within the given timeframe.
+    #
+    #  Required Auth Level: None
+    #
+    #  If called from the server, this function accepts the following parameters:
+    #
+    #     resHallID     <int>  -  an integer representing the id of the desired residence
+    #                              hall in the res_hall table.
+    #     raID          <int>  -  an integer representing the id of the desired RA in the
+    #                              ra table.
+    #     startDateStr  <str>  -  a string representing the first day that should be included.
+    #     endDateStr    <str>  -  a string representing the last day that should be included.
+    #
+    #  If called from a client, the following parameters are required:
+    #
+    #     start  <str>  -  a string representing the first day that should be included.
+    #     end    <str>  -  a string representing the last day that should be included.
+    #
+    #  This method returns an object with the following specifications:
+    #
+    #     [
+    #        {
+    #           "date": day.date,
+    #           "id": duties.id
+    #        },
+    #        ...
+    #     ]
+
+    # Assume this API was called from the server and verify that this is true.
+    fromServer = True
+    if resHallID is None and raID is None and startDateStr is None and endDateStr is None:
+        # If the HallId, raID, startDateStr, and endDateStr are None, then
+        #  this method was called from a remote client.
+
+        # Get the user's information from the database
+        authedUser = getAuth()
+        # Set the value of resHallID and raID from the authedUser
+        resHallID = authedUser.hall_id()
+        raID = authedUser.ra_id()
+        # Get the startDateStr and endDateStr from the request arguments
+        startDateStr = request.args.get("start")
+        endDateStr = request.args.get("end")
+        # Mark that this method was not called from the server
+        fromServer = False
+
+    # Default the result
+    res = []
+
+    # Create a DB cursor
+    cur = ag.conn.cursor()
+
+    # Query the DB for a list of
+    cur.execute(
+        """
+        SELECT day.date, duties.id 
+        FROM duties JOIN day ON (duties.day_id = day.id) 
+        WHERE day.date BETWEEN TO_DATE(%s, 'YYYY-MM-DD') AND TO_DATE(%s, 'YYYY-MM-DD') 
+        AND duties.hall_id = %s
+        AND duties.ra_id = %s
+        """,
+        (startDateStr, endDateStr, resHallID, raID)
+    )
+
+    # Load the results
+    dutyList = cur.fetchall()
+
+    # Check to see if there are any duties
+    if len(dutyList) > 0:
+        # If there are duties, then package them up to be returned
+        for duty in dutyList:
+            res.append({
+                "date": duty[0],
+                "id": duty[1]
+            })
+
+    # Return the result to the caller
+    if fromServer:
+        return res
+    else:
+        return jsonify(res)
+
+
 # ------------------------
 # --  Helper Functions  --
 # ------------------------

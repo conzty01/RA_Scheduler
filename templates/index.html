@@ -69,6 +69,59 @@
   </div>
 </div>
 
+<!-- Request Duty Trade Modal -->
+<div class="modal fade" id="tradeDutyModal" tabindex="-1" role="dialog" aria-labelledby="exchangeDutyModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Trade Duty?</h3>
+      </div>
+      <div class="modal-body">
+          <div class="form-group form-row">
+              <div class="col-sm-5">
+                  <label for="selectedDutyDate"><span id="selectedDutyTraderName">None</span>'s Duty:</label>
+                  <input class="form-control" type="datetime-local" id="selectedDutyDate" disabled>
+                  <div class="custom-control custom-checkbox">
+                      <input class="custom-control-input" type="checkbox" id="selectedDutyDateFlag" disabled>
+                      <label class="custom-control-label overrideDisableColor" for="selectedDutyDateFlag">
+                          <span id="selFlaggedDutyLabel">None</span>
+                      </label>
+                  </div>
+              </div>
+
+              <div class="col-sm-2 fa-container">
+                  <span class="fa fa-exchange-alt"></span>
+              </div>
+
+              <div class="col-sm-5">
+                  <label for="yourDutyDate">Your Duty:</label>
+                  <input class="form-control" type="datetime-local" id="yourDutyDate" readonly disabled>
+                  <div class="custom-control custom-checkbox">
+                      <input class="custom-control-input" type="checkbox" id="yourDutyDateFlag" disabled>
+                      <label class="custom-control-label" for="yourDutyDateFlag">
+                          <span id="yourFlaggedDutyLabel">None</span>
+                      </label>
+                  </div>
+              </div>
+          </div>
+
+          <div class="form-group form-row">
+              <div class="col">
+                  <label for="yourTradeDutyReason">Reason for Trade</label>
+                  <textarea class="form-control" id="yourTradeDutyReason" rows="3" readonly style="max-height:100px"></textarea>
+              </div>
+          </div>
+
+          <div class="modalError">Failed to Accept Trade: <span class="msg"></span></div>
+      </div>
+      <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+          <button id="createTradeButt" type="button" class="btn btn-primary" onclick="createTrade()">Submit<span class="d-none d-sm-inline"> Trade Request</span></button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="calContainer" class="col-lg-9">
     <div id="calendar">
 
@@ -103,6 +156,5 @@
 <script src="{{url_for('.static', filename='index.js')}}"></script>
 <script>
     initIndexCal();
-    $('#tradeDutyModal').modal('show');
 </script>
 {% endblock %}
