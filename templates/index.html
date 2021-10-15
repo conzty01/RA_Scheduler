@@ -69,8 +69,8 @@
   </div>
 </div>
 
-<!-- Request Duty Trade Modal -->
-<div class="modal fade" id="tradeDutyModal" tabindex="-1" role="dialog" aria-labelledby="exchangeDutyModalTitle" aria-hidden="true">
+<!-- Other Duty Trade Modal -->
+<div class="modal fade" id="otherTradeDutyModal" tabindex="-1" role="dialog" aria-labelledby="otherTradeDutyModalTitle" aria-hidden="true">
   <div class="modal-dialog modal-dialog" role="document">
     <div class="modal-content">
       <div class="modal-header">
@@ -79,12 +79,12 @@
       <div class="modal-body">
           <div class="form-group form-row">
               <div class="col-sm-5">
-                  <label for="selectedDutyDate"><span id="selectedDutyTraderName">None</span>'s Duty:</label>
+                  <label for="selectedDutyDate"><span id="otherDutyTraderName">None</span>'s Duty:</label>
                   <input class="form-control" type="datetime-local" id="selectedDutyDate" disabled>
                   <div class="custom-control custom-checkbox">
-                      <input class="custom-control-input" type="checkbox" id="selectedDutyDateFlag" disabled>
-                      <label class="custom-control-label overrideDisableColor" for="selectedDutyDateFlag">
-                          <span id="selFlaggedDutyLabel">None</span>
+                      <input class="custom-control-input" type="checkbox" id="otherDutyDateFlag" disabled>
+                      <label class="custom-control-label overrideDisableColor" for="otherDutyDateFlag">
+                          <span id="otherFlaggedDutyLabel">None</span>
                       </label>
                   </div>
               </div>
@@ -94,12 +94,13 @@
               </div>
 
               <div class="col-sm-5">
-                  <label for="yourDutyDate">Your Duty:</label>
-                  <input class="form-control" type="datetime-local" id="yourDutyDate" readonly disabled>
+                  <label for="yourOtherDutyDate">Your Duty:</label>
+                  <select id="yourOtherDutyDate" class="form-control" onchange="updateOtherTradeDutySelect(this.value)">
+                  </select>
                   <div class="custom-control custom-checkbox">
                       <input class="custom-control-input" type="checkbox" id="yourDutyDateFlag" disabled>
                       <label class="custom-control-label" for="yourDutyDateFlag">
-                          <span id="yourFlaggedDutyLabel">None</span>
+                          <span id="yourOtherFlaggedDutyLabel">None</span>
                       </label>
                   </div>
               </div>
@@ -107,8 +108,8 @@
 
           <div class="form-group form-row">
               <div class="col">
-                  <label for="yourTradeDutyReason">Reason for Trade</label>
-                  <textarea class="form-control" id="yourTradeDutyReason" rows="3" readonly style="max-height:100px"></textarea>
+                  <label for="yourOtherTradeDutyReason">Reason for Trade</label>
+                  <textarea class="form-control" id="yourOtherTradeDutyReason" rows="3" readonly style="max-height:100px"></textarea>
               </div>
           </div>
 
@@ -116,7 +117,7 @@
       </div>
       <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-          <button id="createTradeButt" type="button" class="btn btn-primary" onclick="createTrade()">Submit<span class="d-none d-sm-inline"> Trade Request</span></button>
+          <button id="createTradeButt" type="button" class="btn btn-primary" onclick="submitTrade()">Submit<span class="d-none d-sm-inline"> Trade Request</span></button>
       </div>
     </div>
   </div>
@@ -156,5 +157,6 @@
 <script src="{{url_for('.static', filename='index.js')}}"></script>
 <script>
     initIndexCal();
+    $('#otherTradeDutyModal').modal('show');
 </script>
 {% endblock %}

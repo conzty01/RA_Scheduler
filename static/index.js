@@ -83,8 +83,12 @@ function displayFlaggedDuties(event) {
 
     let formattedDateStr = tmp.start.replaceAll("-", "/");
 
+    // Create a tmp Date object to clear out the time component
+    let tmpDate = new Date(appConfig.curDate.toISOString());
+    tmpDate.setHours(0, 0, 0, 0);
+
     // If the event date is before the current date
-    if (new Date(formattedDateStr) >= appConfig.curDate) {
+    if (new Date(formattedDateStr) >= tmpDate) {
         // Add a css class to the event
         tmp.classNames = ["clickable"];
     }
@@ -104,18 +108,35 @@ function eventClicked(info) {
     console.log(info);
     console.log(info.event.extendedProps.isUser);
 
+    // Create a temporary date object to zero out the timestamp
+    //  associated with the current date.
+    let tmpDateObj = new Date(appConfig.curDate.toISOString());
+    tmpDateObj.setHours(0, 0, 0, 0);
+
     // If the event that was clicked is a duty that has already happened
-    if (info.event.start < appConfig.curDate) {
+    if (info.event.start < tmpDateObj) {
         // These duties cannot be traded.
         return;
     }
+
+    // Reset tmpDateObj for later use
+    tmpDateObj = undefined;
+
+    // Start date will always be the current date
+    let start = appConfig.curDate.toISOString();
+
+    // End will always be the current day next year so that any future duties
+    //  for this calendar year are accounted for. Might be best to
+    tmpDateObj = new Date(appConfig.curDate.toISOString());
+    tmpDateObj.setFullYear(appConfig.curDate.getFullYear() + 1);
+    let end = tmpDateObj.toISOString();
 
     // If the event that was clicked is assigned to the user...
     if (info.event.extendedProps.isUser == 1) {
         // then call an API to get a list of staff members to trade with
         appConfig.base.callAPI(
-            "getStats",
-            {start:"", end:""},
+            "getMembers",
+            {start: start, end: end},
             showYourTradeDutyModal,
             "GET",
             console.err,
@@ -126,7 +147,7 @@ function eventClicked(info) {
         // Otherwise, call an API to get a list of the user's duties to trade with.
         appConfig.base.callAPI(
             "getStafferDuties",
-            {start:"", end:""},
+            {start: start, end: end},
             showOtherTradeDutyModal,
             "GET",
             console.err,
@@ -165,11 +186,11 @@ function getDutyTradeInfo(tradeID, traderName, date, tradeSpecUser) {
 function showDutyExchangeModal(tradeInfo) {
     // Show the selected Duty Exchange Request to the user.
 
-    console.log(tradeInfo);
-    console.log(selectedTrade_traderName);
-    console.log(selectedTrade_date);
-    console.log(selectedTrade_ID);
-    console.log(selectedTrade_specUser);
+    //console.log(tradeInfo);
+    //console.log(selectedTrade_traderName);
+    //console.log(selectedTrade_date);
+    //console.log(selectedTrade_ID);
+    //console.log(selectedTrade_specUser);
 
     let textForTrade;
 
@@ -215,10 +236,6 @@ function showDutyExchangeModal(tradeInfo) {
         document.getElementById("exchangeDutyDate").value = '';
         document.getElementById("exchangeDutyDateFlag").checked = false;
     }
-
-
-    //document.getElementById("textExchangeDutyDate").innerHTML = new Date(tradeInfo.exDuty.date).toLocaleDateString();
-    //document.getElementById("textTradeDutyDate").innerHTML = selectedTrade_date.toLocaleDateString();
 
     document.getElementById("textForTrade").innerHTML = textForTrade;
 
@@ -412,4 +429,61 @@ function modal_handleAPIResponse(modalId, msg, extraWork=() => {}) {
             console.error("REACHED DEFAULT STATE: ",msg);
             break;
     }
+}
+
+var stafferDuties;
+
+function showOtherTradeDutyModal(dutyList) {
+    // Show the otherTradeDutyModal to the user
+
+    // Blank out the previous stafferDuties
+    stafferDuties = new Map();
+
+    // Create a new select object
+    let newSelect = document.createElement("select");
+    newSelect.classList.add("form-control");
+    newSelect.id = "yourOtherDutyDate";
+    newSelect.setAttribute("onchange", "updateOtherTradeDutySelect(this.value)");
+
+    let option;
+    // Add the duties to the <select>
+    for (let duty of dutyList) {
+        // Add the duty to the stafferDuties map
+        stafferDuties.set(duty.id, duty);
+
+        // Add the duty to the new select
+        option = document.createElement("option");
+        option.text = duty.date;
+        option.value = duty.id;
+        newSelect.add(option);
+    }
+
+    // Update the modal's Trade Duty Fields as appropriate
+    document.getElementById("otherDutyTraderName").innerHTML = selectedTrade_traderName;
+    document.getElementById("otherDutyDate").value = selectedTrade_date.toLocaleDateString("en-us", tradeDutyFormatOptions);
+    document.getElementById("otherDutyDateFlag").checked = tradeInfo.trDuty.flagged;
+    document.getElementById("otherFlaggedDutyLabel").innerHTML = tradeInfo.trDuty.label;
+    document.getElementById("yourOtherTradeDutyReason").value = "";
+    document.getElementById("yourOtherFlaggedDutyLabel").innerHTML = tradeInfo.trDuty.label;
+
+
+    // Hide any errors from previous event clicks
+    let modal = document.getElementById("otherTradeDutyModal");
+    let errDiv = modal.getElementsByClassName("modalError")[0];
+    errDiv.style.display = "none";
+
+    // Show the modal to the user
+    $('#otherTradeDutyModal').modal('show');
+}
+
+function updateOtherTradeDutySelect(selectValue) {
+
+}
+
+function showYourTradeDutyModal(staffMembers) {
+    // Show the yourTradeDutyModal to the user
+}
+
+function submitTrade() {
+
 }

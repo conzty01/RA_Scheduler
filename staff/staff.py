@@ -848,7 +848,7 @@ def changeHallView(newHallID):
 
 @staff_bp.route("/api/getStafferDuties", methods=["GET"])
 @login_required
-def getStafferDuties(resHallID=None, raID=None, startDateStr=None, endDateStr=None):
+def getStafferDuties(resHallID=None, raID=None, startDateStr=None, endDateStr=None, truncEndDate=True):
     # API method to return a list of duties that the provided RA is assigned for
     #  for the provided Res Hall within the given timeframe.
     #
@@ -856,12 +856,16 @@ def getStafferDuties(resHallID=None, raID=None, startDateStr=None, endDateStr=No
     #
     #  If called from the server, this function accepts the following parameters:
     #
-    #     resHallID     <int>  -  an integer representing the id of the desired residence
-    #                              hall in the res_hall table.
-    #     raID          <int>  -  an integer representing the id of the desired RA in the
-    #                              ra table.
-    #     startDateStr  <str>  -  a string representing the first day that should be included.
-    #     endDateStr    <str>  -  a string representing the last day that should be included.
+    #     resHallID     <int>    -  an integer representing the id of the desired residence
+    #                                hall in the res_hall table.
+    #     raID          <int>    -  an integer representing the id of the desired RA in the
+    #                                ra table.
+    #     startDateStr  <str>    -  a string representing the first day that should be included.
+    #     endDateStr    <str>    -  a string representing the last day that should be included.
+    #     truncEndDate   <bool>  -  a boolean that, if set to True, will ignore the provided
+    #                                endDateStr and instead use the configured end of the
+    #                                school year. If set to False, the value for endDateStr is
+    #                                used.
     #
     #  If called from a client, the following parameters are required:
     #
@@ -873,7 +877,9 @@ def getStafferDuties(resHallID=None, raID=None, startDateStr=None, endDateStr=No
     #     [
     #        {
     #           "date": day.date,
-    #           "id": duties.id
+    #           "id": duties.id,
+    #           "flagged": duties.flagged,
+    #           "label": hall_settings.duty_flag_label
     #        },
     #        ...
     #     ]
@@ -890,22 +896,28 @@ def getStafferDuties(resHallID=None, raID=None, startDateStr=None, endDateStr=No
         resHallID = authedUser.hall_id()
         raID = authedUser.ra_id()
         # Get the startDateStr and endDateStr from the request arguments
-        startDateStr = request.args.get("start")
-        endDateStr = request.args.get("end")
+        startDateStr = request.args.get("start").split("T")[0]
+        endDateStr = request.args.get("end").split("T")[0]
         # Mark that this method was not called from the server
         fromServer = False
-
-    # Default the result
-    res = []
 
     # Create a DB cursor
     cur = ag.conn.cursor()
 
+    # If we should use the configured end of the school year instead of endDateStr
+    if truncEndDate:
+        # Grab the configured end of the school year
+        _, endDateStr = getCurSchoolYear()
+
+    # Default the result
+    res = []
+
     # Query the DB for a list of
     cur.execute(
         """
-        SELECT day.date, duties.id 
-        FROM duties JOIN day ON (duties.day_id = day.id) 
+        SELECT day.date, duties.id, duties.flagged, hall_settings.duty_flag_label 
+        FROM duties JOIN day ON (duties.day_id = day.id)
+        JOIN hall_settings ON (duties.hall_id = hall_settings.res_hall_id)
         WHERE day.date BETWEEN TO_DATE(%s, 'YYYY-MM-DD') AND TO_DATE(%s, 'YYYY-MM-DD') 
         AND duties.hall_id = %s
         AND duties.ra_id = %s
@@ -921,8 +933,102 @@ def getStafferDuties(resHallID=None, raID=None, startDateStr=None, endDateStr=No
         # If there are duties, then package them up to be returned
         for duty in dutyList:
             res.append({
-                "date": duty[0],
-                "id": duty[1]
+                "date": duty[0].strftime('%Y/%m/%d'),
+                "id": duty[1],
+                "flagged": duty[2],
+                "label": duty[3]
+            })
+
+    # Return the result to the caller
+    if fromServer:
+        return res
+    else:
+        return jsonify(res)
+
+
+@staff_bp.route("/api/getMembers", methods=["GET"])
+@login_required
+def getStaffMembers(resHallID=None, excludeHDs=False):
+    # API method to return a list of staff members for the provided Res Hall.
+    #
+    #  Required Auth Level: None
+    #
+    #  If called from the server, this function accepts the following parameters:
+    #
+    #     resHallID    <int>   -  an integer representing the id of the desired residence
+    #                              hall in the res_hall table.
+    #     excludeHDs   <bool>  -  a boolean that, if set to True, will exclude any Hall
+    #                              Directors/Area Coordinators from the result.
+    #
+    #  If called from a client, the following parameters are required:
+    #
+    #     excludeHDs  <str>  -  a boolean that, if set to True, will exclude any Hall
+    #                            Directors/Area Coordinators from the result.
+    #
+    #  This method returns an object with the following specifications:
+    #
+    #     [
+    #        {
+    #           "name": ra.first_name + " " + ra.last_name,
+    #           "id": ra.id
+    #        },
+    #        ...
+    #     ]
+
+    # Assume this API was called from the server and verify that this is true.
+    fromServer = True
+    raID = None
+    if resHallID is None and not excludeHDs:
+        # If the HallId and excludeHDs flag are None, then
+        #  this method was called from a remote client.
+
+        # Get the user's information from the database
+        authedUser = getAuth()
+        # Set the value of resHallID and raID from the authedUser
+        resHallID = authedUser.hall_id()
+        raID = authedUser.ra_id()
+
+        # Get the excludeHDs flag from the request arguments
+        if request.args.get("excludeHDs").lower() == "true":
+            excludeHDs = True
+
+        elif request.args.get("excludeHDs").lower() == "false":
+            excludeHDs = False
+
+        else:
+            return jsonify(stdRet(-1, "Invalid flag provided"))
+
+        # Mark that this method was not called from the server
+        fromServer = False
+
+    # Create a DB cursor
+    cur = ag.conn.cursor()
+
+    # Query the DB for the list of Staff Members
+    cur.execute(
+        """
+        SELECT CONCAT(ra.first_name, ' ', ra.last_name), ra.id 
+        FROM ra JOIN staff_membership AS sm ON (ra.id = sm.ra_id)
+        WHERE sm.res_hall_id = %s
+        {}
+        """.format("AND auth_level < 3" if excludeHDs else ""),
+        (resHallID, )
+    )
+
+    # Load the results from the DB
+    staffList = cur.fetchall()
+
+    # Default the result
+    res = []
+
+    # Iterate through the results and package them up
+    for name, i in staffList:
+        # If an raID is provided, then don't include them in the results.
+        if i != raID:
+            # Add the RA to the results
+            res.append({
+                "name": name,
+                "id": i
             })
 
     # Return the result to the caller
