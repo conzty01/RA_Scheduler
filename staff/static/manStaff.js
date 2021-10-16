@@ -142,9 +142,16 @@ function addRow(data, table) {
         col = newRow.insertCell(i);
         col.className = d;
 
+        // If the column we are adding is raID or resHall
+        if (d == "raID" || d == "resHall") {
+            // Then hide the column from view
+            col.classList.add("d-none");
+        }
+
         if (d == "startDate") {
             let tmp = new Date(data[i]);
             col.innerHTML = tmp.toISOString().substring(0,10);
+            col.classList.add("d-sm-none d-md-table-cell");
 
         } else if (d == "color") {
             let tmp = document.createElement("input");
@@ -152,6 +159,7 @@ function addRow(data, table) {
             tmp.value = data[i];
             tmp.disabled = true;
             col.appendChild(tmp);
+            col.classList.add("d-sm-none");
 
         } else if (d == "authLevel") {
             switch (data[i]) {
@@ -177,7 +185,7 @@ function addRow(data, table) {
 
             // If this is the case, then we want to hide these
             //  columns from view but still set their value.
-            col.hidden = true;
+            col.classList.add("d-none");
             col.innerHTML = data[i];
 
         } else {

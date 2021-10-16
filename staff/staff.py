@@ -53,7 +53,7 @@ def manStaff():
                    FROM ra JOIN staff_membership AS sm ON (ra.id = sm.ra_id)
                            JOIN res_hall ON (sm.res_hall_id = res_hall.id)
                    WHERE sm.res_hall_id = %s 
-                   ORDER BY ra.id ASC;
+                   ORDER BY sm.auth_level DESC, ra.first_name ASC;
                 """, (authedUser.hall_id(),))
 
     # Get each of the RA's duty statistics for the current school year.
