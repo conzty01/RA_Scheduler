@@ -290,7 +290,7 @@ def getStaffStats():
                  FROM ra JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
                          JOIN res_hall ON (sm.res_hall_id = res_hall.id)
                  WHERE sm.res_hall_id = %s 
-                 ORDER BY ra.id DESC;""", (authedUser.hall_id(),))
+                 ORDER BY sm.auth_level DESC, ra.first_name ASC;""", (authedUser.hall_id(),))
 
     # Get the information for the current school year.
     #  This will be used to calculate duty points for the RAs.
@@ -540,15 +540,27 @@ def addStaffer():
 
     # If there is a user with the provided email already
     if existingRAID is not None:
-        # Create an entry into the staff_membership table for this new member
+
+        # Check to see if the RA is already a part of the desired staff
         cur.execute(
-            """INSERT INTO staff_membership (ra_id, res_hall_id, auth_level, selected)
-               VALUES (%s, %s, %s, %s);""",
-            (existingRAID[0], authedUser.hall_id(), data["authLevel"], False)
+            "SELECT EXISTS (SELECT id FROM staff_membership WHERE ra_id = %s AND res_hall_id = %s)",
+            (existingRAID[0], authedUser.hall_id())
         )
 
-        # Fetch the returned ID of the RA record
-        raID = existingRAID[0]
+        # If there is not already a staff_membership record, then add the new member
+        if not cur.fetchone()[0]:
+
+            logging.debug("No existing Staff Membership record found.")
+
+            # Create an entry into the staff_membership table for this new member
+            cur.execute(
+                """INSERT INTO staff_membership (ra_id, res_hall_id, auth_level, selected)
+                   VALUES (%s, %s, %s, %s);""",
+                (existingRAID[0], authedUser.hall_id(), data["authLevel"], False)
+            )
+
+            # Add the point modifier to the DB
+            addRAPointModifier(existingRAID[0], authedUser.hall_id(), data["modPts"], set=True)
 
     else:
         # Otherwise set the query string create a new RA record in the ra table with
@@ -570,8 +582,8 @@ def addStaffer():
             (raID, authedUser.hall_id(), data["authLevel"], True)
         )
 
-    # Add the point modifier to the DB
-    addRAPointModifier(raID, authedUser.hall_id(), data["modPts"], set=True)
+        # Add the point modifier to the DB
+        addRAPointModifier(raID, authedUser.hall_id(), data["modPts"], set=True)
 
     # Commit the changes to the DB
     ag.conn.commit()

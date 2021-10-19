@@ -129,14 +129,14 @@
                 <th scope="col" class="d-none">ID</th>
                 <th scope="col">First Name</th>
                 <th scope="col">Last Name</th>
-                <th scope="col">Email</th>
-                <th scope="col" class="d-sm-none d-md-table-cell">Date Started</th>
+                <th scope="col" class="d-none d-sm-table-cell">Email</th>
+                <th scope="col" class="d-none d-md-table-cell">Date Started</th>
                 <th scope="col" class="d-none">Res Hall</th>
                 <th scope="col" class="d-none">Duty Points</th>
                 <th scope="col" class="d-none">Modifier Points</th>
                 <th scope="col">Total Points</th>
-                <th scope="col" class="d-sm-none d-md-table-cell">Color</th>
-                <th scope="col">Role</th>
+                <th scope="col" class="d-none d-md-table-cell">Color</th>
+                <th scope="col" class="d-none d-sm-table-cell">Role</th>
                 <th scope="col">Edit</th>
             </tr>
         </thead>
@@ -146,14 +146,14 @@
                 <td class="raID d-none">{{ ra[0] }}</td>
                 <td class="fName">{{ ra[1] }}</td>
                 <td class="lName">{{ ra[2] }}</td>
-                <td class="email">{{ ra[3] }}</td>
-                <td class="startDate d-sm-none d-md-table-cell">{{ ra[4] }}</td>
+                <td class="email d-none d-sm-table-cell">{{ ra[3] }}</td>
+                <td class="startDate d-none d-md-table-cell">{{ ra[4] }}</td>
                 <td class="resHall d-none">{{ ra[5] }}</td>
                 <td class="dutyPts d-none">{{ pts[ra[0]]["pts"]["dutyPts"] }}</td>
                 <td class="modPts d-none">{{ pts[ra[0]]["pts"]["modPts"] }}</td>
                 <td class="totalPts">{{ pts[ra[0]]["pts"]["dutyPts"] + pts[ra[0]]["pts"]["modPts"] }}</td>
-                <td class="color d-sm-none d-md-table-cell"><input type="color" value="{{ ra[6] }}" disabled /></td>
-                <td class="authLevel">{% if ra[7] == 1: %}RA{% elif ra[7] == 2: %}AHD{% else %}HD{% endif %}</td>
+                <td class="color d-none d-md-table-cell"><input type="color" value="{{ ra[6] }}" disabled /></td>
+                <td class="authLevel d-none d-sm-table-cell">{% if ra[7] == 1: %}RA{% elif ra[7] == 2: %}AHD{% else %}HD{% endif %}</td>
                 <td class="edit"><span class="fa fa-pencil" onclick="showEditModal({{ ra[0] }})"></span></td>
             </tr>
     {% endfor %}
