@@ -168,9 +168,11 @@ class TestBreakBP_addBreakDuty(unittest.TestCase):
         retRAID = 3
         retMonthID = 5
         retDayID = 365
+        duplicateCheck = False
         self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
-            (retRAID,),  # First call returns raID
-            (retDayID, retMonthID)  # Second call returns the dayID and monthID
+            (retRAID,),                 # First call returns raID
+            (retDayID, retMonthID),     # Second call returns the dayID and monthID
+            (duplicateCheck,)           # Third call returns the result of the duplicate check
         ]
 
         # Set the desired point value
@@ -190,14 +192,14 @@ class TestBreakBP_addBreakDuty(unittest.TestCase):
         # -- Assert --
 
         # Assert that appGlobals.conn.cursor().execute was called three times
-        self.assertEqual(self.mocked_appGlobals.conn.cursor().execute.call_count, 3)
+        self.assertEqual(self.mocked_appGlobals.conn.cursor().execute.call_count, 4)
 
         # Assert that the last time appGlobals.conn.cursor().execute was called,
         #  it was an insert statement. Since this line is using triple-quote strings,
         #  the whitespace must match exactly.
         self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
             """INSERT INTO break_duties (ra_id, hall_id, month_id, day_id, point_val)
-                    VALUES (%s, %s, %s, %s, %s);""",
+                            VALUES (%s, %s, %s, %s, %s);""",
             (retRAID, self.user_hall_id, retMonthID, retDayID, pointVal)
         )
 
@@ -324,9 +326,11 @@ class TestBreakBP_addBreakDuty(unittest.TestCase):
         #  after subsequent calls.
         desiredRAID = 3
         desiredMonthID = 1
+        duplicateCheck = False
         self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
-            (desiredRAID,),  # First call returns raID
-            (None, desiredMonthID)  # Second call returns the dayID and monthID
+            (desiredRAID,),             # First call returns raID
+            (None, desiredMonthID),     # Second call returns the dayID and monthID
+            (duplicateCheck,)           # Third call returns the result of the duplicate check
         ]
 
         # Set the desired point value and the dateStr
@@ -379,9 +383,11 @@ class TestBreakBP_addBreakDuty(unittest.TestCase):
         #  after subsequent calls.
         desiredRAID = 18
         desiredDayID = 42
+        duplicateCheck = False
         self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
-            (desiredRAID,),  # First call returns raID
-            (desiredDayID, None)  # Second call returns the dayID and monthID
+            (desiredRAID,),         # First call returns raID
+            (desiredDayID, None),   # Second call returns the dayID and monthID
+            (duplicateCheck,)       # Third call returns the result of the duplicate check
         ]
 
         # Set the desired point value and the dateStr
@@ -411,6 +417,65 @@ class TestBreakBP_addBreakDuty(unittest.TestCase):
         # Assert that we received the expected response
         self.assertEqual(resp.json, stdRet(-1, "Unable to find month for {} in database"
                                            .format(dateStr)))
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+    def test_WhenProvidedDuplicateBreakDutyInfo_returnsAlreadyAssignedResult(self):
+        # Test to ensure that a check is done to prevent duplicate break duties
+        #  being created in the DB. If duplicate information is provided, then we
+        #  expect to receive an "Duty Already Assigned" response.
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 2
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        desiredRAID = 18
+        desiredDayID = 42
+        desiredMonthID = 1
+        duplicateCheck = True
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (desiredRAID,),                     # First call returns raID
+            (desiredDayID, desiredMonthID),     # Second call returns the dayID and monthID
+            (duplicateCheck,)                   # Third call returns the result of the duplicate check
+        ]
+
+        # Set the desired point value and the dateStr
+        pointVal = 16
+        dateStr = "2021-10-20"
+
+        # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.post("/breaks/api/addBreakDuty",
+                                json=dict(
+                                    id=desiredRAID,
+                                    pts=pointVal,
+                                    dateStr=dateStr
+                                ),
+                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that the last time appGlobals.conn.cursor().execute was called,
+        #  it was a query for the Day record.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
+            "SELECT EXISTS (SELECT id FROM break_duties WHERE ra_id = %s AND hall_id = %s AND day_id = %s);",
+            (desiredRAID, self.user_hall_id, desiredDayID)
+        )
+
+        # Assert that we received the expected response
+        self.assertEqual(
+            resp.json,
+            stdRet(-1, "Desired Break Duty Already Exists. If you do not see the Break Duty, please refresh the page.")
+        )
 
         # Assert that appGlobals.conn.cursor().close was called
         self.mocked_appGlobals.conn.cursor().close.assert_called_once()

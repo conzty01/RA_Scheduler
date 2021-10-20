@@ -1,5 +1,6 @@
 from flask import render_template, request, Blueprint, abort
 from flask_login import login_required
+from psycopg2 import IntegrityError
 from datetime import date
 import logging
 
@@ -442,12 +443,49 @@ def addBreakDuty():
         # Notify the client of the issue
         return packageReturnObject(stdRet(-1, "Unable to find month for {} in database".format(data["dateStr"])))
 
-    # After we have a dayID and monthId for the date, insert the new break duty into the DB
-    cur.execute("""INSERT INTO break_duties (ra_id, hall_id, month_id, day_id, point_val)
-                    VALUES (%s, %s, %s, %s, %s);""", (raId, hallId, monthId, dayID, ptVal))
+    # Check to see if the desired break duty is already in the DB
+    cur.execute(
+        "SELECT EXISTS (SELECT id FROM break_duties WHERE ra_id = %s AND hall_id = %s AND day_id = %s);",
+        (raId, hallId, dayID)
+    )
 
-    # Commit the changes to the DB
-    ag.conn.commit()
+    # If an entry does not exist
+    if not cur.fetchone()[0]:
+
+        # Attempt to add the break duty
+        try:
+            # After we have a dayID and monthId for the date, insert the new break duty into the DB
+            cur.execute("""INSERT INTO break_duties (ra_id, hall_id, month_id, day_id, point_val)
+                            VALUES (%s, %s, %s, %s, %s);""", (raId, hallId, monthId, dayID, ptVal))
+
+            # Commit the changes to the DB
+            ag.conn.commit()
+
+        except IntegrityError as e:
+            # Possible duplicate found
+
+            # Log the occurrence
+            logging.warning("Add Break Duty - IntegrityError Encountered for Res Hall ID: - {}".format(hallId, e))
+
+            # Roll back the changes
+            ag.conn.rollback()
+
+            # Close the DB cursor
+            cur.close()
+
+            # Notify the user that a duplicate was found
+            return packageReturnObject(stdRet(-1, "Duplicate Break Duty Found"))
+
+    else:
+
+        # Close the DB cursor
+        cur.close()
+
+        # Notify the user that a duplicate was found
+        return packageReturnObject(stdRet(
+            -1,
+            "Desired Break Duty Already Exists. If you do not see the Break Duty, please refresh the page."
+        ))
 
     # Close the DB cursor
     cur.close()
