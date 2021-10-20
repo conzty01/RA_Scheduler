@@ -369,8 +369,12 @@ function hideModalUserInfoDiv(modalName) {
     let modal = document.getElementById(modalName);
     //Get the errorDiv within the modal
     let infoDiv = modal.getElementsByClassName("modalUserInfo")[0];
-    // Hide it from sight
-    infoDiv.style.display = "none";
+
+    // If this modal has a modalUserInfo div
+    if (infoDiv !== undefined) {
+        // Hide it from sight
+        infoDiv.style.display = "none";
+    }
 }
 
 function runScheduler() {
@@ -747,8 +751,20 @@ function getSchedulerQueueEntry(QueueID) {
 function showSchedQueueModal(info) {
     // set the schedQueueModal inputs to display the given values.
 
+    // Manipulate the datetime for datetime-local inputs
+    let tmp = new Date(info.requestDatetime);
+    console.log(tmp);
+    console.log(tmp.getMinutes())
+    console.log(tmp.getTimezoneOffset());
+    console.log(tmp.getMinutes() - tmp.getTimezoneOffset());
+
+    tmp.setMinutes(tmp.getMinutes() - tmp.getTimezoneOffset());
+
+    console.log(info.requestDatetime);
+    console.log(tmp);
+
     // Set the Requested Date
-    document.getElementById("schedQueueDate").value = info.requestDatetime;
+    document.getElementById("schedQueueDate").value = tmp.toISOString().slice(0,16);
 
     // Set the Status
     let badgeStatusColor = "badge-";
@@ -761,7 +777,6 @@ function showSchedQueueModal(info) {
             badgeStatusText = "In Progress";
             break;
 
-        case -1:
         case 1:
             // Status is successful
             badgeStatusColor += "success";
@@ -770,6 +785,7 @@ function showSchedQueueModal(info) {
 
         case -3:
         case -2:
+        case -1:
             // Status is failed
             badgeStatusColor += "danger";
             badgeStatusText = "Failed";
@@ -878,6 +894,7 @@ function updateSchedReqList(schedReqDict) {
         switch (schedReqDict[idKey].status) {
             case -3:
             case -2:
+            case -1:
                 statusText = "Failed";
                 statusClass = "badge-danger";
                 break;
@@ -885,7 +902,6 @@ function updateSchedReqList(schedReqDict) {
                 statusText = "In Progress";
                 statusClass = "badge-secondary";
                 break;
-            case -1:
             case 1:
                 statusText = "Success";
                 statusClass = "badge-success";
