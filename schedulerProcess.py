@@ -284,7 +284,7 @@ def runScheduler(resHallID, monthNum, year, noDutyList, eligibleRAList):
     # Get the start date for the school year. This will be used
     #  to calculate how many points each RA has up to the month
     #  being scheduled.
-    start, _ = getSchoolYear(date.month, date.year)
+    start, _ = getSchoolYear(date.month, date.year, resHallID)
 
     # Get the end from the DB. The end date will be the first day
     #  of the month being scheduled. This will prevent the scheduler
