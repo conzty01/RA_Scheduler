@@ -151,7 +151,7 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
                                 # Set the flagDutySlot value to True if setDDFlag is True
                                 #  AND this is the last double-day duty slot for this day.
                                 flagDutySlot=(setDDFlag and i == doubleNum - 1),
-                                numDutySlots=2
+                                numDutySlots=1
                             )
                             dateDict[d_] = tmp
                             d_ = tmp
@@ -182,7 +182,7 @@ def schedule(raList, year, month, noDutyDates=[], doubleDays=(4, 5), doublePts=2
                                 # Set the flagDutySlot value to True if setDDFlag is True
                                 #  AND this is the last double-day duty slot for this day.
                                 flagDutySlot=(setDDFlag and i == doubleDateNum - 1),
-                                numDutySlots=2
+                                numDutySlots=1
                             )
                             dateDict[d_] = tmp
                             d_ = tmp
