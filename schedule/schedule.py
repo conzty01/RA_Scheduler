@@ -1,6 +1,7 @@
 from schedule.rabbitConnectionManager import RabbitConnectionManager
 from flask import render_template, request, Blueprint, abort
 from flask_login import login_required
+from psycopg2 import IntegrityError
 import logging
 import os
 
@@ -399,7 +400,8 @@ def queueScheduler():
 
     # Add a record in the scheduler_queue table for this request
     cur.execute(
-        "INSERT INTO scheduler_queue (res_hall_id, created_ra_id) VALUES (%s, %s) RETURNING id, created_date, status;",
+        """INSERT INTO scheduler_queue (res_hall_id, created_ra_id, created_date) VALUES (%s, %s, NOW()) 
+        RETURNING id, created_date, status;""",
         (hallId, authedUser.ra_id())
     )
 
@@ -619,7 +621,7 @@ def getScheduleQueueItemInfo(sqid=None, resHallID=None):
         ret = {
             "status": res[0],
             "reason": res[1],
-            "requestDatetime": res[2],
+            "requestDatetime": res[2] if fromServer else res[2].strftime('%Y-%m-%dT%H:%M:%S%z'),
             "requestingRA": res[3],
             "sqid": res[4]
         }
@@ -1013,16 +1015,53 @@ def addNewDuty():
         # Load the schedule ID from the DB
         schedId = cur.fetchone()
 
-    # Execute an INSERT statement to have the duty created in the duties table
-    cur.execute("""INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val, flagged)
-                    VALUES (%s, %s, %s, %s, %s, %s);""",
-                (authedUser.hall_id(), raId[0], dayID, schedId[0], data["pts"], data["flag"]))
+    # Check to see if the desired duty already exists in the DB
+    cur.execute(
+        "SELECT EXISTS (SELECT id FROM duties WHERE hall_id = %s AND ra_id = %s AND day_id = %s AND sched_id = %s);",
+        (authedUser.hall_id(), raId[0], dayID, schedId[0])
+    )
 
-    # Commit the changes to the DB
-    ag.conn.commit()
+    # If an entry already exists
+    if cur.fetchone()[0]:
 
-    # Close the DB cursor
-    cur.close()
+        # Close the DB cursor
+        cur.close()
+
+        # Notify the user that a duplicate was found
+        return packageReturnObject(
+            stdRet(-1, "Desired Duty Already Exists. If you do not see the Duty, please refresh the page.")
+        )
+
+    else:
+
+        try:
+            # Execute an INSERT statement to have the duty created in the duties table
+            cur.execute("""INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val, flagged)
+                            VALUES (%s, %s, %s, %s, %s, %s);""",
+                        (authedUser.hall_id(), raId[0], dayID, schedId[0], data["pts"], data["flag"]))
+
+            # Commit the changes to the DB
+            ag.conn.commit()
+
+            # Close the DB cursor
+            cur.close()
+
+        except IntegrityError as e:
+            # Possible duplicate found
+
+            # Log the occurrence
+            logging.warning(
+                "Add Duty - IntegrityError Encountered for Res Hall ID: - {}".format(authedUser.hall_id(), e)
+            )
+
+            # Roll back the changes
+            ag.conn.rollback()
+
+            # Close the DB cursor
+            cur.close()
+
+            # Notify the user that a duplicate was found
+            return packageReturnObject(stdRet(-1, "Duplicate Duty Found"))
 
     logging.debug("Successfully added new duty")
 
