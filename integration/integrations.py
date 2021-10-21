@@ -1,4 +1,4 @@
-from flask import request, jsonify, redirect, url_for, Blueprint, abort
+from flask import request, redirect, url_for, Blueprint, abort
 from integration.gCalIntegration import gCalIntegratinator
 from flask_login import login_required
 from psycopg2 import IntegrityError
@@ -11,7 +11,7 @@ import pickle
 import appGlobals as ag
 
 # Import the needed functions from other parts of the application
-from helperFunctions.helperFunctions import getAuth, stdRet, formatDateStr
+from helperFunctions.helperFunctions import getAuth, stdRet, formatDateStr, packageReturnObject
 from schedule.schedule import getSchedule2
 from breaks.breaks import getBreakDuties
 
@@ -68,7 +68,7 @@ def createGoogleCalendar(calInfoId):
         cur.close()
 
         # Return a failed standard return
-        return jsonify(stdRet(-1, "No Token Found"))
+        return stdRet(-1, "No Token Found")
 
     # If there is a token in the DB it will be returned as a MemoryView Object
 
@@ -306,7 +306,7 @@ def handleGCalAuthResponse():
         cur.close()
 
         # Notify the user of this issue.
-        return jsonify(stdRet(-1, "Invalid State Received"))
+        return packageReturnObject(stdRet(-1, "Invalid State Received"))
 
     # Get the credentials from the Google Calendar Interface
     creds = gCalInterface.handleAuthResponse(request.url,
@@ -441,7 +441,7 @@ def exportToGCal():
                      .format(authedUser.ra_id()))
 
         # Notify the user that they are not authorized.
-        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+        return packageReturnObject(stdRet(-1, "NOT AUTHORIZED"))
 
     logging.info("Attempting to export Schedule to Google Calendar")
 
@@ -471,7 +471,7 @@ def exportToGCal():
 
         # We will need to let the user know that they will need
         #  to connect/reconnect their Google Calendar Account.
-        return jsonify(stdRet(0, "No Token Found"))
+        return packageReturnObject(stdRet(0, "No Token Found"))
 
     else:
         # Otherwise, if we have a result, then split the data into its components
@@ -580,4 +580,4 @@ def exportToGCal():
     cur.close()
 
     # Otherwise report that it was a success!
-    return jsonify(retStatus)
+    return packageReturnObject(retStatus)

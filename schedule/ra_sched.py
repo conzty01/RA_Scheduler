@@ -838,6 +838,7 @@ class State:
         if self.predetermined:
             # Set the provided raList as the candidate list
             self.candList = raList
+            self.conList = list()
 
         elif len(raList) == 0:
             # Else if the provided raList is empty, then do not attempt to calculate
@@ -897,7 +898,9 @@ class State:
             self.ldaTol == other.ldaTol and \
             self.nddTol == other.nddTol and \
             self.candList == other.candList and \
-            self.predetermined == other.predetermined
+            self.nfd == other.nfd and \
+            self.predetermined == other.predetermined and \
+            self.overrideCons == other.overrideCons
 
     def __lt__(self, other):
         # Return True if this state is considered less than
@@ -975,6 +978,10 @@ class State:
 
         # Get the next candidate RA for the curDay's duty
         candRA = self.getNextCandidate()
+
+        # If flagged duty, then update numFlagDuties
+        if self.curDay.nextDutySlotIsFlagged():
+            self.nfd[candRA] += 1
 
         # Assign the candidate RA for the curDay's duty
         self.curDay.addRA(candRA)

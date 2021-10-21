@@ -101,7 +101,11 @@ function reDrawTable(data) {
 
     let newTBody = document.createElement("tbody");
 
-    for (let staffer of data.raList) {
+    let staffer;
+    for (let i = data.raList.length - 1; i >= 0; i--) {
+
+        // Grab the staffer from the raList
+        staffer = data.raList[i];
 
         // Add the points into the list in the expected locations
         // Total Points
@@ -142,6 +146,31 @@ function addRow(data, table) {
         col = newRow.insertCell(i);
         col.className = d;
 
+        // Add appropriate hidden column classes
+        switch (d) {
+            // always hidden
+            case "raID":
+            case "resHall":
+            case "dutyPts":
+            case "modPts":
+                col.classList.add("d-none");
+                break;
+
+            // sm hidden
+            case "email":
+            case "authLevel":
+                col.classList.add("d-none");
+                col.classList.add("d-sm-table-cell");
+                break;
+
+            // md hidden
+            case "startDate":
+            case "color":
+                col.classList.add("d-none");
+                col.classList.add("d-md-table-cell");
+                break;
+        }
+
         if (d == "startDate") {
             let tmp = new Date(data[i]);
             col.innerHTML = tmp.toISOString().substring(0,10);
@@ -167,18 +196,9 @@ function addRow(data, table) {
                     break;
 
                 default:
-                    col.innerHTML = "HD";
+                    col.innerHTML = "UNK";
                     break;
             }
-
-        } else if (d.includes("Pts") && d != "totalPts") {
-            // Check to see if the current column contains the
-            //  term "Pts" but is also not "totalPts".
-
-            // If this is the case, then we want to hide these
-            //  columns from view but still set their value.
-            col.hidden = true;
-            col.innerHTML = data[i];
 
         } else {
             col.innerHTML = data[i];

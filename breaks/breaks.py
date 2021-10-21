@@ -1,16 +1,19 @@
-from flask import render_template, request, jsonify, Blueprint, abort
+from flask import render_template, request, Blueprint, abort
 from flask_login import login_required
+from psycopg2 import IntegrityError
+from datetime import date
 import logging
 
 # Import the appGlobals for this blueprint to use
 import appGlobals as ag
 
 # Import the needed functions from other parts of the application
-from helperFunctions.helperFunctions import getAuth, stdRet, getCurSchoolYear
+from helperFunctions.helperFunctions import getAuth, stdRet, getCurSchoolYear, packageReturnObject
 
 breaks_bp = Blueprint("breaks_bp", __name__,
                       template_folder="templates",
                       static_folder="static")
+
 
 # ---------------------
 # --      Views      --
@@ -41,7 +44,7 @@ def editBreaks():
 
     # Get the information for the current school year.
     #  This will be used to calculate break duty points for the RAs.
-    start, end = getCurSchoolYear()
+    start, end = getCurSchoolYear(authedUser.hall_id())
 
     logging.debug(start)
     logging.debug(end)
@@ -51,6 +54,19 @@ def editBreaks():
     bkDict = getRABreakStats(authedUser.hall_id(), start, end)
 
     logging.debug(str(bkDict))
+
+    # Get the current school year information
+    yearStart, yearEnd = getCurSchoolYear(authedUser.hall_id())
+
+    # Create a custom settings dict
+    custSettings = {
+        "yearStart": yearStart,
+        "yearEnd": yearEnd
+    }
+
+    # Merge the base options into the custom settings dictionary to simplify passing
+    #  settings into the template renderer.
+    custSettings.update(ag.baseOpts)
 
     # Create a DB cursor
     cur = ag.conn.cursor()
@@ -65,7 +81,7 @@ def editBreaks():
     # Render and return the appropriate template
     return render_template("breaks/editBreaks.html", raList=cur.fetchall(), auth_level=authedUser.auth_level(),
                            bkDict=sorted(bkDict.items(), key=lambda x: x[1]["name"].split(" ")[1]),
-                           curView=3, opts=ag.baseOpts, hall_name=authedUser.hall_name(),
+                           curView=3, opts=custSettings, hall_name=authedUser.hall_name(),
                            linkedHalls=authedUser.getAllAssociatedResHalls())
 
 
@@ -119,6 +135,9 @@ def getRABreakStats(hallId=None, startDateStr=None, endDateStr=None):
         # If the hallId, startDateStr, and endDateStr are None, then
         #  this method was called from a remote client.
 
+        # Mark that this method was not called from the server.
+        fromServer = False
+
         # Get the user's information from the database
         authedUser = getAuth()
         # Set the value of hallId from the userDict
@@ -127,9 +146,6 @@ def getRABreakStats(hallId=None, startDateStr=None, endDateStr=None):
         # Get the startDateStr and endDateStr from the request arguments
         startDateStr = request.args.get("start")
         endDateStr = request.args.get("end")
-
-        # Mark that this method was not called from the server.
-        fromServer = False
 
     logging.debug("Get RA Break Duty Stats - FromServer: {}".format(fromServer))
 
@@ -146,7 +162,7 @@ def getRABreakStats(hallId=None, startDateStr=None, endDateStr=None):
         FROM ra LEFT JOIN (
             SELECT ra_id as rid, COUNT(break_duties.id)
             FROM break_duties JOIN day ON (day.id = break_duties.day_id)
-            WHERE day.date BETWEEN TO_DATE(%s, 'YYYY-MM-DD') AND TO_DATE(%s, 'YYYY-MM-DD')
+            WHERE day.date BETWEEN %s::date AND %s::date
             AND hall_id = %s
             GROUP BY ra_id
         ) AS numQuery ON (ra.id = numQuery.rid)
@@ -165,14 +181,8 @@ def getRABreakStats(hallId=None, startDateStr=None, endDateStr=None):
     # Close the DB cursor
     cur.close()
 
-    # If this API method was called from the server
-    if fromServer:
-        # Then return the result as-is
-        return res
-
-    else:
-        # Otherwise, return a JSON version of the result
-        return jsonify(res)
+    # Return the result
+    return packageReturnObject(res, fromServer)
 
 
 @breaks_bp.route("/api/getBreakDuties", methods=["GET"])
@@ -187,22 +197,22 @@ def getBreakDuties(hallId=None, start=None, end=None, showAllColors=False, raId=
     #
     #  If called from the server, this function accepts the following parameters:
     #
-    #     hallId         <int>  -  an integer representing the id of the desired residence
-    #                               hall in the res_hall table.
-    #     start          <str>  -  a string representing the first day that should be included
-    #                               for the returned duty schedule.
-    #     end            <str>  -  a string representing the last day that should be included
-    #                               for the returned duty schedule.
-    #     showAllColors  <bool> -  a boolean value representing whether the returned duty
-    #                               schedule should include the RA's ra.color value or if
-    #                               the generic value '#2C3E50' should be returned. Setting
-    #                               this value to True will return the RA's ra.color value.
-    #                               By default this parameter is set to False.
+    #     hallId         <int>   -  an integer representing the id of the desired residence
+    #                                hall in the res_hall table.
+    #     start          <date>  -  a datetime object representing the first day that should be included
+    #                                for the returned duty schedule.
+    #     end            <date>  -  a datetime object representing the last day that should be included
+    #                                for the returned duty schedule.
+    #     showAllColors  <bool>  -  a boolean value representing whether the returned duty
+    #                                schedule should include the RA's ra.color value or if
+    #                                the generic value '#2C3E50' should be returned. Setting
+    #                                this value to True will return the RA's ra.color value.
+    #                                By default this parameter is set to False.
     #
-    #     raId           <int>  -  an integer representing the id of the RA that should be
-    #                               considered the requesting user. By default this value is
-    #                               set to -1 which indicates that no RA should be considered
-    #                               the requesting user.
+    #     raId           <int>   -  an integer representing the id of the RA that should be
+    #                                considered the requesting user. By default this value is
+    #                                set to -1 which indicates that no RA should be considered
+    #                                the requesting user.
     #
     #  If called from a client, the following parameters are required:
     #
@@ -243,13 +253,16 @@ def getBreakDuties(hallId=None, start=None, end=None, showAllColors=False, raId=
         # If the HallId, start and end are None, then
         #  this method was called from a remote client.
 
+        # Mark that this method was not called from the server
+        fromServer = False
+
         # Get the start and end string values from the request arguments.
         #  Since we utilize the fullCal.js library, we know that the request
         #  also contains timezone information that we do not care about in
         #  this method. As a result, the timezone information is split out
         #  immediately.
-        start = request.args.get("start").split("T")[0]
-        end = request.args.get("end").split("T")[0]
+        start = date.fromisoformat(request.args.get("start").split("T")[0])
+        end = date.fromisoformat(request.args.get("end").split("T")[0])
 
         # Get the value for allColors from the request arguments.
         showAllColors = request.args.get("allColors") == "true"
@@ -260,8 +273,9 @@ def getBreakDuties(hallId=None, start=None, end=None, showAllColors=False, raId=
         hallId = authedUser.hall_id()
         # Set the value of the raId from the userDict
         raId = authedUser.ra_id()
-        # Mark that this method was not called from the server
-        fromServer = False
+
+    # Create the result object to be returned
+    res = []
 
     # Create a DB cursor
     cur = ag.conn.cursor()
@@ -274,12 +288,9 @@ def getBreakDuties(hallId=None, start=None, end=None, showAllColors=False, raId=
                           JOIN month ON (month.id=break_duties.month_id)
                           JOIN ra ON (ra.id=break_duties.ra_id)
         WHERE break_duties.hall_id = %s
-        AND month.year >= TO_DATE(%s,'YYYY-MM')
-        AND month.year <= TO_DATE(%s,'YYYY-MM')
+        AND month.year >= %s::date
+        AND month.year <= %s::date
     """, (hallId, start, end))
-
-    # Create the result object to be returned
-    res = []
 
     # Iterate through the query result (each day of the break schedule) and assemble
     #  the return result in the format outlined in the comments at the top of this method.
@@ -319,14 +330,8 @@ def getBreakDuties(hallId=None, start=None, end=None, showAllColors=False, raId=
     # Close the DB cursor
     cur.close()
 
-    # If this API method was called from the server
-    if fromServer:
-        # Then return the result as-is
-        return res
-
-    else:
-        # Otherwise return a JSON version of the result
-        return jsonify(res)
+    # Package and return the result
+    return packageReturnObject(res, fromServer)
 
 
 @breaks_bp.route("/api/addBreakDuty", methods=["POST"])
@@ -366,7 +371,7 @@ def addBreakDuty():
                      .format(authedUser.ra_id(), authedUser.hall_id()))
 
         # Notify the user that they are not authorized.
-        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+        return packageReturnObject(stdRet(-1, "NOT AUTHORIZED"))
 
     # Load the data provided by the client
     data = request.json
@@ -400,7 +405,7 @@ def addBreakDuty():
         logging.warning("Unable to find RA {} in hall {}".format(selRAID, hallId))
 
         # Notify the client of the issue.
-        return jsonify(stdRet(0, "Unable to find RA: {} in Hall: {}".format(selRAID, hallId)))
+        return packageReturnObject(stdRet(0, "Unable to find RA: {} in Hall: {}".format(selRAID, hallId)))
 
     else:
         # Otherwise, since psycopg2 returns DB results as a tuple,
@@ -424,7 +429,7 @@ def addBreakDuty():
         logging.warning("Unable to find day {} in database".format(data["dateStr"]))
 
         # Notify the client of the issue
-        return jsonify(stdRet(-1, "Unable to find day {} in database".format(data["dateStr"])))
+        return packageReturnObject(stdRet(-1, "Unable to find day {} in database".format(data["dateStr"])))
 
     if monthId is None:
         # If the monthId is None, then there is not a month in the DB for the desired dateStr.
@@ -436,14 +441,51 @@ def addBreakDuty():
         logging.warning("Unable to find month for {} in database".format(data["dateStr"]))
 
         # Notify the client of the issue
-        return jsonify(stdRet(-1, "Unable to find month for {} in database".format(data["dateStr"])))
+        return packageReturnObject(stdRet(-1, "Unable to find month for {} in database".format(data["dateStr"])))
 
-    # After we have a dayID and monthId for the date, insert the new break duty into the DB
-    cur.execute("""INSERT INTO break_duties (ra_id, hall_id, month_id, day_id, point_val)
-                    VALUES (%s, %s, %s, %s, %s);""", (raId, hallId, monthId, dayID, ptVal))
+    # Check to see if the desired break duty is already in the DB
+    cur.execute(
+        "SELECT EXISTS (SELECT id FROM break_duties WHERE ra_id = %s AND hall_id = %s AND day_id = %s);",
+        (raId, hallId, dayID)
+    )
 
-    # Commit the changes to the DB
-    ag.conn.commit()
+    # If an entry does not exist
+    if not cur.fetchone()[0]:
+
+        # Attempt to add the break duty
+        try:
+            # After we have a dayID and monthId for the date, insert the new break duty into the DB
+            cur.execute("""INSERT INTO break_duties (ra_id, hall_id, month_id, day_id, point_val)
+                            VALUES (%s, %s, %s, %s, %s);""", (raId, hallId, monthId, dayID, ptVal))
+
+            # Commit the changes to the DB
+            ag.conn.commit()
+
+        except IntegrityError as e:
+            # Possible duplicate found
+
+            # Log the occurrence
+            logging.warning("Add Break Duty - IntegrityError Encountered for Res Hall ID: - {}".format(hallId, e))
+
+            # Roll back the changes
+            ag.conn.rollback()
+
+            # Close the DB cursor
+            cur.close()
+
+            # Notify the user that a duplicate was found
+            return packageReturnObject(stdRet(-1, "Duplicate Break Duty Found"))
+
+    else:
+
+        # Close the DB cursor
+        cur.close()
+
+        # Notify the user that a duplicate was found
+        return packageReturnObject(stdRet(
+            -1,
+            "Desired Break Duty Already Exists. If you do not see the Break Duty, please refresh the page."
+        ))
 
     # Close the DB cursor
     cur.close()
@@ -452,7 +494,7 @@ def addBreakDuty():
     logging.info("Successfully added new Break Duty for Hall: {} and Month: {}".format(hallId, monthId))
 
     # Indicate to the client that the save was successful
-    return jsonify(stdRet(1, "successful"))
+    return packageReturnObject(stdRet(1, "successful"))
 
 
 @breaks_bp.route("/api/deleteBreakDuty", methods=["POST"])
@@ -499,11 +541,11 @@ def deleteBreakDuty():
         # Then they are not permitted to see this view.
 
         # Log the occurrence.
-        logging.info("User Not Authorized - RA: {}attempted to add Break Duty for Hall: {}"
+        logging.info("User Not Authorized - RA: {} attempted to add Break Duty for Hall: {}"
                      .format(authedUser.ra_id(), authedUser.hall_id()))
 
         # Notify the user that they are not authorized.
-        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+        return packageReturnObject(stdRet(-1, "NOT AUTHORIZED"))
 
     logging.debug("Delete Break Duty - RA Name: {}".format(fName + " " + lName))
     logging.debug("Delete Break Duty - HallID: {}".format(hallId))
@@ -527,7 +569,7 @@ def deleteBreakDuty():
     raId = cur.fetchone()
 
     # Query the DB for the day and month ids for the break duty on the provided day.
-    cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE(%s, 'MM/DD/YYYY');",
+    cur.execute("SELECT id, month_id FROM day WHERE date = %s::date;",
                 (data["dateStr"],))
 
     # Load the results from the DB
@@ -557,7 +599,7 @@ def deleteBreakDuty():
         logging.info("Successfully deleted duty")
 
         # Indicate to the client that the delete was successful
-        return jsonify(stdRet(1, "successful"))
+        return packageReturnObject(stdRet(1, "successful"))
 
     else:
         # Otherwise if any of the raId, dayID and monthIds are None,
@@ -571,7 +613,7 @@ def deleteBreakDuty():
                      .format(fName + " " + lName, dateStr))
 
         # Indicate to the client that the delete was unsuccessful
-        return jsonify(stdRet(-1, "Unable to find parameters in DB"))
+        return packageReturnObject(stdRet(-1, "Unable to find parameters in DB"))
 
 
 @breaks_bp.route("/api/changeBreakDuty", methods=["POST"])
@@ -615,7 +657,7 @@ def changeBreakDuty():
                      .format(authedUser.ra_id(), authedUser.hall_id()))
 
         # Notify the user that they are not authorized.
-        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+        return packageReturnObject(stdRet(-1, "NOT AUTHORIZED"))
 
     # Load the provided data from the request's JSON
     data = request.json
@@ -657,7 +699,7 @@ def changeBreakDuty():
     oldRA = cur.fetchone()
 
     # Query the DB for the day and month ids for the break duty on the provided day.
-    cur.execute("SELECT id, month_id FROM day WHERE date = TO_DATE(%s, 'MM/DD/YYYY');",
+    cur.execute("SELECT id, month_id FROM day WHERE date = %s::date;",
                 (data["dateStr"],))
 
     # Load the results from the DB
@@ -677,7 +719,7 @@ def changeBreakDuty():
         logging.warning("Unable to find all necessary Break Duty parameters for in database.")
 
         # Notify the client of the issue
-        return jsonify(stdRet(0, "Unable to find all necessary Break Duty parameters in database."))
+        return packageReturnObject(stdRet(0, "Unable to find all necessary Break Duty parameters in database."))
 
     # Otherwise, if we have all the necessary pieces,
     #  go ahead and update the appropriate break duty
@@ -697,4 +739,4 @@ def changeBreakDuty():
     cur.close()
 
     # Indicate to the client that the delete was unsuccessful
-    return jsonify(stdRet(1, "successful"))
+    return packageReturnObject(stdRet(1, "successful"))

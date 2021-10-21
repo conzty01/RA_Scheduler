@@ -186,13 +186,13 @@ function deleteBreakDuty() {
 function getBreakCount() {
     // In order to determine what school year the user is currently in
     //  we need to get the current date and determine if its between
-    //  08-01 and 06-01
+    //  the configured start and end of the school year
 
     let curMonNum = appConfig.curDate.getMonth();
     let startYear;
     let endYear;
 
-    if (curMonNum >= 7) {
+    if (curMonNum >= schoolYearStart.getMonth()) {
         // If the current month is August or later
         //  then the current year is the startYear
 
@@ -208,8 +208,8 @@ function getBreakCount() {
     }
 
     let params = {
-        start: startYear.toString() + '-08-01',
-        end: endYear.toString() + '-06-01'
+        start: new Date(startYear, schoolYearStart.getMonth(), 1).toLocaleDateString(),
+        end: new Date(endYear, schoolYearEnd.getMonth(), 0).toLocaleDateString()
     }
 
     appConfig.base.callAPI("getRABreakStats", params, updateBDCount, "GET");

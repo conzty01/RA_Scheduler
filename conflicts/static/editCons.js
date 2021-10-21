@@ -13,15 +13,15 @@ function initEditConsCal() {
         customButtons: {
             customPrevButton: {
                 text: '<',
-                click: movePrevCons
+                click: movePrev
             },
             customNextButton: {
                 text: '>',
-                click: moveNextCons
+                click: moveNext
             },
             customTodayButton: {
                 text: 'Today',
-                click: moveTodayCons
+                click: moveToday
             }
         },
         dateClick: '',
@@ -40,7 +40,8 @@ function initEditConsCal() {
                     raID: getSelectedRAID(),
                     allColors: true
                 };
-            }
+            },
+            success: getNumberConflicts
         },
         lazyFetching: true,
         showNonCurrentDates: false,

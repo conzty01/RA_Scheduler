@@ -89,7 +89,7 @@
   <div class="modal-dialog modal-dialog" role="document">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 class="modal-title"><span id="modalTitle">Import Staff Members<span></h3>
+          <h3 class="modal-title"><span id="modalTitle">Import Staff Members<span></span></h3>
       </div>
       <form id="importStaffForm" class="modal-body" action="{{url_for('staff_bp.importStaff')}}" method="POST" enctype="multipart/form-data">
           <div class="form-group form-row">
@@ -126,34 +126,34 @@
     <table id="staffTable" class="table table-striped table-hover">
         <thead>
             <tr>
-                <th scope="col">ID</th>
+                <th scope="col" class="d-none">ID</th>
                 <th scope="col">First Name</th>
                 <th scope="col">Last Name</th>
-                <th scope="col">Email</th>
-                <th scope="col">Date Started</th>
-                <th scope="col">Res Hall</th>
-                <th scope="col" hidden>Duty Points</th>
-                <th scope="col" hidden>Modifier Points</th>
+                <th scope="col" class="d-none d-sm-table-cell">Email</th>
+                <th scope="col" class="d-none d-md-table-cell">Date Started</th>
+                <th scope="col" class="d-none">Res Hall</th>
+                <th scope="col" class="d-none">Duty Points</th>
+                <th scope="col" class="d-none">Modifier Points</th>
                 <th scope="col">Total Points</th>
-                <th scope="col">Color</th>
-                <th scope="col">Role</th>
+                <th scope="col" class="d-none d-md-table-cell">Color</th>
+                <th scope="col" class="d-none d-sm-table-cell">Role</th>
                 <th scope="col">Edit</th>
             </tr>
         </thead>
         <tbody>
     {% for ra in raList: %}
             <tr id="{{ ra[0] }}" scope="row">
-                <td class="raID">{{ ra[0] }}</td>
+                <td class="raID d-none">{{ ra[0] }}</td>
                 <td class="fName">{{ ra[1] }}</td>
                 <td class="lName">{{ ra[2] }}</td>
-                <td class="email">{{ ra[3] }}</td>
-                <td class="startDate">{{ ra[4] }}</td>
-                <td class="resHall">{{ ra[5] }}</td>
-                <td class="dutyPts" hidden>{{ pts[ra[0]]["pts"]["dutyPts"] }}</td>
-                <td class="modPts" hidden>{{ pts[ra[0]]["pts"]["modPts"] }}</td>
+                <td class="email d-none d-sm-table-cell">{{ ra[3] }}</td>
+                <td class="startDate d-none d-md-table-cell">{{ ra[4] }}</td>
+                <td class="resHall d-none">{{ ra[5] }}</td>
+                <td class="dutyPts d-none">{{ pts[ra[0]]["pts"]["dutyPts"] }}</td>
+                <td class="modPts d-none">{{ pts[ra[0]]["pts"]["modPts"] }}</td>
                 <td class="totalPts">{{ pts[ra[0]]["pts"]["dutyPts"] + pts[ra[0]]["pts"]["modPts"] }}</td>
-                <td class="color"><input type="color" value="{{ ra[6] }}" disabled /></td>
-                <td class="authLevel">{% if ra[7] == 1: %}RA{% elif ra[7] == 2: %}AHD{% else %}HD{% endif %}</td>
+                <td class="color d-none d-md-table-cell"><input type="color" value="{{ ra[6] }}" disabled /></td>
+                <td class="authLevel d-none d-sm-table-cell">{% if ra[7] == 1: %}RA{% elif ra[7] == 2: %}AHD{% else %}HD{% endif %}</td>
                 <td class="edit"><span class="fa fa-pencil" onclick="showEditModal({{ ra[0] }})"></span></td>
             </tr>
     {% endfor %}

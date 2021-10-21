@@ -2,6 +2,7 @@ from unittest.mock import MagicMock, patch
 from scheduleServer import app
 from flask import Response
 import unittest
+import datetime
 
 from helperFunctions.helperFunctions import AuthenticatedUser
 
@@ -115,6 +116,17 @@ class TestConflictBP_conflicts(unittest.TestCase):
         self.mocked_appGlobals.UPLOAD_FOLDER = "./static"
         self.mocked_appGlobals.ALLOWED_EXTENSIONS = {"txt", "csv"}
 
+        # Create a patcher for the getCurSchoolYear method
+        self.patcher_getCurSchoolYear = patch("breaks.breaks.getCurSchoolYear", autospec=True)
+
+        # Start the patcher - mock returned
+        self.mocked_getCurSchoolYear = self.patcher_getCurSchoolYear.start()
+
+        # Configure the mocked getCurSchoolYear
+        self.helper_schoolYearStart = datetime.date(2021, 8, 1)
+        self.helper_schoolYearEnd = datetime.date(2022, 7, 31)
+        self.mocked_getCurSchoolYear.return_value = (self.helper_schoolYearStart, self.helper_schoolYearEnd)
+
         # -- Create a patchers for the logging --
         self.patcher_loggingDEBUG = patch("logging.debug", autospec=True)
         self.patcher_loggingINFO = patch("logging.info", autospec=True)
@@ -134,6 +146,7 @@ class TestConflictBP_conflicts(unittest.TestCase):
         self.patcher_getAuth.stop()
         self.patcher_appGlobals.stop()
         self.patcher_osEnviron.stop()
+        self.patcher_getCurSchoolYear.stop()
 
         self.patcher_loggingDEBUG.stop()
         self.patcher_loggingINFO.stop()
@@ -194,6 +207,16 @@ class TestConflictBP_conflicts(unittest.TestCase):
         # Configure the mocked render_template function to return a valid response object
         mocked_renderTemplate.return_value = Response(status=200)
 
+        # Create a custom settings dict for the options
+        custSettings = {
+            "yearStart": self.helper_schoolYearStart,
+            "yearEnd": self.helper_schoolYearEnd
+        }
+
+        # Merge the base options into the custom settings dictionary to simplify passing
+        #  settings into the template renderer.
+        custSettings.update(self.mocked_appGlobals.baseOpts)
+
         # -- Act --
 
         # Request the desired page.
@@ -213,7 +236,7 @@ class TestConflictBP_conflicts(unittest.TestCase):
             "conflicts/conflicts.html",
             auth_level=self.mocked_authLevel,
             curView=2,
-            opts=self.mocked_appGlobals.baseOpts,
+            opts=custSettings,
             hall_name=self.helper_getAuth.hall_name(),
             linkedHalls=self.helper_getAuth.getAllAssociatedResHalls()
         )

@@ -283,7 +283,7 @@ class TestSchedule_addNewDuty(unittest.TestCase):
         # Assert that appGlobals.conn.cursor().close was called
         self.mocked_appGlobals.conn.cursor().close.assert_called_once()
 
-    def test_withAuthorizedUser_withoutValidSchedule_returnsCreatesNewScheduleEntry(self):
+    def test_withAuthorizedUser_withoutValidSchedule_createsNewScheduleEntry(self):
         # Test to ensure that when an authorized user attempts to use this API,
         #  if no schedule is available, this will create a new schedule record.
 
@@ -304,6 +304,7 @@ class TestSchedule_addNewDuty(unittest.TestCase):
         expectedDayID = 17
         expectedScheduleID = 60
         desiredFlagState = False
+        duplicateCheck = False
 
         # Configure the appGlobals.conn.cursor.execute mock to return different values
         #  after subsequent calls.
@@ -311,7 +312,8 @@ class TestSchedule_addNewDuty(unittest.TestCase):
             (desiredRAID,),                     # First query is for the RA ID
             (expectedDayID, expectedMonthID),   # Second query is for the day info
             None,                               # Third query is for the schedule
-            (expectedScheduleID,)               # Fourth call will return the new schedule ID
+            (expectedScheduleID,),              # Fourth call will return the new schedule ID
+            (duplicateCheck,)
         ]
 
         # -- Act --
@@ -339,7 +341,7 @@ class TestSchedule_addNewDuty(unittest.TestCase):
         #  it was a query to insert the new duty into the DB.
         self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
             """INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val, flagged)
-                    VALUES (%s, %s, %s, %s, %s, %s);""",
+                            VALUES (%s, %s, %s, %s, %s, %s);""",
             (self.user_hall_id, desiredRAID, expectedDayID,
              expectedScheduleID, desiredPointVal, desiredFlagState)
         )
@@ -369,13 +371,15 @@ class TestSchedule_addNewDuty(unittest.TestCase):
         expectedMonthID = 25
         expectedDayID = 81
         expectedScheduleID = 100
+        duplicateCheck = False
 
         # Configure the appGlobals.conn.cursor.execute mock to return different values
         #  after subsequent calls.
         self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
             (desiredRAID,),                     # First query is for the RA ID
             (expectedDayID, expectedMonthID),   # Second query is for the day info
-            (expectedScheduleID,)               # Third query is for the schedule
+            (expectedScheduleID,),               # Third query is for the schedule
+            (duplicateCheck,)
         ]
 
         # Configure the flag that should be passed in
@@ -399,7 +403,7 @@ class TestSchedule_addNewDuty(unittest.TestCase):
         #  it was a query for the RA.
         self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
             """INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val, flagged)
-                    VALUES (%s, %s, %s, %s, %s, %s);""",
+                            VALUES (%s, %s, %s, %s, %s, %s);""",
             (self.user_hall_id, desiredRAID, expectedDayID,
              expectedScheduleID, desiredPointVal, desiredFlagState)
         )
@@ -409,6 +413,72 @@ class TestSchedule_addNewDuty(unittest.TestCase):
 
         # Assert that the appGlobals.conn.commit was called
         self.mocked_appGlobals.conn.commit.assert_called_once()
+
+        # Assert that appGlobals.conn.cursor().close was called
+        self.mocked_appGlobals.conn.cursor().close.assert_called_once()
+
+    def test_withAuthorizedUser_withDuplicateDutyInformation_returnsAlreadyExistsResponse(self):
+        # Test to ensure that a check is done to prevent duplicate duties
+        #  being created in the DB. If duplicate information is provided, then we
+        #  expect to receive an "Duty Already Assigned" response.
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 2
+
+        # Generate the various objects that will be used in this test
+        desiredRAID = 89
+        desiredDateStr = "2021-01-26"
+        desiredPointVal = 44
+        expectedMonthID = 25
+        expectedDayID = 81
+        expectedScheduleID = 100
+        duplicateCheck = True
+
+        # Configure the appGlobals.conn.cursor.execute mock to return different values
+        #  after subsequent calls.
+        self.mocked_appGlobals.conn.cursor().fetchone.side_effect = [
+            (desiredRAID,),                     # First query is for the RA ID
+            (expectedDayID, expectedMonthID),   # Second query is for the day info
+            (expectedScheduleID,),               # Third query is for the schedule
+            (duplicateCheck,)
+        ]
+
+        # Configure the flag that should be passed in
+        desiredFlagState = True
+
+        # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.post("/schedule/api/addNewDuty",
+                                json=dict(
+                                    id=desiredRAID,
+                                    pts=desiredPointVal,
+                                    dateStr=desiredDateStr,
+                                    flag=desiredFlagState
+                                ),
+                                base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert --
+
+        # Assert that the last time appGlobals.conn.cursor().execute was called,
+        #  it was a query for the RA.
+        self.mocked_appGlobals.conn.cursor().execute.assert_called_with(
+            "SELECT EXISTS (SELECT id FROM duties WHERE hall_id = %s AND ra_id = %s AND day_id = %s AND sched_id = %s);",
+            (self.user_hall_id, desiredRAID, expectedDayID, expectedScheduleID)
+        )
+
+        # Assert that we received the expected response
+        self.assertEqual(
+            resp.json,
+            stdRet(-1, "Desired Duty Already Exists. If you do not see the Duty, please refresh the page.")
+        )
+
+        # Assert that the appGlobals.conn.commit was not called
+        self.mocked_appGlobals.conn.commit.assert_not_called()
 
         # Assert that appGlobals.conn.cursor().close was called
         self.mocked_appGlobals.conn.cursor().close.assert_called_once()

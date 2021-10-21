@@ -78,6 +78,18 @@ var bpAPIPrefix = '/conflicts';
 <script src="{{url_for('static', filename='fullCal.js')}}"></script>
 <script src="{{url_for('conflicts_bp.static', filename='editCons.js')}}"></script>
 <script>
+    {# Convert Python's date objects to Javascript's date objects #}
+    const schoolYearStart = new Date(
+        {{ opts["yearStart"].year }},
+        {{ opts["yearStart"].month - 1 }}, {# JS uses 0 based month numbers #}
+        {{ opts["yearStart"].day }}
+    );
+    const schoolYearEnd = new Date(
+        {{ opts["yearEnd"].year }},
+        {{ opts["yearEnd"].month - 1 }}, {# JS uses 0 based month numbers #}
+        {{ opts["yearEnd"].day }}
+    );
+
     initEditConsCal();
     getNumberConflicts();
 </script>

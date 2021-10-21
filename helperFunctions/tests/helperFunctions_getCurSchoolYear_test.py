@@ -1,4 +1,6 @@
 from unittest.mock import MagicMock, patch
+from calendar import monthrange
+import datetime
 import unittest
 
 from helperFunctions.helperFunctions import getCurSchoolYear
@@ -83,32 +85,38 @@ class TestHelperFunctions_getCurSchoolYear(unittest.TestCase):
     @patch("helperFunctions.helperFunctions.getSchoolYear")
     def test_returnsCurrentSchoolYear_inExpectedFormat(self, mocked_getSchoolYear):
         # Test to ensure that the function returns the current
-        #  school year which should be between August and July.
+        #  school year using the datetime.date.today() function.
 
         # -- Arrange --
 
-        # Reset the mocks used in this test
-        self.mocked_datetime.reset_mock()
+        expectedCurrentMonth = 8
+        expectedCurrentYear = 2021
+        desiredHallID = 25
 
-        expectedMonth = 7
-        expectedYear = 2021
+        expectedResult = (datetime.date(2021, 8, 1), datetime.date(2022, 7, 31))
 
         # Set the value for the current month and year
-        self.mocked_datetime.date.today().month = expectedMonth
-        self.mocked_datetime.date.today().year = expectedYear
+        self.mocked_datetime.date.today().month = expectedCurrentMonth
+        self.mocked_datetime.date.today().year = expectedCurrentYear
+
+        # Reset the mock's call count used in this test
+        self.mocked_datetime.reset_mock()
+
+        # Configure the mocked_getSchoolYear to return a result
+        mocked_getSchoolYear.return_value = expectedResult
 
         # -- Act --
 
         # Call the function
-        result = getCurSchoolYear()
+        result = getCurSchoolYear(desiredHallID)
 
         # -- Assert --
 
-        # Assert that the current month and year were polled
-        self.assertEqual(self.mocked_datetime.date.today.call_count, 4)
+        # Assert that the current month and year were retrieved
+        self.assertEqual(2, self.mocked_datetime.date.today.call_count)
 
         # Assert that the getSchoolYear function was called as expected
-        mocked_getSchoolYear.assert_called_once_with(expectedMonth, expectedYear)
+        mocked_getSchoolYear.assert_called_once_with(expectedCurrentMonth, expectedCurrentYear, desiredHallID)
 
         # Assert that we received the expected result
-        self.assertEqual(mocked_getSchoolYear(), result)
+        self.assertEqual(expectedResult, result)

@@ -1,5 +1,6 @@
 from flask_login import current_user
 from flask import abort, jsonify
+from calendar import monthrange
 import datetime
 import logging
 
@@ -126,45 +127,55 @@ def fileAllowed(filename):
     return ('.' in filename) and (filename.rsplit('.', 1)[1].lower() in ag.ALLOWED_EXTENSIONS)
 
 
-def getSchoolYear(month, year):
-    # Return a tuple of 2 strings that denote the start and end date of the school year that
-    #  the provided month and year belong to.
+def getSchoolYear(month, year, hallID):
+    # Return a tuple of 2 datetime objects that denote the start and end date of
+    #  the school year that the provided month and year belong to.
     #
     #  This function accepts the following parameters:
     #
-    #     month  <int>  -  the integer value representing the month following the standard
-    #                       gregorian calendar convention.
-    #     year   <str>  -  the integer value representing the calendar year following the
-    #                       standard gregorian calendar convention.
+    #     month    <int>  -  an integer value representing the month following the standard
+    #                         gregorian calendar convention.
+    #     year     <int>  -  an integer value representing the calendar year following the
+    #                         standard gregorian calendar convention.
+    #     hallID   <int>  -  an integer value representing the res_hall.id of the hall in question.
+
+    # Ensure the provided month and year are integers
+    month = int(month)
+    year = int(year)
 
     logging.debug("Calculate School Year: {} {}".format(month, year))
 
-    if int(month) >= 8:
-        # If the current month is August or later
+    # Create a new cursor object
+    cur = ag.conn.cursor()
+
+    # Get the configured start and end month for the given Res Hall
+    cur.execute("SELECT year_start_mon, year_end_mon FROM hall_settings WHERE res_hall_id = %s", (hallID,))
+
+    startMon, endMon = cur.fetchone()
+
+    if month >= startMon:
+        # If the provided month is equal to the configured start month or later,
         #  then the current year is the startYear
-        startYear = int(year)
-        endYear = int(year) + 1
+        startYear = year
+        endYear = year + 1
 
     else:
-        # If the current month is earlier than August
+        # If the provided month is earlier than the configured start month,
         #  then the current year is the endYear
-        startYear = int(year) - 1
-        endYear = int(year)
+        startYear = year - 1
+        endYear = year
 
-    # TODO: Currently, a school year is considered from August to August.
-    #        Perhaps this should be configurable by the AHD/HDs?
+    # Create date objects to represent the start and end dates
+    start = datetime.date(startYear, startMon, 1)
+    end = datetime.date(endYear, endMon, monthrange(endYear, endMon)[-1])
 
-    # Concatenate the calculated years to the start and end date strings
-    start = str(startYear) + '-08-01'
-    end = str(endYear) + '-07-31'
-
-    logging.debug("Start: " + start)
-    logging.debug("End: " + end)
+    logging.debug("Start: {}".format(start))
+    logging.debug("End: {}".format(end))
 
     return start, end
 
 
-def getCurSchoolYear():
+def getCurSchoolYear(hallID):
     # Calculate what school year it is based on the current date and return a tuple
     #  of strings that represent the start and end date of the school year.
 
@@ -177,7 +188,7 @@ def getCurSchoolYear():
     year = datetime.date.today().year
 
     # Call getSchoolYear, passing it the current month and year and return the value
-    return getSchoolYear(month, year)
+    return getSchoolYear(month, year, hallID)
 
 
 def formatDateStr(day, month, year, format="YYYY-MM-DD", divider="-"):
@@ -252,7 +263,7 @@ def formatDateStr(day, month, year, format="YYYY-MM-DD", divider="-"):
     return result[:-1]
 
 
-def packageReturnObject(obj, fromServer):
+def packageReturnObject(obj, fromServer=False):
     # Package up the provided object. If the fromServer parameter is set to
     #  True, then the object will be returned as-is. If it is set to False,
     #  then a serialized version of the object is returned.

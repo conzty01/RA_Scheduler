@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 from scheduleServer import app
 import unittest
+import datetime
 
 from helperFunctions.helperFunctions import AuthenticatedUser
 from breaks.breaks import getBreakDuties
@@ -126,11 +127,24 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
         self.mocked_loggingCRITICAL = self.patcher_loggingCRITICAL.start()
         self.mocked_loggingERROR = self.patcher_loggingERROR.start()
 
+        # -- Create a patcher for the getCurrentSchoolYear method --
+        self.patcher_getCurSchoolYear = patch("breaks.breaks.getCurSchoolYear")
+
+        # Start the patcher - mock returned
+        self.mocked_getCurrentSchoolYear = self.patcher_getCurSchoolYear.start()
+
+        # Configure the mocked getCurrentSchoolYear
+        self.currentSchoolYearStart = datetime.date(2021, 8, 1)
+        self.currentSchoolYearEnd = datetime.date(2022, 7, 31)
+
+        self.mocked_getCurrentSchoolYear.return_value = (self.currentSchoolYearStart, self.currentSchoolYearEnd)
+
     def tearDown(self):
         # Stop all of the patchers
         self.patcher_getAuth.stop()
         self.patcher_appGlobals.stop()
         self.patcher_osEnviron.stop()
+        self.patcher_getCurSchoolYear.stop()
 
         self.patcher_loggingDEBUG.stop()
         self.patcher_loggingINFO.stop()
@@ -146,7 +160,7 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
     # ------------------------------
     # -- Called from Client Tests --
     # ------------------------------
-    def test_whenCalledFromClient_returnScheduleInExpectedJSONFormat(self):
+    def test_whenCalledFromClient_withDateInsideCurrentSchoolYear_returnScheduleInExpectedJSONFormat(self):
         # Test to ensure that when this API is called from a remote client
         #  it accepts the below parameters and returns a schedule in the
         #  expected JSON format.
@@ -173,6 +187,9 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
         desiredStartStr = "2021-01-01T00:00:00.000"
         desiredEndStr = "2022-02-01T00:00:00.000"
         desiredColors = "false"  # <- Must be set as it would appear coming across from JSON
+
+        expectedStartDatetime = datetime.date.fromisoformat(desiredStartStr.split("T")[0])
+        expectedEndDatetime = datetime.date.fromisoformat(desiredEndStr.split("T")[0])
 
         # Create some dummy duties that will be returned from the DB.
         breakDutySchedule = []
@@ -239,9 +256,9 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
                           JOIN month ON (month.id=break_duties.month_id)
                           JOIN ra ON (ra.id=break_duties.ra_id)
         WHERE break_duties.hall_id = %s
-        AND month.year >= TO_DATE(%s,'YYYY-MM')
-        AND month.year <= TO_DATE(%s,'YYYY-MM')
-    """, (self.user_hall_id, desiredStartStr.split("T")[0], desiredEndStr.split("T")[0])
+        AND month.year >= %s::date
+        AND month.year <= %s::date
+    """, (self.user_hall_id, expectedStartDatetime, expectedEndDatetime)
         )
 
         # Assert that appGlobals.conn.commit was never called
@@ -405,6 +422,42 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
         # Assert that we received our expected result
         self.assertListEqual(expectedScheduleResult, resp.json)
 
+    def test_whenCalledFromClient_withDateOutsideOfCurrentSchoolYear_returnsEmptySchedule(self):
+        # Test to ensure that when the method is called with a start and end date that
+        #  is outside of the current school year, then a blank schedule is returned.
+
+        # -- Arrange --
+
+        # Reset all of the mocked objects that will be used in this test
+        self.mocked_authLevel.reset_mock()
+        self.mocked_appGlobals.conn.reset_mock()
+
+        # Set the auth_level of this session to 2
+        self.mocked_authLevel.return_value = 2
+
+        # Set the passed arguments
+        desiredStartStr = "2000-01-01T00:00:00.000"
+        desiredEndStr = "2000-02-01T00:00:00.000"
+        desiredColors = "false"  # <- Must be set as it would appear coming across from JSON
+
+        expectedScheduleResult = []
+
+        # -- Act --
+
+        # Make a request to the desired API endpoint
+        resp = self.server.get("/breaks/api/getBreakDuties",
+                               query_string=dict(
+                                   start=desiredStartStr,
+                                   end=desiredEndStr,
+                                   allColors=desiredColors
+                               ),
+                               base_url=self.mocked_appGlobals.baseOpts["HOST_URL"])
+
+        # -- Assert
+
+        # Assert that we received our expected result
+        self.assertListEqual(expectedScheduleResult, resp.json)
+
     # ------------------------------
     # -- Called from Server Tests --
     # ------------------------------
@@ -436,8 +489,8 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
         self.mocked_appGlobals.conn.reset_mock()
 
         # Set the passed arguments
-        desiredStartStr = "2021-01-01"
-        desiredEndStr = "2022-02-01"
+        desiredStartStr = datetime.date(2021, 1, 1)
+        desiredEndStr = datetime.date(2021, 2, 1)
 
         # Create some dummy duties that will be returned from the DB.
         breakDutySchedule = []
@@ -496,8 +549,8 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
                           JOIN month ON (month.id=break_duties.month_id)
                           JOIN ra ON (ra.id=break_duties.ra_id)
         WHERE break_duties.hall_id = %s
-        AND month.year >= TO_DATE(%s,'YYYY-MM')
-        AND month.year <= TO_DATE(%s,'YYYY-MM')
+        AND month.year >= %s::date
+        AND month.year <= %s::date
     """, (self.user_hall_id, desiredStartStr, desiredEndStr)
         )
 
@@ -525,8 +578,8 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
         self.mocked_appGlobals.conn.reset_mock()
 
         # Set the passed arguments
-        desiredStartStr = "2021-01-01"
-        desiredEndStr = "2022-02-01"
+        desiredStartStr = datetime.date(2021, 1, 1)
+        desiredEndStr = datetime.date(2021, 2, 1)
 
         # Create some dummy duties that will be returned from the DB.
         breakDutySchedule = []
@@ -586,8 +639,8 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
                           JOIN month ON (month.id=break_duties.month_id)
                           JOIN ra ON (ra.id=break_duties.ra_id)
         WHERE break_duties.hall_id = %s
-        AND month.year >= TO_DATE(%s,'YYYY-MM')
-        AND month.year <= TO_DATE(%s,'YYYY-MM')
+        AND month.year >= %s::date
+        AND month.year <= %s::date
     """, (self.user_hall_id, desiredStartStr, desiredEndStr)
         )
 
@@ -616,8 +669,8 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
         self.mocked_appGlobals.conn.reset_mock()
 
         # Set the passed arguments
-        desiredStartStr = "2021-01-01"
-        desiredEndStr = "2022-02-01"
+        desiredStartStr = datetime.date(2021, 1, 1)
+        desiredEndStr = datetime.date(2021, 2, 1)
 
         # Create some dummy duties that will be returned from the DB.
         breakDutySchedule = []
@@ -677,8 +730,8 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
                           JOIN month ON (month.id=break_duties.month_id)
                           JOIN ra ON (ra.id=break_duties.ra_id)
         WHERE break_duties.hall_id = %s
-        AND month.year >= TO_DATE(%s,'YYYY-MM')
-        AND month.year <= TO_DATE(%s,'YYYY-MM')
+        AND month.year >= %s::date
+        AND month.year <= %s::date
     """, (self.user_hall_id, desiredStartStr, desiredEndStr)
         )
 
@@ -707,8 +760,8 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
         self.mocked_appGlobals.conn.reset_mock()
 
         # Set the passed arguments
-        desiredStartStr = "2021-01-01"
-        desiredEndStr = "2022-02-01"
+        desiredStartStr = datetime.date(2021, 1, 1)
+        desiredEndStr = datetime.date(2021, 2, 1)
 
         # Create some dummy duties that will be returned from the DB.
         breakDutySchedule = []
@@ -776,8 +829,8 @@ class TestBreakBP_getBreakDuties(unittest.TestCase):
                           JOIN month ON (month.id=break_duties.month_id)
                           JOIN ra ON (ra.id=break_duties.ra_id)
         WHERE break_duties.hall_id = %s
-        AND month.year >= TO_DATE(%s,'YYYY-MM')
-        AND month.year <= TO_DATE(%s,'YYYY-MM')
+        AND month.year >= %s::date
+        AND month.year <= %s::date
     """, (self.user_hall_id, desiredStartStr, desiredEndStr)
         )
 

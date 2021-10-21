@@ -1,10 +1,12 @@
 language: python
 python:
-  - "3.6"
+  - "3.9"
 script:
   - python -m unittest discover -p "*_test.py" -v
 services:
   - rabbitmq
-dist: trusty
-notifications:
-    slack: ra-scheduler:z6I7Y1LLLdzzVggMuJnw4Jiq
+dist: xenial
+addons:
+  apt:
+    packages:
+      - rabbitmq-server

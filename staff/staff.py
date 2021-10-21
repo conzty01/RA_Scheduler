@@ -1,4 +1,4 @@
-from flask import render_template, request, jsonify, redirect, url_for, Blueprint, abort
+from flask import render_template, request, redirect, url_for, Blueprint, abort
 from flask_login import login_required
 from psycopg2 import IntegrityError
 import logging
@@ -7,7 +7,7 @@ import logging
 import appGlobals as ag
 
 # Import the needed functions from other parts of the application
-from helperFunctions.helperFunctions import getAuth, stdRet, getCurSchoolYear, fileAllowed
+from helperFunctions.helperFunctions import getAuth, stdRet, getCurSchoolYear, fileAllowed, packageReturnObject
 
 staff_bp = Blueprint("staff_bp", __name__,
                      template_folder="templates",
@@ -42,7 +42,7 @@ def manStaff():
 
     # Get the information for the current school year.
     #  This will be used to calculate duty points for the RAs.
-    start, end = getCurSchoolYear()
+    start, end = getCurSchoolYear(authedUser.hall_id())
 
     # Create a DB cursor
     cur = ag.conn.cursor()
@@ -53,7 +53,7 @@ def manStaff():
                    FROM ra JOIN staff_membership AS sm ON (ra.id = sm.ra_id)
                            JOIN res_hall ON (sm.res_hall_id = res_hall.id)
                    WHERE sm.res_hall_id = %s 
-                   ORDER BY ra.id ASC;
+                   ORDER BY sm.auth_level DESC, ra.first_name ASC;
                 """, (authedUser.hall_id(),))
 
     # Get each of the RA's duty statistics for the current school year.
@@ -117,13 +117,14 @@ def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None
 
         # Get the user's information from the database
         authedUser = getAuth()
+        # Mark that this method was not called from the server
+        fromServer = False
         # Set the value of hallId from the userDict
         hallId = authedUser.hall_id()
         # Get the startDateStr and endDateStr from the request arguments
         startDateStr = request.args.get("start")
         endDateStr = request.args.get("end")
-        # Mark that this method was not called from the server
-        fromServer = False
+
 
     logging.debug("Get RA Stats - FromServer: {}".format(fromServer))
 
@@ -178,8 +179,8 @@ def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None
                          (
                              SELECT month.id
                              FROM month
-                             WHERE month.year >= TO_DATE(%s, 'YYYY-MM-DD')
-                             AND month.year <= TO_DATE(%s, 'YYYY-MM-DD')
+                             WHERE month.year >= %s::date
+                             AND month.year <= %s::date
                          )
                          ORDER BY schedule.month_id, schedule.created DESC, schedule.id DESC
                       )
@@ -191,8 +192,8 @@ def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None
                       FROM break_duties JOIN day ON (day.id=break_duties.day_id)
                                         JOIN ra ON (ra.id=break_duties.ra_id)
                       WHERE break_duties.hall_id = %s
-                      AND day.date BETWEEN TO_DATE(%s, 'YYYY-MM-DD')
-                                       AND TO_DATE(%s, 'YYYY-MM-DD')
+                      AND day.date BETWEEN %s::date
+                                       AND %s::date
                       GROUP BY rid
                       
                    ) AS combined_res
@@ -227,14 +228,8 @@ def getRAStats(hallId=None, startDateStr=None, endDateStr=None, maxBreakDay=None
     # Close the DB cursor
     cur.close()
 
-    # If this API method was called from the server
-    if fromServer:
-        # Then return the result as-is
-        return res
-
-    else:
-        # Otherwise return a JSON version of the result
-        return jsonify(res)
+    # Return the result
+    return packageReturnObject(res, fromServer)
 
 
 @staff_bp.route("/api/getStaffInfo", methods=["GET"])
@@ -284,7 +279,7 @@ def getStaffStats():
         logging.info("User Not Authorized - RA: {}".format(authedUser.ra_id()))
 
         # Notify the user that they are not authorized.
-        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+        return packageReturnObject(stdRet(-1, "NOT AUTHORIZED"))
 
     # Create a DB cursor
     cur = ag.conn.cursor()
@@ -295,11 +290,11 @@ def getStaffStats():
                  FROM ra JOIN staff_membership AS sm ON (sm.ra_id = ra.id)
                          JOIN res_hall ON (sm.res_hall_id = res_hall.id)
                  WHERE sm.res_hall_id = %s 
-                 ORDER BY ra.id DESC;""", (authedUser.hall_id(),))
+                 ORDER BY sm.auth_level DESC, ra.first_name ASC;""", (authedUser.hall_id(),))
 
     # Get the information for the current school year.
     #  This will be used to calculate duty points for the RAs.
-    start, end = getCurSchoolYear()
+    start, end = getCurSchoolYear(authedUser.hall_id())
 
     # Get each of the RA's duty statistics for the current school year.
     pts = getRAStats(authedUser.hall_id(), start, end)
@@ -308,7 +303,7 @@ def getStaffStats():
     ret = {"raList": cur.fetchall(), "pts": pts}
 
     # return a JSON version of the return result
-    return jsonify(ret)
+    return packageReturnObject(ret)
 
 
 @staff_bp.route("/api/changeStaffInfo", methods=["POST"])
@@ -352,7 +347,7 @@ def changeStaffInfo():
         logging.info("User Not Authorized - RA: {}".format(authedUser.ra_id()))
 
         # Notify the user that they are not authorized.
-        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+        return packageReturnObject(stdRet(-1, "NOT AUTHORIZED"))
 
     # Load the data provided by the client
     data = request.json
@@ -378,7 +373,7 @@ def changeStaffInfo():
         cur.close()
 
         # Indicate to the client that the user does not belong to the provided hall
-        return jsonify(stdRet(0, "NOT AUTHORIZED"))
+        return packageReturnObject(stdRet(0, "NOT AUTHORIZED"))
 
     else:
         # Otherwise go ahead and update the RA's information
@@ -406,7 +401,7 @@ def changeStaffInfo():
         cur.close()
 
     # Indicate to the client that the save was successful
-    return jsonify(stdRet(1, "successful"))
+    return packageReturnObject(stdRet(1, "successful"))
 
 
 @staff_bp.route("/api/removeStaffer", methods=["POST"])
@@ -444,7 +439,7 @@ def removeStaffer():
         logging.info("User Not Authorized - RA: {}".format(authedUser.ra_id()))
 
         # Notify the user that they are not authorized.
-        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+        return packageReturnObject(stdRet(-1, "NOT AUTHORIZED"))
 
     # Load the raID from the request's JSON
     raID = request.json
@@ -472,7 +467,7 @@ def removeStaffer():
         cur.close()
 
         # Indicate to the client that the user does not belong to the provided hall
-        return jsonify(stdRet(0, "NOT AUTHORIZED"))
+        return packageReturnObject(stdRet(0, "NOT AUTHORIZED"))
 
     else:
         # Otherwise go ahead and remove the RA from the hall
@@ -488,17 +483,28 @@ def removeStaffer():
         cur.close()
 
     # Indicate to the client that the save was successful
-    return jsonify(stdRet(1, "successful"))
+    return packageReturnObject(stdRet(1, "successful"))
 
 
 @staff_bp.route("/api/addStaffer", methods=["POST"])
 @login_required
-def addStaffer():
+def addStaffer(fName=None, lName=None, color=None, email=None, authLevel=None, modPts=None, hallID=None):
     # API Method that adds a new staff member to the same res hall as the client.
     #
     #  Required Auth Level: >= HD
     #
-    #  This method is currently unable to be called from the server.
+    #  If called from the server, this function accepts the following parameters:
+    #
+    #     fName      <str>  -  The value for the RA's first name (ra.first_name)
+    #     lName      <str>  -  The value for the RA's last name (ra.last_name)
+    #     color      <str>  -  The value for the RA's color (ra.color)
+    #     email      <str>  -  The value for the RA's email (ra.email)
+    #     authLevel  <int>  -  An integer denoting the authorization level for the RA.
+    #                           Must be an integer value in the range: 1-3.
+    #     modPts     <int>  -  Number of modifying points that should be awarded
+    #                           to the RA.
+    #     hallID     <int>  -  An integer denoting the Res Hall id that the ra
+    #                           should be added to.
     #
     #  If called from a client, the following parameters are required:
     #
@@ -508,6 +514,8 @@ def addStaffer():
     #     email      <str>  -  The value for the RA's email (ra.email)
     #     authLevel  <int>  -  An integer denoting the authorization level for the RA.
     #                           Must be an integer value in the range: 1-3.
+    #     modPts     <int>  -  Number of modifying points that should be awarded
+    #                           to the RA.
     #
     #  This method returns a standard return object whose status is one of the
     #  following:
@@ -516,44 +524,100 @@ def addStaffer():
     #      0 : the client does not belong to the same hall as the provided RA
     #     -1 : the addition was unsuccessful
 
-    # Get the user's information from the database
-    authedUser = getAuth()
+    # Assume this API was called from the server and verify that this is true
+    fromServer = True
+    if fName is None and lName is None and color is None and \
+            email is None and authLevel is None and modPts is None \
+            and hallID is None:
+        # If the required parameters are None, then this method
+        #  was called from a remote client.
 
-    # Check to see if the user is authorized to add a staffer
-    # If the user is not at least an HD
-    if authedUser.auth_level() < 3:
-        # Then they are not permitted to see this view.
+        # Mark that this method was not called from the server
+        fromServer = False
 
-        # Log the occurrence.
-        logging.info("User Not Authorized - RA: {} attempted to add Staff Member for Hall: {}"
-                     .format(authedUser.ra_id(), authedUser.hall_id()))
+        # Get the user's information from the database
+        authedUser = getAuth()
 
-        # Notify the user that they are not authorized.
-        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+        # Check to see if the user is authorized to add a staffer
+        # If the user is not at least an HD
+        if authedUser.auth_level() < 3:
+            # Then they are not permitted to see this view.
 
-    # Load the data from the request's JSON
-    data = request.json
+            # Log the occurrence.
+            logging.info("User Not Authorized - RA: {} attempted to add Staff Member for Hall: {}"
+                         .format(authedUser.ra_id(), authedUser.hall_id()))
+
+            # Notify the user that they are not authorized.
+            return packageReturnObject(stdRet(-1, "NOT AUTHORIZED"), fromServer)
+
+        try:
+            # Load the data from the request's JSON
+            fName = request.json["fName"]
+            lName = request.json["lName"]
+            color = request.json["color"]
+            email = request.json["email"]
+            authLevel = int(request.json["authLevel"])
+            modPts = int(request.json["modPts"])
+            hallID = authedUser.hall_id()
+
+        except ValueError as ve:
+            # If a ValueError occurs, then there was an issue parsing out the
+            #  integer values from the Data
+
+            # Log the occurrence
+            logging.warning("Error Parsing Request Values for addStaffer: {}".format(ve))
+
+            # Notify the user of the error
+            return packageReturnObject(
+                stdRet(-1, "Error Parsing Staff Member Parameters. Please refresh and try again."),
+                fromServer
+            )
+
+        except KeyError as ke:
+            # If a KeyError occurs, then there was an expected value in the
+            #  request json that was missing.
+
+            # Log the occurrence
+            logging.warning("Error Loading Request Values for addStaffer: {}".format(ke))
+
+            # Notify the user of the error
+            return packageReturnObject(
+                stdRet(-1, "Missing Staff Member Parameters. Please refresh and try again."),
+                fromServer
+            )
 
     # Create a DB cursor
     cur = ag.conn.cursor()
 
     # Query the DB to see if there is already an RA associated with the provided email.
-    cur.execute("SELECT id FROM ra WHERE email = %s;", (data["email"],))
+    cur.execute("SELECT id FROM ra WHERE email = %s;", (email,))
 
     # Load the result from the DB
     existingRAID = cur.fetchone()
 
     # If there is a user with the provided email already
     if existingRAID is not None:
-        # Create an entry into the staff_membership table for this new member
+
+        # Check to see if the RA is already a part of the desired staff
         cur.execute(
-            """INSERT INTO staff_membership (ra_id, res_hall_id, auth_level, selected)
-               VALUES (%s, %s, %s, %s);""",
-            (existingRAID[0], authedUser.hall_id(), data["authLevel"], False)
+            "SELECT EXISTS (SELECT id FROM staff_membership WHERE ra_id = %s AND res_hall_id = %s)",
+            (existingRAID[0], hallID)
         )
 
-        # Fetch the returned ID of the RA record
-        raID = existingRAID[0]
+        # If there is not already a staff_membership record, then add the new member
+        if not cur.fetchone()[0]:
+
+            logging.debug("No existing Staff Membership record found.")
+
+            # Create an entry into the staff_membership table for this new member
+            cur.execute(
+                """INSERT INTO staff_membership (ra_id, res_hall_id, auth_level, selected)
+                   VALUES (%s, %s, %s, %s);""",
+                (existingRAID[0], hallID, authLevel, False)
+            )
+
+            # Add the point modifier to the DB
+            addRAPointModifier(existingRAID[0], hallID, authLevel, set=True)
 
     else:
         # Otherwise set the query string create a new RA record in the ra table with
@@ -563,7 +627,7 @@ def addStaffer():
         cur.execute(
             """INSERT INTO ra (first_name, last_name, color, email)
                VALUES (%s, %s, %s, %s) RETURNING id;""",
-            (data["fName"], data["lName"], data["color"], data["email"]))
+            (fName, lName, color, email))
 
         # Fetch the returned ID of the RA record
         raID = cur.fetchone()[0]
@@ -572,17 +636,17 @@ def addStaffer():
         cur.execute(
             """INSERT INTO staff_membership (ra_id, res_hall_id, auth_level, selected)
                VALUES (%s, %s, %s, %s);""",
-            (raID, authedUser.hall_id(), data["authLevel"], True)
+            (raID, hallID, authLevel, True)
         )
 
-    # Add the point modifier to the DB
-    addRAPointModifier(raID, authedUser.hall_id(), data["modPts"], set=True)
+        # Add the point modifier to the DB
+        addRAPointModifier(raID, hallID, modPts, set=True)
 
     # Commit the changes to the DB
     ag.conn.commit()
 
     # Notify the client that the save was successful
-    return jsonify(stdRet(1, "successful"))
+    return packageReturnObject(stdRet(1, "successful"), fromServer)
 
 
 @staff_bp.route("/api/importStaff", methods=["POST"])
@@ -623,7 +687,7 @@ def importStaff():
                      .format(authedUser.ra_id(), authedUser.hall_id()))
 
         # Notify the user that they are not authorized.
-        return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+        return packageReturnObject(stdRet(-1, "NOT AUTHORIZED"))
 
     logging.info("Import File: {} for Hall: {}".format(request.files, authedUser.hall_id()))
 
@@ -633,7 +697,9 @@ def importStaff():
         logging.info("No file part found")
 
         # Notify the client that there was a transmission issue.
-        return jsonify(stdRet(0, "There appears to have been an issue uploading the file. - No File Part Found"))
+        return packageReturnObject(
+            stdRet(0, "There appears to have been an issue uploading the file. - No File Part Found")
+        )
 
     # Otherwise load the file
     file = request.files['file']
@@ -647,7 +713,7 @@ def importStaff():
         logging.info("No File Selected")
 
         # Notify the client that this issue occurred.
-        return jsonify(stdRet(0, "No File Selected"))
+        return packageReturnObject(stdRet(0, "No File Selected"))
 
     # Check to ensure that 1) we have a file and 2) the file type is allowed
     if file and fileAllowed(file.filename):
@@ -656,9 +722,6 @@ def importStaff():
         dataStr = file.read().decode("utf-8")
 
         logging.debug(dataStr)
-
-        # Create a DB cursor
-        cur = ag.conn.cursor()
 
         # Iterate through the rows of the dataStr and process them.
         #  The expected format for the csv contains a header row and is as follows:
@@ -699,7 +762,7 @@ def importStaff():
                                  .format(authedUser.hall_id()))
 
                     # Notify the client of this issue.
-                    return jsonify(ret)
+                    return packageReturnObject(ret)
 
                 # Check the authorization level indicated by the row
                 #  and translate the human-readable text into the values
@@ -718,46 +781,10 @@ def importStaff():
                     #        as any strange roles that the user enters.
                     auth = 1
 
-                logging.debug(str(auth))
+                logging.debug("Calculated Auth Level: {}".format(auth))
 
-                try:
-                    # Attempt to insert the new staff member into the RA table.
-                    cur.execute("""
-                        INSERT INTO ra (first_name, last_name, color, email)
-                        VALUES (%s, %s, %s, %s)
-                        RETURNING id;
-                        """, (pl[0], pl[1], pl[4], pl[2]))
-
-                    # Load the new RA's ID from the query
-                    newRAID = cur.fetchone()
-
-                    # Add a record in the staff_membership table
-                    cur.execute(
-                        """INSERT INTO staff_membership (ra_id, res_hall_id, start_date, auth_level, selected)
-                           VALUES (%s, %s, TO_DATE(%s, 'MM/DD/YYYY'), %s, %s)""",
-                        (newRAID, authedUser.hall_id(), pl[3], auth, True)
-                    )
-
-                    # Commit the changes to the DB
-                    ag.conn.commit()
-
-                except IntegrityError:
-                    # If the ra already exists in the DB
-                    # Log the instance
-                    logging.warning("Duplicate RA: {}, rolling back DB changes".format(pl))
-
-                    # Roll back the DB prior to the inserting the duplicate
-                    ag.conn.rollback()
-
-                    # Close the cursor
-                    cur.close()
-
-                    # Create a new cursor to get a fresh start
-                    cur = ag.conn.cursor()
-
-        # When we are done iterating through all of the rows...
-        # Close the DB cursor
-        cur.close()
+                # Call the addStaffer API to add the staff member
+                addStaffer(pl[0], pl[1], pl[4], pl[2], auth, 0, authedUser.hall_id())
 
         # Redirect the user back to the Manage Staff page.
         return redirect(url_for("staff_bp.manStaff"))

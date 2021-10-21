@@ -1,4 +1,4 @@
-from flask import render_template, request, jsonify, Blueprint, abort
+from flask import render_template, request, Blueprint, abort
 from flask_login import login_required
 import logging
 
@@ -6,7 +6,7 @@ import logging
 import appGlobals as ag
 
 # Import the needed functions from other parts of the application
-from helperFunctions.helperFunctions import getAuth, stdRet
+from helperFunctions.helperFunctions import getAuth, stdRet, getCurSchoolYear, packageReturnObject
 
 # Create the blueprint representing these routes
 conflicts_bp = Blueprint("conflicts_bp", __name__,
@@ -29,9 +29,22 @@ def conflicts():
     # Authenticate the user against the DB
     authedUser = getAuth()
 
+    # Get the current school year information
+    yearStart, yearEnd = getCurSchoolYear(authedUser.hall_id())
+
+    # Create a custom settings dict
+    custSettings = {
+        "yearStart": yearStart,
+        "yearEnd": yearEnd
+    }
+
+    # Merge the base options into the custom settings dictionary to simplify passing
+    #  settings into the template renderer.
+    custSettings.update(ag.baseOpts)
+
     # Render and return the appropriate template.
     return render_template("conflicts/conflicts.html", auth_level=authedUser.auth_level(), curView=2,
-                           opts=ag.baseOpts, hall_name=authedUser.hall_name(),
+                           opts=custSettings, hall_name=authedUser.hall_name(),
                            linkedHalls=authedUser.getAllAssociatedResHalls())
 
 
@@ -58,6 +71,19 @@ def editCons():
         # Raise an 403 Access Denied HTTP Exception that will be handled by flask
         abort(403)
 
+    # Get the current school year information
+    yearStart, yearEnd = getCurSchoolYear(authedUser.hall_id())
+
+    # Create a custom settings dict
+    custSettings = {
+        "yearStart": yearStart,
+        "yearEnd": yearEnd
+    }
+
+    # Merge the base options into the custom settings dictionary to simplify passing
+    #  settings into the template renderer.
+    custSettings.update(ag.baseOpts)
+
     # Create a DB Cursor
     cur = ag.conn.cursor()
 
@@ -70,7 +96,7 @@ def editCons():
 
     # Render and return the appropriate template.
     return render_template("conflicts/editCons.html", raList=cur.fetchall(), auth_level=authedUser.auth_level(),
-                           curView=3, opts=ag.baseOpts, hall_name=authedUser.hall_name(),
+                           curView=3, opts=custSettings, hall_name=authedUser.hall_name(),
                            linkedHalls=authedUser.getAllAssociatedResHalls())
 
 
@@ -136,7 +162,7 @@ def getUserConflicts():
         cur.close()
 
         # Simply return an empty list
-        return jsonify({"conflicts": []})
+        return packageReturnObject({"conflicts": []})
 
     else:
         # Otherwise extract the monthID from the query result
@@ -157,7 +183,7 @@ def getUserConflicts():
     cur.close()
 
     # Otherwise return a JSON version of the result
-    return jsonify({"conflicts": ret})
+    return packageReturnObject({"conflicts": ret})
 
 
 @conflicts_bp.route("/api/getRAConflicts", methods=["GET"])
@@ -218,6 +244,9 @@ def getRAConflicts(startDateStr=None, endDateStr=None, raID=-1, hallID=None):
         # Get the user's info from our database
         authedUser = getAuth()
 
+        # Mark that the API was called from the client
+        fromServer = False
+
         # If the user is not at least an AHD
         if authedUser.auth_level() < 2:
             # Then they are not permitted to see this view.
@@ -227,7 +256,7 @@ def getRAConflicts(startDateStr=None, endDateStr=None, raID=-1, hallID=None):
                          .format(authedUser.ra_id(), authedUser.hall_id()))
 
             # Notify the user that they are not authorized.
-            return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+            return packageReturnObject(stdRet(-1, "NOT AUTHORIZED"), fromServer)
 
         # Set the value of hallId from the userDict
         hallID = authedUser.hall_id()
@@ -243,7 +272,7 @@ def getRAConflicts(startDateStr=None, endDateStr=None, raID=-1, hallID=None):
             logging.warning("Unable to parse RA ID from getRAConflicts API request")
 
             # Notify the user of the error
-            return jsonify(stdRet(-1, "Invalid RA ID"))
+            return packageReturnObject(stdRet(-1, "Invalid RA ID"), fromServer)
 
         # Get the start and end string values from the request arguments.
         #  Since we utilize the fullCal.js library, we know that the request
@@ -252,8 +281,6 @@ def getRAConflicts(startDateStr=None, endDateStr=None, raID=-1, hallID=None):
         #  immediately.
         startDateStr = request.args.get("start").split("T")[0]
         endDateStr = request.args.get("end").split("T")[0]
-
-        fromServer = False
 
     logging.debug("HallId: {}".format(hallID))
     logging.debug("RaId: {}".format(raID))
@@ -310,14 +337,8 @@ def getRAConflicts(startDateStr=None, endDateStr=None, raID=-1, hallID=None):
     # Close the DB Cursor
     cur.close()
 
-    # If this API method was called from the server
-    if fromServer:
-        # Then return the result as-is
-        return res
-
-    else:
-        # Otherwise return a JSON version of the result
-        return jsonify(res)
+    # Return the result
+    return packageReturnObject(res, fromServer)
 
 
 @conflicts_bp.route("/api/getConflictNums", methods=["GET"])
@@ -363,16 +384,21 @@ def getNumberConflicts(hallId=None, monthNum=None, year=None):
         # Get the user's information from the database
         authedUser = getAuth()
 
+        # Mark that this method was not called from the server
+        fromServer = False
+
         # If the user is not at least an AHD
         if authedUser.auth_level() < 2:
             # Then they are not permitted to see this view.
 
             # Log the occurrence.
-            logging.info("User Not Authorized - RA: {} attempted to view staff conflicts numbers for Hall: {}"
-                         .format(authedUser.ra_id(), authedUser.hall_id()))
+            logging.info(
+                "User Not Authorized - RA: {} attempted to view staff conflicts numbers for Hall: {}"
+                    .format(authedUser.ra_id(), authedUser.hall_id())
+            )
 
             # Notify the user that they are not authorized.
-            return jsonify(stdRet(-1, "NOT AUTHORIZED"))
+            return packageReturnObject(stdRet(-1, "NOT AUTHORIZED"), fromServer)
 
         # Set the value of the hallId from the userDict
         hallId = authedUser.hall_id()
@@ -380,9 +406,6 @@ def getNumberConflicts(hallId=None, monthNum=None, year=None):
         # Get the value for monthNum and year from the request arguments.
         monthNum = request.args.get("monthNum")
         year = request.args.get("year")
-
-        # Mark that this method was not called from the server
-        fromServer = False
 
     # Create a DB cursor
     cur = ag.conn.cursor()
@@ -414,14 +437,8 @@ def getNumberConflicts(hallId=None, monthNum=None, year=None):
     # Close the DB cursor
     cur.close()
 
-    # If this API method was called from the server
-    if fromServer:
-        # Then return the result as-is
-        return res
-
-    else:
-        # Otherwise, return a JSON version of the result
-        return jsonify(res)
+    # Return the results
+    return packageReturnObject(res, fromServer)
 
 
 @conflicts_bp.route("/api/enterConflicts/", methods=['POST'])
@@ -546,4 +563,4 @@ def processConflicts():
     cur.close()
 
     # Indicate to the client that the save was successful
-    return jsonify(stdRet(1, "successful"))
+    return packageReturnObject(stdRet(1, "successful"))

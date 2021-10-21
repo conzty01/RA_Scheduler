@@ -2,6 +2,7 @@ from unittest.mock import MagicMock, patch
 from scheduleServer import app
 from flask import Response
 import unittest
+import datetime
 
 from helperFunctions.helperFunctions import stdRet, getCurSchoolYear, AuthenticatedUser
 
@@ -115,6 +116,17 @@ class TestSchedule_editSched(unittest.TestCase):
         self.mocked_appGlobals.UPLOAD_FOLDER = "./static"
         self.mocked_appGlobals.ALLOWED_EXTENSIONS = {"txt", "csv"}
 
+        # Create a patcher for the getCurSchoolYear method
+        self.patcher_getCurSchoolYear = patch("schedule.schedule.getCurSchoolYear", autospec=True)
+
+        # Start the patcher - mock returned
+        self.mocked_getCurSchoolYear = self.patcher_getCurSchoolYear.start()
+
+        # Configure the mocked getCurSchoolYear
+        self.helper_schoolYearStart = datetime.date(2021, 8, 1)
+        self.helper_schoolYearEnd = datetime.date(2022, 7, 31)
+        self.mocked_getCurSchoolYear.return_value = (self.helper_schoolYearStart, self.helper_schoolYearEnd)
+
         # -- Create a patchers for the logging --
         self.patcher_loggingDEBUG = patch("logging.debug", autospec=True)
         self.patcher_loggingINFO = patch("logging.info", autospec=True)
@@ -134,6 +146,7 @@ class TestSchedule_editSched(unittest.TestCase):
         self.patcher_getAuth.stop()
         self.patcher_appGlobals.stop()
         self.patcher_osEnviron.stop()
+        self.patcher_getCurSchoolYear.stop()
 
         # Stop all of the logging patchers
         self.patcher_loggingDEBUG.stop()
@@ -211,9 +224,6 @@ class TestSchedule_editSched(unittest.TestCase):
             }
         }
 
-        # Get the values for the start and end dates of the current school year
-        start, end = getCurSchoolYear()
-
         # -- Act --
 
         # Request the desired page.
@@ -229,7 +239,11 @@ class TestSchedule_editSched(unittest.TestCase):
         self.assertFalse(resp.is_json)
 
         # Assert that the getRABreakStats Function was called as expected
-        mocked_getRAStats.assert_called_once_with(self.helper_getAuth.hall_id(), start, end)
+        mocked_getRAStats.assert_called_once_with(
+            self.helper_getAuth.hall_id(),
+            self.helper_schoolYearStart,
+            self.helper_schoolYearEnd
+        )
 
         # Assert that the last call to the DB was queried as expected.
         #  In this instance, we are unable to use the assert_called_once_with
@@ -277,7 +291,9 @@ class TestSchedule_editSched(unittest.TestCase):
         expectedGCalIntegration = False
         expectedCustomSettingsDict = {
             "dutyFlagLabel": expectedDutyFlagLabel,
-            "gCalConnected": expectedGCalIntegration
+            "gCalConnected": expectedGCalIntegration,
+            "yearStart": self.helper_schoolYearStart,
+            "yearEnd": self.helper_schoolYearEnd
         }
 
         # Configure the expectedCustomSettingsDict so that it is as it would
