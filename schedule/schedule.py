@@ -1283,7 +1283,7 @@ def getUserTradeRequests(authedUser=None):
         })
 
     # Return a successful result
-    return packageReturnObject(stdRet(1, "successful"))
+    return packageReturnObject(tradeRequests, fromServer)
 
 
 @schedule_bp.route("/api/getAddTradeInfo", methods=["GET"])
