@@ -934,7 +934,7 @@ def getStafferDuties(resHallID=None, raID=None, startDateStr=None, endDateStr=No
     # If we should use the configured end of the school year instead of endDateStr
     if truncEndDate:
         # Grab the configured end of the school year
-        _, endDateStr = getCurSchoolYear()
+        _, endDateStr = getCurSchoolYear(resHallID)
 
     # Default the result
     res = []
@@ -967,10 +967,7 @@ def getStafferDuties(resHallID=None, raID=None, startDateStr=None, endDateStr=No
             })
 
     # Return the result to the caller
-    if fromServer:
-        return res
-    else:
-        return jsonify(res)
+    return packageReturnObject(res, fromServer)
 
 
 @staff_bp.route("/api/getMembers", methods=["GET"])
@@ -1023,7 +1020,7 @@ def getStaffMembers(resHallID=None, excludeHDs=False):
             excludeHDs = False
 
         else:
-            return jsonify(stdRet(-1, "Invalid flag provided"))
+            return packageReturnObject(stdRet(-1, "Invalid flag provided"))
 
         # Mark that this method was not called from the server
         fromServer = False
@@ -1059,10 +1056,7 @@ def getStaffMembers(resHallID=None, excludeHDs=False):
             })
 
     # Return the result to the caller
-    if fromServer:
-        return res
-    else:
-        return jsonify(res)
+    return packageReturnObject(res, fromServer)
 
 
 # ------------------------
