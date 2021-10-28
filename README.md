@@ -26,7 +26,7 @@ to the client in addition to running the scheduling
 algorithm. For this application, you will need:
 
 * PostgreSQL 10.17
-* Python 3.6
+* Python 3.9
 * VirtualEnv 15.1
 * RabbitMQ 3.8.14
 
@@ -50,7 +50,7 @@ username and making yourself a superuser.
 #### Installing Python
 
 ```
-$ sudo apt-get install python3.6
+$ sudo apt-get install python3.9
 ```
 
 #### Installing and Setting up a Python Virtual Env
