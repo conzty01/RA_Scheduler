@@ -8,7 +8,7 @@ import time
 def schedule(raList, year, month, noDutyDates=None, doubleDays=(4, 5), doublePts=2,
              doubleNum=2, doubleDates=None, doubleDateNum=2, doubleDatePts=1,
              ldaTolerance=8, nddTolerance=.1, prevDuties=None, breakDuties=None,
-             setDDFlag=False, regDutyPts=1, regNumAssigned=1, timeout=30):
+             setDDFlag=False, regDutyPts=1, regNumAssigned=1, timeout=5):
     # This algorithm will schedule RAs for duties based on ...
     #
     # The algorithm returns a Schedule object that contains Day objects which, in
@@ -378,6 +378,11 @@ def schedule(raList, year, month, noDutyDates=None, doubleDays=(4, 5), doublePts
         # Check how long we've been working on this schedule attempt
         cur_time = time.time()
 
+        # Debugging timeout
+        # logging.debug(
+        #     "Elapsed Time: {} > {} = {}".format(cur_time - start_time, timeout, cur_time - start_time > timeout)
+        # )
+
         # If this process is taking longer than the provided timeout
         if cur_time - start_time > timeout:
             # Package up a message to present to the user
@@ -387,7 +392,8 @@ def schedule(raList, year, month, noDutyDates=None, doubleDays=(4, 5), doublePts
                 noDutyDates,
                 doubleDays,
                 doubleDates,
-                "The schedule took too long to create. Please try again."
+                "The schedule took too long to create. " +
+                "Please check for missing Break Duties, No-Duty days, or Staff Members and try again."
             )
 
         # Get the current working state off the stack
