@@ -1,6 +1,6 @@
 from schedule.rabbitConnectionManager import RabbitConnectionManager
 from json import loads, JSONDecodeError
-from schedule import scheduler4_2
+from schedule import scheduler4_3
 from schedule.ra_sched import RA, Schedule
 from scheduleServer import app
 import copy as cp
@@ -182,6 +182,35 @@ def forwardMsgToErrorQueue(reason, forwardedMsg, sqid):
     rabbitErrorQueueManager.publishMsg(msgBody, {"sqid": sqid}, deliveryMode=2)
 
     logging.info("Forwarded message to '{}' failure queue.".format(rabbitErrorQueueManager.rabbitQueueName))
+
+
+def getSchedulerRunTimeout():
+    # Grab the timeout for a single scheduler run from the environment. Doing it
+    #  this way means that we can update it in the environment without restarting
+    #  the process.
+
+    defaultTimeout = 5
+
+    try:
+        # Grab the value from the environment
+        timeout = int(os.getenv('SINGLE_SCHEDULER_RUN_TIMEOUT', defaultTimeout))
+
+    except ValueError as ex:
+        # If a ValueError was encountered, then that means that there was an issue
+        #  while attempting to parse the value of the environment variable
+
+        # Log the occurrence
+        logging.exception(
+            "Error Parsing ENV Variable for Single Scheduler Run Timeout. " +
+            "Default value of '{}' is being used.".format(defaultTimeout) +
+            "Please check configuration."
+        )
+        logging.exception("getSchedulerRunTimeout - ValueError: {}".format(ex))
+
+        # Set the default timeout
+        timeout = defaultTimeout
+
+    return timeout
 
 
 def runScheduler(resHallID, monthNum, year, noDutyList, eligibleRAList):
@@ -461,12 +490,12 @@ def runScheduler(resHallID, monthNum, year, noDutyList, eligibleRAList):
     successful = False
     while not completed:
         # While we are not finished scheduling, create a candidate schedule
-        sched = scheduler4_2.schedule(
+        sched = scheduler4_3.schedule(
             copy_raList, year, monthNum, doubleDateNum=mulNumAssigned, doubleDatePts=mulDutyPts,
             noDutyDates=copy_noDutyList, doubleDays=mulDutyDays, doublePts=mulDutyPts,
             ldaTolerance=ldat, doubleNum=mulNumAssigned, prevDuties=prevRADuties,
             breakDuties=breakDuties, setDDFlag=flagMultiDuty, regDutyPts=regDutyPts,
-            regNumAssigned=regNumAssigned
+            regNumAssigned=regNumAssigned, timeout=getSchedulerRunTimeout()
         )
 
         # If the schedule's status encountered an error and cannot create a schedule
@@ -581,7 +610,7 @@ def runScheduler(resHallID, monthNum, year, noDutyList, eligibleRAList):
         if dutyDayStr != "":
             # Then insert all of the duties that were scheduled for the month into the DB
             cur.execute("""
-            INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val, flagged) 
+            INSERT INTO duties (hall_id, ra_id, day_id, sched_id, point_val, flagged)
             VALUES {};
             """.format(dutyDayStr[:-1]))
 
@@ -601,6 +630,9 @@ def runScheduler(resHallID, monthNum, year, noDutyList, eligibleRAList):
             "IntegrityError encountered when attempting to save duties for Schedule: {}. Rolling back changes."
                 .format(schedId)
         )
+
+        # Close the cursor
+        cur.close()
 
         # Rollback the changes to the DB
         dbConn.rollback()

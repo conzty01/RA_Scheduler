@@ -54,3 +54,6 @@ export TEMPLATES_AUTO_RELOAD=true
 # Disabling SQLALCHEMY_TRACK_MODIFICATIONS will turn off Flask-SQLAlchemy events
 #  which are unnecessary for this application.
 export SQLALCHEMY_TRACK_MODIFICATIONS=false
+
+# Timeout in seconds for a single run of the scheduler algorithm.
+export SINGLE_SCHEDULER_RUN_TIMEOUT=5
