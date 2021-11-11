@@ -8,39 +8,110 @@ import os
 def migrate(conn):
     cur = conn.cursor()
 
-    # --------------------------------------------
-    # --  Add enabled column to res_hall table  --
-    # --------------------------------------------
+    # -------------------------------------------------
+    # --  Remove unused duties and schedule entries  --
+    # -------------------------------------------------
 
-    # Check to see if the column already exists
+    logging.info("  Checking for unused 'duties' entries")
+
+    # Check to see if there are unused duties
     cur.execute(
-        """SELECT EXISTS (
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name='res_hall' 
-            AND column_name='enabled');"""
+        """
+        SELECT COUNT(*)
+        FROM duties
+        WHERE duties.sched_id IN 
+        (
+            SELECT schedule.id
+            FROM schedule
+            WHERE schedule.id NOT IN
+            (
+                -- Get the active schedule record associated with the given Res Hall for each month in the DB
+                SELECT DISTINCT ON (schedule.month_id, schedule.hall_id) schedule.id
+                FROM schedule
+                ORDER BY schedule.month_id, schedule.hall_id, schedule.created DESC, schedule.id DESC
+            )
+        )
+        """
     )
 
-    # If the column does not already exist...
-    if not cur.fetchone()[0]:
-        logging.info("  Adding 'enabled' column to res_hall table")
+    numDuties = cur.fetchone()[0]
 
-        # Create the column in the res_hall.
-        cur.execute("""
-            ALTER TABLE res_hall
-            ADD COLUMN enabled BOOLEAN
-            ;""")
+    logging.info("  {} unused 'duties' entries found.".format(numDuties))
 
-        # Set a default value for the enabled column
-        cur.execute("UPDATE res_hall SET enabled = TRUE;")
+    # If there are unused duties entries
+    if numDuties > 0:
+        # Then delete them
+        logging.info("  Deleting unused 'duties' entries.")
 
-        # Set the enabled column to not allow Null values
-        cur.execute("ALTER TABLE res_hall ALTER COLUMN enabled SET NOT NULL;")
+        cur.execute(
+            """
+            DELETE FROM duties
+            WHERE duties.id IN
+            (
+                SELECT COUNT(*)--duties.id
+                FROM duties
+                WHERE duties.sched_id IN 
+                (
+                    SELECT schedule.id
+                    FROM schedule
+                    WHERE schedule.id NOT IN
+                    (
+                        -- Get the active schedule record associated with the given Res Hall for each month in the DB
+                        SELECT DISTINCT ON (schedule.month_id, schedule.hall_id) schedule.id
+                        FROM schedule
+                        ORDER BY schedule.month_id, schedule.hall_id, schedule.created DESC, schedule.id DESC
+                    )
+                    --AND schedule.hall_id = 2
+                    --ORDER BY month_id, id
+                )
+            );
+            """
+        )
 
-        # Set the enabled column to have a default value
-        cur.execute("ALTER TABLE res_hall ALTER COLUMN enabled SET DEFAULT FALSE;")
+    logging.info("  Checking for unused 'schedule' entries")
 
-        logging.info("  Finished adding 'enabled' column to res_hall table")
+    # Check to see if there are unused duties
+    cur.execute(
+        """
+        SELECT COUNT(*)
+        FROM schedule
+        WHERE schedule.id NOT IN
+        (
+            -- Get the active schedule record associated with the given Res Hall for each month in the DB
+            SELECT DISTINCT ON (schedule.month_id, schedule.hall_id) schedule.id
+            FROM schedule
+            ORDER BY schedule.month_id, schedule.hall_id, schedule.created DESC, schedule.id DESC
+        )
+        """
+    )
+
+    numScheds = cur.fetchone()[0]
+
+    logging.info("  {} unused 'schedule' entries found.".format(numScheds))
+
+    # If there are unused schedule entries
+    if numScheds > 0:
+        # Then delete them
+        logging.info("  Deleting unused 'schedule' entries.")
+
+        cur.execute(
+            """
+            DELETE FROM schedule
+            WHERE schedule.id IN 
+            (
+                SELECT schedule.id
+                FROM schedule
+                WHERE schedule.id NOT IN
+                (
+                    -- Get the active schedule record associated with the given Res Hall for each month in the DB
+                    SELECT DISTINCT ON (schedule.month_id, schedule.hall_id) schedule.id
+                    FROM schedule
+                    ORDER BY schedule.month_id, schedule.hall_id, schedule.created DESC, schedule.id DESC
+                )
+                ORDER BY month_id, id
+            );
+            """
+        )
 
 
 if __name__ == "__main__":
