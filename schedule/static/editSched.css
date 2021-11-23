@@ -103,19 +103,6 @@
     color: var(--blue);
 }
 
-.datepicker {
-    max-width: 90%;
-}
-
-.datepicker-days .table-condensed {
-    width: 100%;
-}
-
-.datepicker.datepicker-dropdown.dropdown-menu {
-    width: 20%;
-    max-width: 568px; /*500px - 32px*/
-    border-width: 3px;
-}
 .badge {
     margin:  5px auto;
 }
