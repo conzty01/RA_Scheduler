@@ -120,7 +120,7 @@ function getPrevConflicts() {
 
     let data = {
         // Convert from js zero-based numbering
-        monthNum: appConfig.calDate.getMonth() + 1,
+        monthNum: appConfig.calDate.getMonth(),
         year: appConfig.calDate.getFullYear()
     }
 
