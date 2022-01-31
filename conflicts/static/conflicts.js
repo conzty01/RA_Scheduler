@@ -182,7 +182,7 @@ function conflict_Submit() {
 
     data = {
         conflicts: Array.from(conSet),
-        monthNum: appConfig.calDate.getMonth() + 1,
+        monthNum: appConfig.calDate.getMonth(),
         year: appConfig.calDate.getFullYear()
     };
 
