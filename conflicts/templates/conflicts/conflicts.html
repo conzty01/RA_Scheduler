@@ -52,6 +52,12 @@ var bpAPIPrefix = '/conflicts';
         {{ opts["yearEnd"].month - 1 }}, {# JS uses 0 based month numbers #}
         {{ opts["yearEnd"].day }}
     );
+
+    {# Set the calendar date to the 15th to avoid issues moving between months        #}
+    {# This is because when setting the month number of JS Dates, if the previously   #}
+    {#  set date is outside the bounds of the month, then the month will recalculate. #}
+    {# For example, adding 1 month to 1/31 becomes 3/3 since there is no 2/31.        #}
+    appConfig.calDate.setDate(15);
     
     initConflictCal();
     getPrevConflicts();
