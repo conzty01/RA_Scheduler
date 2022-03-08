@@ -50,19 +50,37 @@ function editSchedMoveCalendar(direction) {
     }
 
     // Adjust the datepicker in the run scheduler modal to look at the next month.
-    $('#runNoDutyDates').datepicker('setEndDate', new Date(appConfig.calDate.getFullYear(), appConfig.calDate.getMonth()+1, 0));
-    $('#runNoDutyDates').datepicker('setStartDate', new Date(appConfig.calDate.getFullYear(), appConfig.calDate.getMonth(), 1));
-
-    // Set the selection to the 15th of the month to update the view when the
-    //  the date picker is loaded. This will ensure that the proper month is
-    //  shown to the user on focus.
-    //$('#runNoDutyDates').datepicker('setDate', new Date(appConfig.calDate.getFullYear(), appConfig.calDate.getMonth(), 1);)
-    //$('#runNoDutyDates').datepicker('clearDates');
-
+    resetDatePicker(
+        new Date(appConfig.calDate.getFullYear(), appConfig.calDate.getMonth(), 1),
+        new Date(appConfig.calDate.getFullYear(), appConfig.calDate.getMonth()+1, 0),
+        []
+    );
 }
+
 function editSchedMovePrev()  { editSchedMoveCalendar(-1) }
 function editSchedMoveToday() { editSchedMoveCalendar( 0) }
 function editSchedMoveNext()  { editSchedMoveCalendar( 1) }
+
+function resetDatePicker(start, end, disabledDates) {
+
+console.log(start);
+console.log(end);
+let opts = {
+        dateFormat: "d",
+        maxDate: start,
+        minDate: end,
+        mode: "multiple",
+        conjunction: ", "
+    }
+    console.log(opts)
+
+    $("#runNoDutyDates").flatpickr().destroy()
+
+    $("#runNoDutyDates").flatpickr(opts);
+
+    $("#runNoDutyDates").flatpickr(opts).redraw()
+
+}
 
 function initEditSchedCal() {
     initCal({
